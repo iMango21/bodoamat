@@ -8,21 +8,29 @@ Versi 3.0 menghadirkan integrasi penuh dengan ekspansi zona game terbaru (**Copp
 
 ## ⚡ Fitur Utama v3.0
 
-### 1. 🗺️ Navigasi & Teleportasi 30+ Lokasi Terkini
-Dukungan penuh untuk seluruh zona peta dan area ekspansi terbaru:
-- **🌟 Zona Baru (Benchmark Update)**:
-  - **Copper Canyon** & **Copper Canyon Mines** (Lokasi *Withering Core* untuk quest joran *Withering Rod / Batang Layu*).
-  - **The Sewers** (Saluran pembuangan bawah tanah).
-  - **Mariana Trench** & **Mariana Trench Deep** (Palung laut dalam habitat *Trench Warden* & *Caeruleum Razorback*).
+### 1. 🗺️ Navigasi & Teleportasi 58+ Lokasi Terkini
+Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area ekspansi terbaru dengan orientasi pandangan (`lookAt`) presisi:
+- **🌟 Zona Baru & Kosmik (Benchmark Update)**:
+  - **The Celestarium** & **Starfall Gardens** (Zona kosmik luar angkasa).
+  - **Gloomcap Grotto** & **Sawers / The Sewers** (Gua jamur & saluran bawah tanah).
+  - **Copper Canyon Mines**, **Spot 1**, & **Spot 2** (Lokasi *Withering Core*).
+  - **Mariana Trench** & **Mariana Trench Deep** (Palung laut dalam habitat *Trench Warden*).
   - **Crystal Depths** (Gua kristal bawah laut).
-- **🛒 Toko & Rahasia**:
+- **🌪️ Elemental Islands, Doors & Throne Rooms**:
+  - **Elemental Doors**: Blizzard, Storm, Volcano.
+  - **Throne Rooms**: Blizzard, Storm, Volcano.
+  - **Elemental Islands**: Blizzard, Storm, Volcano.
+- **🌀 Spot Buff Abyss & Rahasia Laut Dalam**:
+  - **Lucky Abyss**, **Shiny Abyss**, **Mutation Vents**, **Lucky Volcano**, **Titan Pressure**, **Rushing Current**, **Silent Reach**.
+  - **Aquarium** & **Underwater City**, **Vulcanic Cavern** & **Lava Basin**.
+- **🛒 Toko & Pusat Layanan**:
   - **Underground Cellar** (Pasar Gelap / Black Market).
   - **Traveling Merchant / Alien** (Pedagang keliling).
-  - **Weather Machine Island** (Pusat pengontrol cuaca).
+  - **Weather Machine** (Pusat pengontrol cuaca).
 - **🏝️ Pulau-Pulau Utama**:
-  - Fisherman Island (Spawn), Kohana, Kohana Volcano/Lava, Coral Reefs, Tropical Grove, Crater Island, Mount Hallow, Classic Island, Esoteric Island.
+  - Fisherman Island (Spawn), Kohana, Kohana Volcano/Lab, Coral Reefs, Tropical Grove, Crater Island, Mount Hallow, Classic Island, Esoteric Island, Stingray Shores.
 - **🔮 Endgame & Gua Rahasia**:
-  - Esoteric Depths (Enchant Stone), Lost Isle (Underwater), Sisyphus Statue, Treasure Room, Ancient Jungle, Ancient Ruin, Sacred Temple, Pirate Cove, Pirate Treasure Room, Leviathan's Den, Iron Cavern, Iron Cafe.
+  - Esoteric Depths (Enchant Stone), Lost Isle (Underwater), Sisyphus Statue, Treasure Room, Ancient Jungle, Ancient Ruin, Sacred Temple, Pirate Cove, Pirate Treasure Room, Leviathan Den, Iron Cavern, Iron Cafe, Planetary Observatory.
 - **👥 Smart Scanner & Pemain**:
   - **Teleport ke Pemain**: Cukup ketik nama pemain di server untuk langsung teleport ke posisinya.
   - **Simpan Titik Kustom (Waypoint)**: Simpan koordinat memancing favorit dan teleport kembali kapan saja.
