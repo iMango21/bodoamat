@@ -107,7 +107,6 @@ local Config = {
     Movement = {
         WaterWalk = false,      -- Berjalan di atas air (Jesus Walk)
         InfiniteJump = false,   -- Lompat di udara tanpa batas
-        WalkSpeed = 16,
         JumpPower = 50,
     },
 
@@ -151,7 +150,6 @@ local State = {
     -- Movement
     IsWaterWalk = false,
     IsInfJump = false,
-    WalkSpeed = 16,
     JumpPower = 50,
 
     -- Statistika Session
@@ -708,7 +706,6 @@ end
 local Movement = {
     IsWaterWalk = false,
     IsInfJump = false,
-    WalkSpeed = 16,
     JumpPower = 50,
     
     WaterPlatform = nil :: Part?,
@@ -746,12 +743,9 @@ function Movement:SetWaterWalk(enabled: boolean)
                     self.WaterPlatform.CFrame = CFrame.new(hrp.Position.X, -0.6, hrp.Position.Z)
                 end
 
-                -- Terapkan WalkSpeed / JumpPower secara konsisten
+                -- Terapkan JumpPower secara konsisten (WalkSpeed dihapus demi keamanan Anti BAC-7214)
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health > 0 then
-                    if self.WalkSpeed ~= 16 and hum.WalkSpeed ~= self.WalkSpeed then
-                        hum.WalkSpeed = self.WalkSpeed
-                    end
                     if self.JumpPower ~= 50 and hum.JumpPower ~= self.JumpPower then
                         hum.JumpPower = self.JumpPower
                     end
@@ -760,7 +754,7 @@ function Movement:SetWaterWalk(enabled: boolean)
         end
         print("[Bodoamat | Movement] Walk on Water diaktifkan.")
     else
-        if not self.IsWaterWalk and self.WalkSpeed == 16 and self.JumpPower == 50 then
+        if not self.IsWaterWalk and self.JumpPower == 50 then
             if self.HeartbeatConn then
                 self.HeartbeatConn:Disconnect()
                 self.HeartbeatConn = nil
@@ -805,15 +799,7 @@ function Movement:SetInfiniteJump(enabled: boolean)
     end
 end
 
--- [[ 3. SPEED & JUMP MODIFIERS ]]
-function Movement:SetWalkSpeed(speed: number)
-    self.WalkSpeed = math.clamp(speed, 16, 200)
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = self.WalkSpeed end
-    end
-end
+-- [[ 3. JUMP MODIFIER ]]
 
 function Movement:SetJumpPower(power: number)
     self.JumpPower = math.clamp(power, 50, 250)
@@ -1168,6 +1154,25 @@ function Teleport:ScanWorkspace(query: string): CFrame?
     return nil
 end
 
+-- Pindai seluruh pemain aktif di server (selain LocalPlayer)
+function Teleport:ScanPlayers(): { { Name: string, DisplayName: string, UserId: number } }
+    local playerList = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(playerList, {
+                Name = player.Name,
+                DisplayName = player.DisplayName,
+                UserId = player.UserId
+            })
+        end
+    end
+    table.sort(playerList, function(a, b)
+        return a.DisplayName:lower() < b.DisplayName:lower()
+    end)
+    print(string.format("[Bodoamat | Teleport] 👥 Berhasil memindai %d pemain di server.", #playerList))
+    return playerList
+end
+
 -- Teleport ke Pemain Lain di Server (Berguna jika teman sudah berada di zona baru)
 function Teleport:ToPlayer(targetName: string): boolean
     for _, player in ipairs(Players:GetPlayers()) do
@@ -1367,11 +1372,9 @@ local Merchant = {
     ReturnGui = nil :: ScreenGui?,
 }
 
--- Daftar Item Populer Toko & Merchant
+-- Daftar Item Populer Toko & Merchant (Bait & Crates dihapus demi keamanan Anti BAC-7214)
 Merchant.Items = {
-    Bait = { "Singularity Bait", "Royal Bait", "Enchanted Bait", "Golden Bait", "Topwater Bait" },
     Totem = { "Luck Totem", "Shiny Totem", "Mutation Totem" },
-    Crates = { "Luxury Crate", "Azure Crate", "Enchanted Crate", "Elderwood Crate" },
     Weather = { "Storm", "Thunderstorm", "Blizzard", "Sandstorm", "Cloudy", "Wind" }
 }
 
@@ -2402,60 +2405,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         modules.Merchant:OpenRemoteShop("traveling")
     end)
 
-    -- Quick Buy Bait
-    local buyCard = Instance.new("Frame")
-    buyCard.Size = UDim2.new(1, -4, 0, 68)
-    buyCard.BackgroundColor3 = config.UI.Theme.CardBg
-    buyCard.BorderSizePixel = 0
-    buyCard.Parent = sellPage
-
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 8)
-    bCorner.Parent = buyCard
-
-    local bTitle = Instance.new("TextLabel")
-    bTitle.Size = UDim2.new(1, -20, 0, 18)
-    bTitle.Position = UDim2.new(0, 12, 0, 6)
-    bTitle.BackgroundTransparency = 1
-    bTitle.Text = "Beli Umpan Instan (Top Bait)"
-    bTitle.TextColor3 = config.UI.Theme.Text
-    bTitle.TextSize = 11
-    bTitle.Font = Enum.Font.GothamBold
-    bTitle.TextXAlignment = Enum.TextXAlignment.Left
-    bTitle.Parent = buyCard
-
-    local baitBtns = { "Singularity Bait", "Royal Bait", "Enchanted Bait", "Golden Bait" }
-    local baitContainer = Instance.new("Frame")
-    baitContainer.Size = UDim2.new(1, -24, 0, 28)
-    baitContainer.Position = UDim2.new(0, 12, 0, 30)
-    baitContainer.BackgroundTransparency = 1
-    baitContainer.Parent = buyCard
-
-    local baitLayout = Instance.new("UIListLayout")
-    baitLayout.FillDirection = Enum.FillDirection.Horizontal
-    baitLayout.Padding = UDim.new(0, 4)
-    baitLayout.Parent = baitContainer
-
-    for _, baitName in ipairs(baitBtns) do
-        local bb = Instance.new("TextButton")
-        bb.Size = UDim2.new(0.24, -2, 1, 0)
-        bb.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
-        bb.Text = baitName:gsub(" Bait", "")
-        bb.TextColor3 = Color3.fromRGB(255, 255, 255)
-        bb.TextSize = 9
-        bb.Font = Enum.Font.GothamMedium
-        bb.Parent = baitContainer
-
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 5)
-        c.Parent = bb
-
-        bb.MouseButton1Click:Connect(function()
-            modules.Merchant:BuyItem(baitName, modules.Network)
-        end)
-    end
-
-    -- Quick Buy Totem & Crate
+    -- Quick Buy Totem (Bait & Crates dihapus demi keamanan Anti BAC-7214)
     local itemBuyCard = Instance.new("Frame")
     itemBuyCard.Size = UDim2.new(1, -4, 0, 68)
     itemBuyCard.BackgroundColor3 = config.UI.Theme.CardBg
@@ -2470,14 +2420,14 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     ibTitle.Size = UDim2.new(1, -20, 0, 18)
     ibTitle.Position = UDim2.new(0, 12, 0, 6)
     ibTitle.BackgroundTransparency = 1
-    ibTitle.Text = "Beli Totem & Crate Instan (Remote)"
+    ibTitle.Text = "Beli Totem Instan (Remote)"
     ibTitle.TextColor3 = config.UI.Theme.Text
     ibTitle.TextSize = 11
     ibTitle.Font = Enum.Font.GothamBold
     ibTitle.TextXAlignment = Enum.TextXAlignment.Left
     ibTitle.Parent = itemBuyCard
 
-    local itemBtns = { "Luck Totem", "Shiny Totem", "Mutation Totem", "Luxury Crate", "Azure Crate" }
+    local itemBtns = { "Luck Totem", "Shiny Totem", "Mutation Totem" }
     local itemContainer = Instance.new("Frame")
     itemContainer.Size = UDim2.new(1, -24, 0, 28)
     itemContainer.Position = UDim2.new(0, 12, 0, 30)
@@ -2486,16 +2436,16 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     local itemLayout = Instance.new("UIListLayout")
     itemLayout.FillDirection = Enum.FillDirection.Horizontal
-    itemLayout.Padding = UDim.new(0, 4)
+    itemLayout.Padding = UDim.new(0, 6)
     itemLayout.Parent = itemContainer
 
     for _, itName in ipairs(itemBtns) do
         local ib = Instance.new("TextButton")
-        ib.Size = UDim2.new(0.19, -2, 1, 0)
+        ib.Size = UDim2.new(0.32, -2, 1, 0)
         ib.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
-        ib.Text = itName:gsub(" Totem", ""):gsub(" Crate", "")
+        ib.Text = itName:gsub(" Totem", "")
         ib.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ib.TextSize = 9
+        ib.TextSize = 10
         ib.Font = Enum.Font.GothamMedium
         ib.Parent = itemContainer
 
@@ -2669,7 +2619,225 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     local tpPage = self.Tabs["Teleport"]
 
     createSectionHeader(tpPage, "👥 TELEPORT KE PEMAIN LAIN")
-    createTextInput(tpPage, "Ketik Username / Display Name...", "TP Player", function(name)
+
+    -- Scanner Pemain & Dropdown Teleport
+    local playerScanCard = Instance.new("Frame")
+    playerScanCard.Size = UDim2.new(1, -4, 0, 0)
+    playerScanCard.AutomaticSize = Enum.AutomaticSize.Y
+    playerScanCard.BackgroundColor3 = config.UI.Theme.CardBg
+    playerScanCard.BorderSizePixel = 0
+    playerScanCard.Parent = tpPage
+
+    local psCorner = Instance.new("UICorner")
+    psCorner.CornerRadius = UDim.new(0, 8)
+    psCorner.Parent = playerScanCard
+
+    local psPadding = Instance.new("UIPadding")
+    psPadding.PaddingTop = UDim.new(0, 8)
+    psPadding.PaddingBottom = UDim.new(0, 8)
+    psPadding.PaddingLeft = UDim.new(0, 10)
+    psPadding.PaddingRight = UDim.new(0, 10)
+    psPadding.Parent = playerScanCard
+
+    local psLayout = Instance.new("UIListLayout")
+    psLayout.Padding = UDim.new(0, 6)
+    psLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    psLayout.Parent = playerScanCard
+
+    -- Baris Atas: Label & Tombol Scan Player
+    local topRow = Instance.new("Frame")
+    topRow.Size = UDim2.new(1, 0, 0, 28)
+    topRow.BackgroundTransparency = 1
+    topRow.LayoutOrder = 1
+    topRow.Parent = playerScanCard
+
+    local psTitle = Instance.new("TextLabel")
+    psTitle.Size = UDim2.new(1, -110, 1, 0)
+    psTitle.BackgroundTransparency = 1
+    psTitle.Text = "Scanner Pemain Aktif"
+    psTitle.TextColor3 = config.UI.Theme.Text
+    psTitle.TextSize = 11
+    psTitle.Font = Enum.Font.GothamBold
+    psTitle.TextXAlignment = Enum.TextXAlignment.Left
+    psTitle.Parent = topRow
+
+    local scanBtn = Instance.new("TextButton")
+    scanBtn.Size = UDim2.new(0, 100, 1, 0)
+    scanBtn.Position = UDim2.new(1, -100, 0, 0)
+    scanBtn.BackgroundColor3 = config.UI.Theme.Accent
+    scanBtn.Text = "🔍 Scan Player"
+    scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    scanBtn.TextSize = 10
+    scanBtn.Font = Enum.Font.GothamBold
+    scanBtn.Parent = topRow
+
+    local sbCorner = Instance.new("UICorner")
+    sbCorner.CornerRadius = UDim.new(0, 6)
+    sbCorner.Parent = scanBtn
+
+    -- Label Status Hasil Scan
+    local scanStatusLbl = Instance.new("TextLabel")
+    scanStatusLbl.Size = UDim2.new(1, 0, 0, 14)
+    scanStatusLbl.BackgroundTransparency = 1
+    scanStatusLbl.Text = "Klik 'Scan Player' untuk mendeteksi pemain di server"
+    scanStatusLbl.TextColor3 = config.UI.Theme.TextSubtle
+    scanStatusLbl.TextSize = 10
+    scanStatusLbl.Font = Enum.Font.Gotham
+    scanStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    scanStatusLbl.LayoutOrder = 2
+    scanStatusLbl.Parent = playerScanCard
+
+    -- Dropdown Trigger Button
+    local selectedPlayerName = ""
+    local isDropdownOpen = false
+
+    local dropdownBtn = Instance.new("TextButton")
+    dropdownBtn.Size = UDim2.new(1, 0, 0, 30)
+    dropdownBtn.BackgroundColor3 = Color3.fromRGB(32, 36, 48)
+    dropdownBtn.Text = "  👤 Pilih Pemain (Klik Scan)..."
+    dropdownBtn.TextColor3 = Color3.fromRGB(200, 205, 220)
+    dropdownBtn.TextSize = 11
+    dropdownBtn.Font = Enum.Font.GothamMedium
+    dropdownBtn.TextXAlignment = Enum.TextXAlignment.Left
+    dropdownBtn.LayoutOrder = 3
+    dropdownBtn.Parent = playerScanCard
+
+    local ddCorner = Instance.new("UICorner")
+    ddCorner.CornerRadius = UDim.new(0, 6)
+    ddCorner.Parent = dropdownBtn
+
+    local arrowLbl = Instance.new("TextLabel")
+    arrowLbl.Size = UDim2.new(0, 24, 1, 0)
+    arrowLbl.Position = UDim2.new(1, -26, 0, 0)
+    arrowLbl.BackgroundTransparency = 1
+    arrowLbl.Text = "▼"
+    arrowLbl.TextColor3 = config.UI.Theme.TextSubtle
+    arrowLbl.TextSize = 10
+    arrowLbl.Font = Enum.Font.GothamBold
+    arrowLbl.Parent = dropdownBtn
+
+    -- Dropdown Scrollable List Menu
+    local dropdownList = Instance.new("ScrollingFrame")
+    dropdownList.Size = UDim2.new(1, 0, 0, 110)
+    dropdownList.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
+    dropdownList.BorderSizePixel = 0
+    dropdownList.ScrollBarThickness = 3
+    dropdownList.ScrollBarImageColor3 = config.UI.Theme.Accent
+    dropdownList.Visible = false
+    dropdownList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    dropdownList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    dropdownList.LayoutOrder = 4
+    dropdownList.Parent = playerScanCard
+
+    local ddlCorner = Instance.new("UICorner")
+    ddlCorner.CornerRadius = UDim.new(0, 6)
+    ddlCorner.Parent = dropdownList
+
+    local ddlPadding = Instance.new("UIPadding")
+    ddlPadding.PaddingTop = UDim.new(0, 4)
+    ddlPadding.PaddingBottom = UDim.new(0, 4)
+    ddlPadding.PaddingLeft = UDim.new(0, 4)
+    ddlPadding.PaddingRight = UDim.new(0, 4)
+    ddlPadding.Parent = dropdownList
+
+    local ddlLayout = Instance.new("UIListLayout")
+    ddlLayout.Padding = UDim.new(0, 3)
+    ddlLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ddlLayout.Parent = dropdownList
+
+    -- Tombol Teleport ke Pemain
+    local tpExecBtn = Instance.new("TextButton")
+    tpExecBtn.Size = UDim2.new(1, 0, 0, 30)
+    tpExecBtn.BackgroundColor3 = config.UI.Theme.Success
+    tpExecBtn.Text = "🚀 Teleport ke Pemain Terpilih"
+    tpExecBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpExecBtn.TextSize = 11
+    tpExecBtn.Font = Enum.Font.GothamBold
+    tpExecBtn.LayoutOrder = 5
+    tpExecBtn.Parent = playerScanCard
+
+    local teCorner = Instance.new("UICorner")
+    teCorner.CornerRadius = UDim.new(0, 6)
+    teCorner.Parent = tpExecBtn
+
+    -- Handler Toggle Dropdown
+    dropdownBtn.MouseButton1Click:Connect(function()
+        isDropdownOpen = not isDropdownOpen
+        dropdownList.Visible = isDropdownOpen
+        arrowLbl.Text = isDropdownOpen and "▲" or "▼"
+    end)
+
+    -- Handler Scan Player
+    scanBtn.MouseButton1Click:Connect(function()
+        local playersList = modules.Teleport:ScanPlayers()
+        for _, child in ipairs(dropdownList:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+
+        if #playersList == 0 then
+            scanStatusLbl.Text = "⚠️ Tidak ada pemain lain di server."
+            scanStatusLbl.TextColor3 = Color3.fromRGB(240, 160, 60)
+            dropdownBtn.Text = "  (Server Kosong)"
+            selectedPlayerName = ""
+            return
+        end
+
+        scanStatusLbl.Text = string.format("✅ Ditemukan %d pemain aktif di server.", #playersList)
+        scanStatusLbl.TextColor3 = config.UI.Theme.Success
+
+        for _, pInfo in ipairs(playersList) do
+            local pBtn = Instance.new("TextButton")
+            pBtn.Size = UDim2.new(1, -4, 0, 24)
+            pBtn.BackgroundColor3 = Color3.fromRGB(28, 32, 44)
+            pBtn.Text = "  " .. pInfo.DisplayName .. " (@" .. pInfo.Name .. ")"
+            pBtn.TextColor3 = Color3.fromRGB(240, 240, 245)
+            pBtn.TextSize = 10
+            pBtn.Font = Enum.Font.GothamMedium
+            pBtn.TextXAlignment = Enum.TextXAlignment.Left
+            pBtn.Parent = dropdownList
+
+            local pbCorner = Instance.new("UICorner")
+            pbCorner.CornerRadius = UDim.new(0, 4)
+            pbCorner.Parent = pBtn
+
+            pBtn.MouseButton1Click:Connect(function()
+                selectedPlayerName = pInfo.Name
+                dropdownBtn.Text = "  👤 " .. pInfo.DisplayName .. " (@" .. pInfo.Name .. ")"
+                isDropdownOpen = false
+                dropdownList.Visible = false
+                arrowLbl.Text = "▼"
+            end)
+        end
+
+        -- Otomatis set pemain pertama jika belum memilih
+        if selectedPlayerName == "" and #playersList > 0 then
+            selectedPlayerName = playersList[1].Name
+            dropdownBtn.Text = "  👤 " .. playersList[1].DisplayName .. " (@" .. playersList[1].Name .. ")"
+        end
+    end)
+
+    -- Handler Tombol Teleport
+    tpExecBtn.MouseButton1Click:Connect(function()
+        if selectedPlayerName == "" then
+            scanStatusLbl.Text = "⚠️ Silakan klik 'Scan Player' dan pilih pemain!"
+            scanStatusLbl.TextColor3 = Color3.fromRGB(240, 80, 80)
+            return
+        end
+
+        local ok = modules.Teleport:ToPlayer(selectedPlayerName)
+        if ok then
+            state.LastStatusMessage = "📍 TP ke pemain: " .. selectedPlayerName
+            scanStatusLbl.Text = "🚀 Berhasil teleport ke @" .. selectedPlayerName
+            scanStatusLbl.TextColor3 = config.UI.Theme.Success
+        else
+            scanStatusLbl.Text = "❌ Gagal TP: Pemain @" .. selectedPlayerName .. " tidak ditemukan/mati"
+            scanStatusLbl.TextColor3 = Color3.fromRGB(240, 80, 80)
+        end
+    end)
+
+    createTextInput(tpPage, "Atau ketik manual Username / Display Name...", "TP Manual", function(name)
         local ok = modules.Teleport:ToPlayer(name)
         if ok then
             state.LastStatusMessage = "📍 TP ke pemain: " .. name
@@ -2815,65 +2983,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         modules.Movement:SetInfiniteJump(val)
     end)
 
-    -- Kecepatan Lari (WalkSpeed)
-    local spdCard = Instance.new("Frame")
-    spdCard.Size = UDim2.new(1, -4, 0, 62)
-    spdCard.BackgroundColor3 = config.UI.Theme.CardBg
-    spdCard.BorderSizePixel = 0
-    spdCard.Parent = movePage
 
-    local sCorner = Instance.new("UICorner")
-    sCorner.CornerRadius = UDim.new(0, 8)
-    sCorner.Parent = spdCard
-
-    local sTitle = Instance.new("TextLabel")
-    sTitle.Size = UDim2.new(1, -20, 0, 18)
-    sTitle.Position = UDim2.new(0, 12, 0, 6)
-    sTitle.BackgroundTransparency = 1
-    sTitle.Text = "Kecepatan Karakter (WalkSpeed: " .. tostring(modules.Movement.WalkSpeed) .. ")"
-    sTitle.TextColor3 = config.UI.Theme.Text
-    sTitle.TextSize = 12
-    sTitle.Font = Enum.Font.GothamBold
-    sTitle.TextXAlignment = Enum.TextXAlignment.Left
-    sTitle.Parent = spdCard
-
-    local spdContainer = Instance.new("Frame")
-    spdContainer.Size = UDim2.new(1, -24, 0, 28)
-    spdContainer.Position = UDim2.new(0, 12, 0, 26)
-    spdContainer.BackgroundTransparency = 1
-    spdContainer.Parent = spdCard
-
-    local spdLayout = Instance.new("UIListLayout")
-    spdLayout.FillDirection = Enum.FillDirection.Horizontal
-    spdLayout.Padding = UDim.new(0, 6)
-    spdLayout.Parent = spdContainer
-
-    local speeds = {
-        { Label = "Normal (16)", Val = 16 },
-        { Label = "Cepat (32)",  Val = 32 },
-        { Label = "Super (64)",  Val = 64 },
-        { Label = "Flash (120)", Val = 120 },
-    }
-
-    for _, s in ipairs(speeds) do
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0.24, -4, 1, 0)
-        b.BackgroundColor3 = (modules.Movement.WalkSpeed == s.Val) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
-        b.Text = s.Label
-        b.TextColor3 = Color3.fromRGB(255, 255, 255)
-        b.TextSize = 10
-        b.Font = Enum.Font.GothamMedium
-        b.Parent = spdContainer
-
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 5)
-        c.Parent = b
-
-        b.MouseButton1Click:Connect(function()
-            modules.Movement:SetWalkSpeed(s.Val)
-            sTitle.Text = "Kecepatan Karakter (WalkSpeed: " .. tostring(s.Val) .. ")"
-        end)
-    end
 
     -- ==========================================
     -- ISI KONTEN TAB 6: OPTIMASI & PERFORMA

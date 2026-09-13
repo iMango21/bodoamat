@@ -32,7 +32,7 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **🔮 Endgame & Gua Rahasia**:
   - Esoteric Depths (Enchant Stone), Lost Isle (Underwater), Sisyphus Statue, Treasure Room, Ancient Jungle, Ancient Ruin, Sacred Temple, Pirate Cove, Pirate Treasure Room, Leviathan Den, Iron Cavern, Iron Cafe, Planetary Observatory.
 - **👥 Smart Scanner & Pemain**:
-  - **Teleport ke Pemain**: Cukup ketik nama pemain di server untuk langsung teleport ke posisinya.
+  - **Smart Player Scanner & Dropdown Teleport**: Memindai seluruh pemain aktif di server dengan 1 klik tombol 'Scan Player', memilih pemain lewat menu dropdown dinamis, dan langsung teleport ke posisinya (lengkap dengan opsi input manual).
   - **Simpan Titik Kustom (Waypoint)**: Simpan koordinat memancing favorit dan teleport kembali kapan saja.
   - **Workspace Dynamic Scanner**: Mendeteksi otomatis pergeseran posisi pulau jika terjadi update map oleh developer game.
 
@@ -45,7 +45,7 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 ### 3. 🛒 Remote Toko, Black Market & Kontrol Cuaca
 - **Buka Black Market Jarak Jauh**: Membuka prompt menu Underground Cellar dari lokasi mana pun di peta tanpa harus berjalan ke gua.
 - **Buka Pedagang Keliling (Alien)**: Membuka prompt Traveling Merchant secara remote via simulasi proximity.
-- **Beli Umpan Instan**: Pembelian cepat umpan terbaik (*Singularity Bait, Royal Bait, Enchanted Bait, Golden Bait*).
+- **Beli Totem Instan**: Pembelian cepat totem buff (*Luck Totem, Shiny Totem, Mutation Totem*) secara remote (Bait & Crate dihapus demi keamanan anti-cheat).
 - **Pengontrol Cuaca Server**: Membeli event cuaca server (*Storm, Thunderstorm, Cloudy, Wind*) secara instan.
 
 ### 4. 🤿 Eksplorasi Laut Dalam & Radar Ikan
@@ -53,6 +53,9 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **Fishing Radar**: Mengaktifkan radar visual untuk mendeteksi posisi, jarak, dan tingkat kelangkaan (*rarity*) ikan di dalam air.
 
 ### 5. 🛡️ Keamanan Anti-BAC (Bacon Anti-Cheat Protected)
+- **BAC-7214 Guard (Zero WalkSpeed Tampering & Risky Remote Protection)**:
+  - Seluruh manipulasi WalkSpeed dihapus secara permanen untuk mencegah flag kecepatan server BAC-7214.
+  - Remote pembelian Bait & Crates dihapus dari antarmuka untuk mencegah validasi anomali vendor jarak jauh.
 - **BAC-8228 Guard (Safe Selling & Fishing Isolation)**:
   - Mengunci status `IsSelling` saat proses jual berlangsung.
   - Menghentikan input pancing (`CancelFishingInputs`), mencopot joran ke tas (*unequip*), memberi jeda buffer 0.4 detik sebelum memanggil `RF/SellAllItems`, lalu memasang kembali joran setelah selesai.
@@ -103,7 +106,7 @@ d:/PROGRAM/LuaRebel/
 │   │   ├── Teleport.luau       -- Navigasi 30+ lokasi pulau, TP player, & custom waypoint
 │   │   ├── Totem.luau          -- Pasang 1 totem, formasi 5 totem (+), & auto loop
 │   │   ├── Merchant.luau       -- Remote Black Market, beli item, tabung O2, & radar
-│   │   ├── Movement.luau       -- Walk on water (Jesus walk), infinite jump, & walkspeed
+│   │   ├── Movement.luau       -- Walk on water (Jesus walk), infinite jump, & JumpPower (Anti BAC-7214)
 │   │   ├── FpsBooster.luau     -- Pembersih visual aman anti-BAC & GPU Saver
 │   │   └── AntiAfk.luau        -- Proteksi disconnect 20 menit & auto-rejoin
 │   └── UI/
