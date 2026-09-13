@@ -72,15 +72,6 @@ local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- Pastikan karakter siap sebelum script dijalankan
-if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-    LocalPlayer.CharacterAdded:Wait()
-    local char = LocalPlayer.Character
-    if char then
-        char:WaitForChild("HumanoidRootPart", 10)
-    end
-end
-
 -- ============================================================
 -- 1. CONFIGURATION
 -- ============================================================
@@ -330,19 +321,19 @@ function Network:ChargeRod(power: number?): boolean
     return false
 end
 
--- Wrapper: Permintaan Minigame - Dynamic Live Timestamp (Anti BAC-4218 & Anti BAC-52110)
+-- Wrapper: Permintaan Minigame - Dynamic Live Timestamp (Anti BAC-6217 & Anti BAC-52110)
 function Network:RequestMinigame(diff: number?, luck: number?): boolean
     local remote = self.Remotes["RequestGame"]
     if remote and remote:IsA("RemoteFunction") then
         local now = workspace:GetServerTimeNow()
-        local safeDiff = diff or -1.233
+        local safeDiff = diff or 0
         local safeLuck = luck or 1
         local ok, _ = pcall(function()
             remote:InvokeServer(safeDiff, safeLuck, now)
         end)
         if not ok then
             pcall(function()
-                remote:InvokeServer(1.2854545116425, 1, now)
+                remote:InvokeServer(0, 1, now)
             end)
         end
         return true
@@ -360,6 +351,9 @@ function Network:CompleteFishing(): boolean
             elseif remote:IsA("RemoteFunction") then
                 remote:InvokeServer()
             end
+        end)
+        pcall(function()
+            self:CancelInput()
         end)
         return ok
     end
@@ -874,7 +868,6 @@ function AutoFish:Start(config: any, state: any, network: any)
                     task.wait(0.25)
 
                     -- Aktivasi lemparan kail normal (Dynamic server timestamp)
-                    if currentTool then pcall(function() currentTool:Activate() end) end
                     network:ChargeRod()
 
                     -- Fase 1: Menunggu ikan memakan umpan (Waktu natural 2.8 - 4.2 detik acak)
@@ -906,7 +899,6 @@ function AutoFish:Start(config: any, state: any, network: any)
 
                     -- Fase 3: Selesaikan tarikan kail
                     state.LastStatusMessage = "✨ Menarik Ikan..."
-                    if currentTool then pcall(function() currentTool:Activate() end) end
                     network:CompleteFishing()
 
                     state.FishCaught = state.FishCaught + 1
@@ -2738,10 +2730,13 @@ local function Init()
     print("🚀 BODOAMAT v3.0 (Stealth Anti-BAC / Delta) - Memulai...")
     print("================================================")
 
-    -- Inisialisasi Jaringan Stealth & Netralisasi Pelaporan BAC
-    Network:Init()
-
+    -- Buat Tampilan GUI Secara Instan (0 Detik)
     BodoamatGui:Create(Config, State, Modules)
+
+    -- Inisialisasi Jaringan Stealth di Background (Non-blocking)
+    task.spawn(function()
+        Network:Init()
+    end)
 
     print("[Bodoamat v3.0] Berhasil dimuat! Tekan RightShift atau sentuh tombol 🐟 untuk membuka menu.")
 end
