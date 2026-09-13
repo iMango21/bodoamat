@@ -86,8 +86,10 @@ local Config = {
     AutoSell = {
         Enabled = false,          -- Default NON-AKTIF
         Interval = 45,            -- Menjual otomatis setiap N detik
-        AutoFavorite = true,      -- Default AKTIF agar ikan Rare+ selalu aman
-        MinRarity = "Rare",       -- Tingkat kelangkaan minimal yang diamankan (Rare, Epic, Legendary, Mythic, Secret)
+        Threshold = 100,          -- Batas jumlah ikan di tas sebelum dijual (misal: 100 -> jika 101 maka auto-sell)
+        AutoFavorite = false,     -- Default NON-AKTIF
+        MinRarity = "Legendary",  -- Tingkat kelangkaan minimal yang diamankan (Legendary, Mitos, Secret)
+        MerchantSafeTp = false,   -- Default NON-AKTIF
     },
 
     -- Totem Automation
@@ -138,8 +140,8 @@ local State = {
     IsFpsBoost = false,
     IsGpuSaver = false,
     IsAutoSell = false,
-    IsAutoFavorite = true,
-    MinFavoriteRarity = "Rare",
+    IsAutoFavorite = false,
+    MinFavoriteRarity = "Legendary",
 
     -- Totem & Laut Dalam (v3.0)
     IsAutoTotem = false,
@@ -356,8 +358,16 @@ function Network:CancelInput(): boolean
     return false
 end
 
--- Wrapper: Jual Semua Ikan
+local lastSellTime = 0
+
+-- Wrapper: Jual Semua Ikan (Anti BAC Debounce Protected)
 function Network:SellAll(): boolean
+    local now = os.clock()
+    if now - lastSellTime < 1.5 then
+        return false
+    end
+    lastSellTime = now
+
     local remote = self.Remotes["SellAll"]
     if remote and remote:IsA("RemoteFunction") then
         local ok, _ = pcall(function()
@@ -463,8 +473,28 @@ function Network:PurchaseWeather(weatherName: string): boolean
     return false
 end
 
--- Wrapper: Beli Item dari Merchant/Toko (Totem, Bait, Crate)
+-- Wrapper: Beli Item dari Merchant/Toko (Totem, Bait, Crate) - Anti BAC-4212 Protected
 function Network:BuyItem(itemName: string): boolean
+    local char = LocalPlayer and LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if hrp then
+        local shopSpots = {
+            Vector3.new(-9255.90, -255.59, -1.05), -- Mariana Trench (Black Market)
+            Vector3.new(-135.0, 3.5, 2764.0),       -- Traveling Merchant
+        }
+        local nearShop = false
+        for _, pos in ipairs(shopSpots) do
+            if (hrp.Position - pos).Magnitude <= 45 then
+                nearShop = true
+                break
+            end
+        end
+        if not nearShop then
+            warn("[Bodoamat | Network] ⚠️ Remote BuyItem dibatalkan (Anti BAC-4212: Karakter berada di luar jangkauan toko).")
+            return false
+        end
+    end
+
     local remote = self.Remotes["BuyItem"]
     if remote and remote:IsA("RemoteFunction") then
         local ok, _ = pcall(function()
@@ -717,6 +747,7 @@ local AutoSell = {
     FavoriteThread = nil :: thread?,
     AutoFavoriteEnabled = true, -- Default AKTIF untuk memproteksi ikan bernilai tinggi!
     MinFavoriteRarity = "Legendary", -- Pilihan mulai dari Legendary, Mitos, Secret (Anti BAC-4214)
+    MaxFishThreshold = 100, -- Batas jumlah ikan di tas sebelum dijual (misal: 100 -> jika 101 maka auto-sell)
     FavoritedCache = {} :: { [string]: boolean },
 }
 
@@ -753,6 +784,30 @@ function AutoSell:InitDataUtility(): boolean
     end)
 
     return (ItemUtility ~= nil and PlayerData ~= nil)
+end
+
+-- Hitung jumlah item/ikan yang ada di dalam tas saat ini
+function AutoSell:GetInventoryCount(): number
+    local count = 0
+    pcall(function()
+        if not PlayerData or not ItemUtility then
+            self:InitDataUtility()
+        end
+        if not PlayerData then return end
+
+        local inv = (PlayerData.GetExpect and PlayerData:GetExpect("Inventory")) or (PlayerData.Get and PlayerData:Get("Inventory"))
+        if inv and inv.Items then
+            count = #inv.Items
+        end
+    end)
+    return count
+end
+
+-- Set batas jumlah ikan sebelum dijual otomatis
+function AutoSell:SetThreshold(count: number)
+    local val = math.max(0, math.floor(count or 0))
+    self.MaxFishThreshold = val
+    print(string.format("[Bodoamat | AutoSell] Batas kapasitas ikan diset: %d (otomatis jual saat mencapai %d)", val, val + 1))
 end
 
 -- Scan Backpack & Beri Bintang Favorit ke Seluruh Ikan Langka (Anti-BAC 4214 Rate-Limit Protected)
@@ -831,7 +886,7 @@ function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boole
 
     local success = false
     pcall(function()
-        -- LANGKAH 1 (PENTING): Kunci semua ikan Rare/Epic/Legendary sebelum remote jual dipanggil!
+        -- LANGKAH 1 (PENTING): Kunci semua ikan Legendary/Mitos/Secret sebelum remote jual dipanggil!
         -- Ini menjamin 100% ikan langka tidak akan pernah terhapus/terjual!
         local locked = 0
         if self.AutoFavoriteEnabled then
@@ -862,7 +917,7 @@ function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boole
     return success
 end
 
--- Mulai loop auto-sell berkala
+-- Mulai loop auto-sell berkala atau berdasarkan batas jumlah ikan di tas
 function AutoSell:Start(interval: number, network: any, state: any, teleportMod: any)
     if self.Running then return end
     self.Running = true
@@ -870,12 +925,36 @@ function AutoSell:Start(interval: number, network: any, state: any, teleportMod:
     local sleepTime = math.max(15, interval or 45)
 
     self.Thread = task.spawn(function()
-        print("[Bodoamat | AutoSell] Penjualan otomatis aktif setiap " .. tostring(sleepTime) .. "s.")
+        print(string.format("[Bodoamat | AutoSell] Penjualan otomatis aktif (Timer: %ds, Threshold: %d ikan).", sleepTime, self.MaxFishThreshold))
 
+        local timerAccumulator = 0
         while self.Running do
-            task.wait(sleepTime)
+            task.wait(1.5)
             if not self.Running then break end
-            self:ExecuteSell(network, state, teleportMod)
+            timerAccumulator = timerAccumulator + 1.5
+
+            local shouldSell = false
+
+            -- Pengecekan Batas Kapasitas Ikan (Threshold)
+            -- Misal: MaxFishThreshold = 100, jika jumlah ikan/item > 100 (misal 101), langsung jual otomatis
+            if self.MaxFishThreshold > 0 then
+                local currentCount = self:GetInventoryCount()
+                if currentCount > self.MaxFishThreshold then
+                    print(string.format("[Bodoamat | AutoSell] Kapasitas tercapai (%d > %d), menjual ikan otomatis...", currentCount, self.MaxFishThreshold))
+                    shouldSell = true
+                end
+            else
+                -- Jika threshold diset 0, gunakan interval waktu berkala
+                if timerAccumulator >= sleepTime then
+                    shouldSell = true
+                end
+            end
+
+            if shouldSell then
+                timerAccumulator = 0
+                self:ExecuteSell(network, state, teleportMod)
+                task.wait(3) -- Cooldown aman mencegah spam jika tas penuh ikan favorit
+            end
         end
     end)
 end
@@ -893,79 +972,77 @@ end
 -- 9. MODULE: TELEPORT & NAVIGATION
 -- ============================================================
 local Teleport = {
-    -- Peta Lokasi Lengkap & Update Terbaru (58 Lokasi Terverifikasi via 4LynxX Coords Engine)
+    -- Peta Lokasi Lengkap & Update Terbaru (59 Lokasi Terverifikasi via 4LynxX Coords Engine - Terurut Ascending A-Z)
     Locations = {
-        -- [[ KOTA, SPAWN & MERCHANT ]]
-        { Name = "Fisherman Island (Spawn)",         CFrame = CFrame.new(Vector3.new(-61.73, 3.53, 2770.77), Vector3.new(-211.45, 3.53, 2761.67)), Category = "Main" },
-        { Name = "Weather Machine",                  CFrame = CFrame.new(Vector3.new(-1528.41, 2.88, 1915.32), Vector3.new(-1513.05, 2.88, 2064.53)), Category = "Main" },
+        { Name = "Ancient Jungle",                   CFrame = CFrame.new(Vector3.new(1467.43, 7.57, -327.70), Vector3.new(1610.47, 7.57, -282.55)), Category = "Secret" },
+        { Name = "Ancient Ruin",                     CFrame = CFrame.new(Vector3.new(6045.40, -588.60, 4608.94), Vector3.new(6059.22, -588.60, 4758.30)), Category = "Secret" },
+        { Name = "Aquarium",                         CFrame = CFrame.new(Vector3.new(-3039.56, -624.24, -10573.49), Vector3.new(-3036.04, -624.24, -10582.85)), Category = "Secret" },
         { Name = "Black Market (Mariana Trench)",     CFrame = CFrame.new(Vector3.new(-9255.90, -255.59, -1.05), Vector3.new(-9261.08, -255.59, -9.61)), Category = "Shop" },
-        { Name = "Underground Cellar",               CFrame = CFrame.new(Vector3.new(2109.52, -94.19, -708.61), Vector3.new(2097.20, -94.19, -703.74)), Category = "Shop" },
-        { Name = "Traveling Merchant / Alien",       CFrame = CFrame.new(-135.0, 3.0, 2764.0), Category = "Shop" },
-
-        -- [[ ZONA UPDATE TERBARU (BENCHMARK MODERN) ]]
-        { Name = "Copper Canyon Mines",              CFrame = CFrame.new(Vector3.new(-4079.11, -547.17, 548.03), Vector3.new(-4069.59, -547.17, 551.12)), Category = "New" },
+        { Name = "Classic Island",                   CFrame = CFrame.new(1433.0, 44.0, 2755.0), Category = "Island" },
         { Name = "Copper Canyon [SPOT 1]",           CFrame = CFrame.new(Vector3.new(-4145.04, 7.95, 617.36), Vector3.new(-4154.18, 7.95, 613.28)), Category = "New" },
         { Name = "Copper Canyon [SPOT 2]",           CFrame = CFrame.new(Vector3.new(-4241.77, 60.48, 414.65), Vector3.new(-4232.34, 60.48, 417.99)), Category = "New" },
-        { Name = "Crystal Depths",                   CFrame = CFrame.new(Vector3.new(5614.18, -903.11, 15345.87), Vector3.new(5613.30, -903.11, 15355.83)), Category = "New" },
-        { Name = "Gloomcap Grotto",                  CFrame = CFrame.new(Vector3.new(5940.17, -850.19, 12468.71), Vector3.new(5932.44, -850.19, 12475.06)), Category = "New" },
-        { Name = "Mariana Trench",                   CFrame = CFrame.new(Vector3.new(-9255.90, -255.59, -1.05), Vector3.new(-9261.08, -255.59, -9.61)), Category = "New" },
-        { Name = "Mariana Trench Deep (Dasar Palung)", CFrame = CFrame.new(5750.0, -2600.0, 15400.0), Category = "New" },
-        { Name = "Sewers / Sawers",                  CFrame = CFrame.new(Vector3.new(-1448.11, -1041.59, -10447.08), Vector3.new(-1598.04, -1041.59, -10442.53)), Category = "New" },
-        { Name = "Starfall Gardens",                 CFrame = CFrame.new(Vector3.new(-22266.74, -252.37, -7991.04), Vector3.new(-22267.48, -252.37, -7981.07)), Category = "New" },
-        { Name = "The Celestarium",                  CFrame = CFrame.new(Vector3.new(-28372.21, -161.00, -8254.72), Vector3.new(-28373.10, -161.00, -8244.76)), Category = "New" },
-
-        -- [[ PULAU-PULAU UTAMA ]]
+        { Name = "Copper Canyon Mines",              CFrame = CFrame.new(Vector3.new(-4079.11, -547.17, 548.03), Vector3.new(-4069.59, -547.17, 551.12)), Category = "New" },
         { Name = "Coral Reefs",                      CFrame = CFrame.new(Vector3.new(-2921.86, 3.25, 2083.30), Vector3.new(-3068.68, 3.25, 2052.58)), Category = "Island" },
         { Name = "Crater Island",                    CFrame = CFrame.new(Vector3.new(1074.38, 4.03, 5098.48), Vector3.new(928.26, 4.03, 5064.55)), Category = "Island" },
+        { Name = "Crystal Depths",                   CFrame = CFrame.new(Vector3.new(5614.18, -903.11, 15345.87), Vector3.new(5613.30, -903.11, 15355.83)), Category = "New" },
+        { Name = "Elemental Door [Blizzard]",        CFrame = CFrame.new(Vector3.new(-834.38, 18.97, 5054.68), Vector3.new(-830.12, 18.97, 5063.72)), Category = "Secret" },
+        { Name = "Elemental Door [Storm]",           CFrame = CFrame.new(Vector3.new(-914.24, 30.06, 5114.68), Vector3.new(-921.25, 30.06, 5121.81)), Category = "Secret" },
+        { Name = "Elemental Door [Volcano]",         CFrame = CFrame.new(Vector3.new(-749.51, 7.29, 5195.48), Vector3.new(-756.40, 7.29, 5188.23)), Category = "Secret" },
         { Name = "Elemental Island",                 CFrame = CFrame.new(Vector3.new(-859.99, 56.56, 5311.90), Vector3.new(-868.14, 56.56, 5317.69)), Category = "Island" },
         { Name = "Elemental Island [Blizzard]",       CFrame = CFrame.new(Vector3.new(-1089.14, 142.59, 5577.94), Vector3.new(-1083.46, 142.59, 5586.17)), Category = "Island" },
         { Name = "Elemental Island [Storm]",          CFrame = CFrame.new(Vector3.new(-859.99, 56.56, 5311.90), Vector3.new(-868.14, 56.56, 5317.69)), Category = "Island" },
         { Name = "Elemental Island [Volcano]",        CFrame = CFrame.new(Vector3.new(-820.79, 59.87, 5289.58), Vector3.new(-811.65, 59.87, 5293.64)), Category = "Island" },
-        { Name = "Kohana",                           CFrame = CFrame.new(Vector3.new(-655.47, 17.25, 501.04), Vector3.new(-511.25, 17.25, 542.27)), Category = "Island" },
-        { Name = "Kohana Volcano",                   CFrame = CFrame.new(Vector3.new(-552.30, 20.73, 183.19), Vector3.new(-604.90, 20.73, 42.72)), Category = "Island" },
-        { Name = "Stingray Shores",                  CFrame = CFrame.new(Vector3.new(-2131.05, 16.68, -848.95), Vector3.new(-2129.99, 16.68, -858.90)), Category = "Island" },
-        { Name = "Tropical Grove",                   CFrame = CFrame.new(Vector3.new(-2140.80, 53.49, 3622.71), Vector3.new(-2216.20, 53.49, 3752.38)), Category = "Island" },
-        { Name = "Classic Island",                   CFrame = CFrame.new(1433.0, 44.0, 2755.0), Category = "Island" },
-        { Name = "Mount Hallow",                     CFrame = CFrame.new(2136.62, 78.92, 3272.50), Category = "Island" },
-        { Name = "Esoteric Island",                  CFrame = CFrame.new(1991.0, 6.0, 1390.0), Category = "Island" },
-
-        -- [[ ENDGAME, ELEMENTAL, ABYSS & SECRET ]]
-        { Name = "Ancient Jungle",                   CFrame = CFrame.new(Vector3.new(1467.43, 7.57, -327.70), Vector3.new(1610.47, 7.57, -282.55)), Category = "Secret" },
-        { Name = "Ancient Ruin",                     CFrame = CFrame.new(Vector3.new(6045.40, -588.60, 4608.94), Vector3.new(6059.22, -588.60, 4758.30)), Category = "Secret" },
-        { Name = "Aquarium",                         CFrame = CFrame.new(Vector3.new(-3039.56, -624.24, -10573.49), Vector3.new(-3036.04, -624.24, -10582.85)), Category = "Secret" },
-        { Name = "Elemental Door [Blizzard]",        CFrame = CFrame.new(Vector3.new(-834.38, 18.97, 5054.68), Vector3.new(-830.12, 18.97, 5063.72)), Category = "Secret" },
-        { Name = "Elemental Door [Storm]",           CFrame = CFrame.new(Vector3.new(-914.24, 30.06, 5114.68), Vector3.new(-921.25, 30.06, 5121.81)), Category = "Secret" },
-        { Name = "Elemental Door [Volcano]",         CFrame = CFrame.new(Vector3.new(-749.51, 7.29, 5195.48), Vector3.new(-756.40, 7.29, 5188.23)), Category = "Secret" },
         { Name = "Esoteric Depths (Enchant Stone)",  CFrame = CFrame.new(Vector3.new(3207.32, -1302.86, 1444.52), Vector3.new(3216.52, -1302.86, 1440.58)), Category = "Secret" },
+        { Name = "Esoteric Island",                  CFrame = CFrame.new(1991.0, 6.0, 1390.0), Category = "Island" },
+        { Name = "Fisherman Island (Spawn)",         CFrame = CFrame.new(Vector3.new(-61.73, 3.53, 2770.77), Vector3.new(-211.45, 3.53, 2761.67)), Category = "Main" },
+        { Name = "Gloomcap Grotto",                  CFrame = CFrame.new(Vector3.new(5940.17, -850.19, 12468.71), Vector3.new(5932.44, -850.19, 12475.06)), Category = "New" },
+        { Name = "Iron Cafe",                        CFrame = CFrame.new(-8647.0, -548.0, 160.0), Category = "Secret" },
+        { Name = "Iron Cavern",                      CFrame = CFrame.new(-8798.0, -585.0, 241.0), Category = "Secret" },
+        { Name = "Kohana",                           CFrame = CFrame.new(Vector3.new(-655.47, 17.25, 501.04), Vector3.new(-511.25, 17.25, 542.27)), Category = "Island" },
         { Name = "Kohana Lab",                       CFrame = CFrame.new(Vector3.new(-201.61, 63.56, 475.35), Vector3.new(-206.76, 63.56, 483.92)), Category = "Secret" },
+        { Name = "Kohana Volcano",                   CFrame = CFrame.new(Vector3.new(-552.30, 20.73, 183.19), Vector3.new(-604.90, 20.73, 42.72)), Category = "Island" },
         { Name = "Lava Basin",                       CFrame = CFrame.new(Vector3.new(894.22, 89.03, -10195.55), Vector3.new(1032.50, 89.03, -10137.42)), Category = "Secret" },
         { Name = "Leviathan Den",                    CFrame = CFrame.new(Vector3.new(3472.98, -287.84, 3471.07), Vector3.new(3530.81, -287.84, 3609.46)), Category = "Secret" },
         { Name = "Lost Isle (Underwater)",           CFrame = CFrame.new(Vector3.new(-3685.38, 5.43, -1066.63), Vector3.new(-3638.59, 5.43, -1209.14)), Category = "Secret" },
         { Name = "Lucky Abyss",                      CFrame = CFrame.new(Vector3.new(-9132.20, -269.54, 813.39), Vector3.new(-9126.93, -269.54, 804.89)), Category = "Secret" },
         { Name = "Lucky Volcano",                    CFrame = CFrame.new(Vector3.new(-8569.07, -69.10, -424.65), Vector3.new(-8560.58, -69.10, -429.93)), Category = "Secret" },
+        { Name = "Mariana Trench",                   CFrame = CFrame.new(Vector3.new(-9255.90, -255.59, -1.05), Vector3.new(-9261.08, -255.59, -9.61)), Category = "New" },
+        { Name = "Mariana Trench Deep (Dasar Palung)", CFrame = CFrame.new(5750.0, -2600.0, 15400.0), Category = "New" },
+        { Name = "Mount Hallow",                     CFrame = CFrame.new(2136.62, 78.92, 3272.50), Category = "Island" },
         { Name = "Mutation Vents",                   CFrame = CFrame.new(Vector3.new(-9112.33, -91.77, -1639.63), Vector3.new(-9116.35, -91.77, -1648.79)), Category = "Secret" },
         { Name = "Pirate Cove",                      CFrame = CFrame.new(Vector3.new(3406.97, 4.19, 3497.09), Vector3.new(3512.49, 4.19, 3390.47)), Category = "Secret" },
         { Name = "Pirate Treasure Room",             CFrame = CFrame.new(Vector3.new(3349.35, -297.94, 3086.00), Vector3.new(3247.83, -297.94, 2975.58)), Category = "Secret" },
         { Name = "Planetary Observatory",            CFrame = CFrame.new(Vector3.new(440.90, 9.18, 2148.80), Vector3.new(436.54, 9.18, 2157.80)), Category = "Secret" },
         { Name = "Rushing Current",                  CFrame = CFrame.new(Vector3.new(-9687.61, -74.28, -1779.64), Vector3.new(-9685.84, -74.28, -1789.48)), Category = "Secret" },
         { Name = "Sacred Temple",                    CFrame = CFrame.new(Vector3.new(1453.84, -22.12, -621.65), Vector3.new(1480.26, -22.12, -474.00)), Category = "Secret" },
+        { Name = "Sewers / Sawers",                  CFrame = CFrame.new(Vector3.new(-1448.11, -1041.59, -10447.08), Vector3.new(-1598.04, -1041.59, -10442.53)), Category = "New" },
         { Name = "Shiny Abyss",                      CFrame = CFrame.new(Vector3.new(-9729.08, -269.54, 810.51), Vector3.new(-9725.21, -269.54, 819.73)), Category = "Secret" },
         { Name = "Silent Reach",                     CFrame = CFrame.new(Vector3.new(-10021.38, -72.10, 178.31), Vector3.new(-10017.69, -72.10, 169.01)), Category = "Secret" },
+        { Name = "Starfall Gardens",                 CFrame = CFrame.new(Vector3.new(-22266.74, -252.37, -7991.04), Vector3.new(-22267.48, -252.37, -7981.07)), Category = "New" },
+        { Name = "Stingray Shores",                  CFrame = CFrame.new(Vector3.new(-2131.05, 16.68, -848.95), Vector3.new(-2129.99, 16.68, -858.90)), Category = "Island" },
         { Name = "Sysiphus Statue",                  CFrame = CFrame.new(Vector3.new(-3656.65, -134.36, -963.25), Vector3.new(-3802.69, -134.36, -928.99)), Category = "Secret" },
+        { Name = "The Celestarium",                  CFrame = CFrame.new(Vector3.new(-28372.21, -161.00, -8254.72), Vector3.new(-28373.10, -161.00, -8244.76)), Category = "New" },
         { Name = "Throne Room (Blizzard)",           CFrame = CFrame.new(Vector3.new(-1248.29, -855.70, 5639.27), Vector3.new(-1254.92, -855.70, 5631.78)), Category = "Secret" },
         { Name = "Throne Room (Storm)",              CFrame = CFrame.new(Vector3.new(-1305.17, -855.70, 5654.64), Vector3.new(-1304.09, -855.70, 5644.70)), Category = "Secret" },
         { Name = "Throne Room (Volcano)",            CFrame = CFrame.new(Vector3.new(-1334.50, -855.70, 5555.16), Vector3.new(-1326.89, -855.70, 5561.65)), Category = "Secret" },
         { Name = "Titan Pressure",                   CFrame = CFrame.new(Vector3.new(-9867.53, -84.11, -1188.16), Vector3.new(-9871.01, -84.11, -1197.53)), Category = "Secret" },
+        { Name = "Traveling Merchant / Alien",       CFrame = CFrame.new(-135.0, 3.0, 2764.0), Category = "Shop" },
         { Name = "Treasure Room",                    CFrame = CFrame.new(Vector3.new(-3597.32, -275.67, -1641.22), Vector3.new(-3722.61, -275.67, -1558.74)), Category = "Secret" },
+        { Name = "Tropical Grove",                   CFrame = CFrame.new(Vector3.new(-2140.80, 53.49, 3622.71), Vector3.new(-2216.20, 53.49, 3752.38)), Category = "Island" },
+        { Name = "Underground Cellar",               CFrame = CFrame.new(Vector3.new(2109.52, -94.19, -708.61), Vector3.new(2097.20, -94.19, -703.74)), Category = "Shop" },
         { Name = "Underwater City",                  CFrame = CFrame.new(Vector3.new(-3124.52, -645.42, -10489.41), Vector3.new(-3122.09, -645.42, -10479.71)), Category = "Secret" },
         { Name = "Vulcanic Cavern",                  CFrame = CFrame.new(Vector3.new(1145.14, 74.94, -10234.56), Vector3.new(1277.26, 74.94, -10163.52)), Category = "Secret" },
-        { Name = "Iron Cavern",                      CFrame = CFrame.new(-8798.0, -585.0, 241.0), Category = "Secret" },
-        { Name = "Iron Cafe",                        CFrame = CFrame.new(-8647.0, -548.0, 160.0), Category = "Secret" },
+        { Name = "Weather Machine",                  CFrame = CFrame.new(Vector3.new(-1528.41, 2.88, 1915.32), Vector3.new(-1513.05, 2.88, 2064.53)), Category = "Main" },
     },
 
     -- Titik Kustom Buatan Pemain (Save & Load Waypoint)
     CustomWaypoints = {} :: { [string]: CFrame },
 }
+
+-- Pastikan daftar lokasi selalu tersortir alfabetis ascending (A-Z)
+table.sort(Teleport.Locations, function(a, b)
+    return a.Name:lower() < b.Name:lower()
+end)
 
 -- Eksekusi Teleportasi Aman (Bebas Flung, Anti-BAC 4217 & 10216 Velocity Guard)
 function Teleport:To(targetCFrame: CFrame): boolean
@@ -1340,40 +1417,13 @@ function Merchant:OpenRemoteShop(keyword: string?, network: any?): boolean
         char:PivotTo(targetCFrame + Vector3.new(0, 2.5, 0))
     end)
 
-    -- 2. Tunggu sebentar agar asset & ProximityPrompt dimuat oleh game
-    task.spawn(function()
-        task.wait(0.35)
-
-        -- Cari ProximityPrompt dalam jangkauan 35 stud
-        for _, desc in ipairs(Workspace:GetDescendants()) do
-            if desc:IsA("ProximityPrompt") and desc.Parent and desc.Parent:IsA("BasePart") then
-                local dist = (desc.Parent.Position - hrp.Position).Magnitude
-                if dist <= 35 then
-                    local firePrompt = (rawget and rawget(getgenv and getgenv() or {}, "fireproximityprompt"))
-                                       or (getfenv and getfenv().fireproximityprompt)
-                    if firePrompt then
-                        firePrompt(desc, 0)
-                    else
-                        pcall(function()
-                            desc:InputHoldBegin()
-                            task.wait(desc.HoldDuration + 0.05)
-                            desc:InputHoldEnd()
-                        end)
-                    end
-                    print("[Bodoamat | Merchant] ✅ Berhasil memicu prompt toko: " .. tostring(desc.ObjectText or desc.ActionText))
-                    break
-                end
-            end
-        end
-
-        -- Tampilkan widget kembali ke spot memancing semula
-        self:ShowReturnWidget(shopName, savedSpot)
-    end)
+    -- 2. Tampilkan widget kembali ke spot memancing (Bebas BAC-4212: Tanpa trigger prompt buatan/bypass)
+    self:ShowReturnWidget(shopName, savedSpot)
 
     return true
 end
 
--- Widget banner kembali ke spot memancing semula setelah selesai belanja
+-- Widget banner kembali ke spot memancing semula setelah selesai belanja (Bebas BAC-4212)
 function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
     if self.ReturnGui then
         self.ReturnGui:Destroy()
@@ -1397,8 +1447,8 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
     self.ReturnGui = gui
 
     local banner = Instance.new("Frame")
-    banner.Size = UDim2.new(0, 420, 0, 75)
-    banner.Position = UDim2.new(0.5, -210, 0, 25)
+    banner.Size = UDim2.new(0, 440, 0, 84)
+    banner.Position = UDim2.new(0.5, -220, 0, 20)
     banner.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
     banner.BorderSizePixel = 0
     banner.Active = true
@@ -1415,20 +1465,31 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
     stroke.Parent = banner
 
     local titleLbl = Instance.new("TextLabel")
-    titleLbl.Size = UDim2.new(1, -20, 0, 24)
+    titleLbl.Size = UDim2.new(1, -20, 0, 20)
     titleLbl.Position = UDim2.new(0, 10, 0, 6)
     titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = "🛒 " .. shopTitle .. " (Sedang Dibuka)"
+    titleLbl.Text = "🛒 " .. shopTitle .. " (Sedang Dikunjungi)"
     titleLbl.TextColor3 = Color3.fromRGB(0, 215, 255)
-    titleLbl.TextSize = 13
+    titleLbl.TextSize = 12
     titleLbl.Font = Enum.Font.GothamBold
     titleLbl.TextXAlignment = Enum.TextXAlignment.Center
     titleLbl.Parent = banner
 
-    -- Tombol Kembali
+    local subLbl = Instance.new("TextLabel")
+    subLbl.Size = UDim2.new(1, -20, 0, 16)
+    subLbl.Position = UDim2.new(0, 10, 0, 26)
+    subLbl.BackgroundTransparency = 1
+    subLbl.Text = "Tekan [E] atau tap pada NPC untuk belanja • Klik tombol jika sudah selesai"
+    subLbl.TextColor3 = Color3.fromRGB(170, 180, 205)
+    subLbl.TextSize = 10
+    subLbl.Font = Enum.Font.Gotham
+    subLbl.TextXAlignment = Enum.TextXAlignment.Center
+    subLbl.Parent = banner
+
+    -- Tombol Kembali ke Spot Mancing
     local returnBtn = Instance.new("TextButton")
-    returnBtn.Size = UDim2.new(0.68, -12, 0, 32)
-    returnBtn.Position = UDim2.new(0, 10, 0, 34)
+    returnBtn.Size = UDim2.new(0.68, -12, 0, 30)
+    returnBtn.Position = UDim2.new(0, 10, 0, 46)
     returnBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 220)
     returnBtn.Text = "🔙 Selesai (Kembali ke Spot Mancing)"
     returnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1457,8 +1518,8 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
 
     -- Tombol Tetap Disini (Close Banner)
     local stayBtn = Instance.new("TextButton")
-    stayBtn.Size = UDim2.new(0.32, -12, 0, 32)
-    stayBtn.Position = UDim2.new(0.68, 4, 0, 34)
+    stayBtn.Size = UDim2.new(0.32, -12, 0, 30)
+    stayBtn.Position = UDim2.new(0.68, 4, 0, 46)
     stayBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 62)
     stayBtn.Text = "✕ Tetap Disini"
     stayBtn.TextColor3 = Color3.fromRGB(200, 205, 220)
@@ -1476,9 +1537,32 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
     end)
 end
 
--- Beli Item Spesifik via Network Remote
+-- Beli Item Spesifik via Network Remote (Dengan Proteksi Jarak Anti BAC-4212)
 function Merchant:BuyItem(itemName: string, network: any): boolean
     if not network then return false end
+
+    -- Anti BAC-4212 Guard: Verifikasi pemain berdiri dekat lokasi toko/pedagang
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not hrp then return false end
+
+    local nearShop = false
+    local shopSpots = {
+        Vector3.new(-9255.90, -255.59, -1.05), -- Mariana Trench (Black Market)
+        Vector3.new(-135.0, 3.5, 2764.0),       -- Traveling Merchant
+    }
+    for _, pos in ipairs(shopSpots) do
+        if (hrp.Position - pos).Magnitude <= 45 then
+            nearShop = true
+            break
+        end
+    end
+
+    if not nearShop then
+        print("[Bodoamat | Merchant] ⚠️ Pembelian remote dicegah demi keamanan Anti BAC-4212. Buka toko langsung untuk belanja!")
+        return false
+    end
+
     local success = network:BuyItem(itemName)
     if success then
         print("[Bodoamat | Merchant] ✅ Berhasil membeli item: " .. itemName)
@@ -1488,9 +1572,30 @@ function Merchant:BuyItem(itemName: string, network: any): boolean
     return success
 end
 
--- Refresh Stok Merchant
+-- Refresh Stok Merchant (Dengan Proteksi Jarak Anti BAC-4212)
 function Merchant:RefreshStock(network: any): boolean
     if not network then return false end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not hrp then return false end
+
+    local nearShop = false
+    local shopSpots = {
+        Vector3.new(-9255.90, -255.59, -1.05),
+        Vector3.new(-135.0, 3.5, 2764.0),
+    }
+    for _, pos in ipairs(shopSpots) do
+        if (hrp.Position - pos).Magnitude <= 45 then
+            nearShop = true
+            break
+        end
+    end
+
+    if not nearShop then
+        print("[Bodoamat | Merchant] ⚠️ Refresh stok remote dicegah demi keamanan Anti BAC-4212.")
+        return false
+    end
+
     return network:RefreshMerchant()
 end
 
@@ -2298,12 +2403,80 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     -- ==========================================
     local sellPage = self.Tabs["Selling"]
 
-    createToggle(sellPage, "Auto Sell Ikan", "Menjual hasil tangkapan biasa secara berkala", state.IsAutoSell, function(val)
+    createToggle(sellPage, "Auto Sell Ikan", "Menjual hasil tangkapan otomatis secara berkala atau saat kapasitas tercapai", state.IsAutoSell, function(val)
         state:Set("IsAutoSell", val)
         if val then
-            modules.AutoSell:Start(config.AutoSell.Interval, modules.Network, state)
+            modules.AutoSell:Start(config.AutoSell.Interval, modules.Network, state, modules.Teleport)
         else
             modules.AutoSell:Stop()
+        end
+    end)
+
+    -- Input Kapasitas Ikan (Threshold Auto-Sell: misal 100 -> jika 101 otomatis jual)
+    local thresholdCard = Instance.new("Frame")
+    thresholdCard.Size = UDim2.new(1, -4, 0, 48)
+    thresholdCard.BackgroundColor3 = config.UI.Theme.CardBg
+    thresholdCard.BorderSizePixel = 0
+    thresholdCard.Parent = sellPage
+
+    local tCorner = Instance.new("UICorner")
+    tCorner.CornerRadius = UDim.new(0, 8)
+    tCorner.Parent = thresholdCard
+
+    local tLabel = Instance.new("TextLabel")
+    tLabel.Size = UDim2.new(1, -110, 0, 20)
+    tLabel.Position = UDim2.new(0, 12, 0, 6)
+    tLabel.BackgroundTransparency = 1
+    tLabel.Text = "Batas Jumlah Ikan (Threshold Auto Sell)"
+    tLabel.TextColor3 = config.UI.Theme.Text
+    tLabel.TextSize = 11
+    tLabel.Font = Enum.Font.GothamBold
+    tLabel.TextXAlignment = Enum.TextXAlignment.Left
+    tLabel.Parent = thresholdCard
+
+    local tSub = Instance.new("TextLabel")
+    tSub.Size = UDim2.new(1, -110, 0, 14)
+    tSub.Position = UDim2.new(0, 12, 0, 26)
+    tSub.BackgroundTransparency = 1
+    tSub.Text = "Contoh: 100 (Ikan ke-101 otomatis terjual)"
+    tSub.TextColor3 = config.UI.Theme.TextSubtle
+    tSub.TextSize = 9
+    tSub.Font = Enum.Font.Gotham
+    tSub.TextXAlignment = Enum.TextXAlignment.Left
+    tSub.Parent = thresholdCard
+
+    local tBox = Instance.new("TextBox")
+    tBox.Size = UDim2.new(0, 85, 0, 30)
+    tBox.Position = UDim2.new(1, -97, 0, 9)
+    tBox.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
+    tBox.BorderSizePixel = 0
+    tBox.Text = tostring(modules.AutoSell.MaxFishThreshold or (config.AutoSell and config.AutoSell.Threshold) or 100)
+    tBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tBox.PlaceholderText = "100"
+    tBox.PlaceholderColor3 = Color3.fromRGB(130, 135, 150)
+    tBox.TextSize = 12
+    tBox.Font = Enum.Font.GothamBold
+    tBox.ClearTextOnFocus = false
+    tBox.Parent = thresholdCard
+
+    local tbCorner = Instance.new("UICorner")
+    tbCorner.CornerRadius = UDim.new(0, 6)
+    tbCorner.Parent = tBox
+
+    local tbStroke = Instance.new("UIStroke")
+    tbStroke.Color = config.UI.Theme.Border
+    tbStroke.Thickness = 1
+    tbStroke.Parent = tBox
+
+    tBox.FocusLost:Connect(function()
+        local num = tonumber(tBox.Text)
+        if num and num >= 0 then
+            num = math.floor(num)
+            modules.AutoSell:SetThreshold(num)
+            if config.AutoSell then config.AutoSell.Threshold = num end
+            tBox.Text = tostring(num)
+        else
+            tBox.Text = tostring(modules.AutoSell.MaxFishThreshold)
         end
     end)
 
@@ -2386,68 +2559,15 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         sellDebounce = false
     end)
 
-    createSectionHeader(sellPage, "🛒 TOKO & BLACK MARKET REMOTE")
+    createSectionHeader(sellPage, "🛒 TOKO & BLACK MARKET (KUNJUNGAN AMAN)")
 
-    createActionButton(sellPage, "Buka Black Market (Mariana Trench)", "Kunjungi Black Market di Mariana Trench, auto pakai O2 & buka prompt otomatis", function()
+    createActionButton(sellPage, "Buka Black Market (Mariana Trench)", "Kunjungi Black Market di Mariana Trench secara aman, auto pakai O2 & kembali dengan 1 klik", function()
         modules.Merchant:OpenRemoteShop("blackmarket", modules.Network)
     end)
 
-    createActionButton(sellPage, "Buka Pedagang Keliling (Traveling Merchant)", "Kunjungi Kapal Pedagang Alien, buka prompt otomatis, ada tombol kembali", function()
+    createActionButton(sellPage, "Buka Pedagang Keliling (Traveling Merchant)", "Kunjungi Kapal Pedagang Alien secara aman, belanja langsung di NPC & kembali dengan 1 klik", function()
         modules.Merchant:OpenRemoteShop("traveling", modules.Network)
     end)
-
-    -- Quick Buy Totem (Bait & Crates dihapus demi keamanan Anti BAC-7214)
-    local itemBuyCard = Instance.new("Frame")
-    itemBuyCard.Size = UDim2.new(1, -4, 0, 68)
-    itemBuyCard.BackgroundColor3 = config.UI.Theme.CardBg
-    itemBuyCard.BorderSizePixel = 0
-    itemBuyCard.Parent = sellPage
-
-    local ibCorner = Instance.new("UICorner")
-    ibCorner.CornerRadius = UDim.new(0, 8)
-    ibCorner.Parent = itemBuyCard
-
-    local ibTitle = Instance.new("TextLabel")
-    ibTitle.Size = UDim2.new(1, -20, 0, 18)
-    ibTitle.Position = UDim2.new(0, 12, 0, 6)
-    ibTitle.BackgroundTransparency = 1
-    ibTitle.Text = "Beli Totem Instan (Remote)"
-    ibTitle.TextColor3 = config.UI.Theme.Text
-    ibTitle.TextSize = 11
-    ibTitle.Font = Enum.Font.GothamBold
-    ibTitle.TextXAlignment = Enum.TextXAlignment.Left
-    ibTitle.Parent = itemBuyCard
-
-    local itemBtns = { "Luck Totem", "Shiny Totem", "Mutation Totem" }
-    local itemContainer = Instance.new("Frame")
-    itemContainer.Size = UDim2.new(1, -24, 0, 28)
-    itemContainer.Position = UDim2.new(0, 12, 0, 30)
-    itemContainer.BackgroundTransparency = 1
-    itemContainer.Parent = itemBuyCard
-
-    local itemLayout = Instance.new("UIListLayout")
-    itemLayout.FillDirection = Enum.FillDirection.Horizontal
-    itemLayout.Padding = UDim.new(0, 6)
-    itemLayout.Parent = itemContainer
-
-    for _, itName in ipairs(itemBtns) do
-        local ib = Instance.new("TextButton")
-        ib.Size = UDim2.new(0.32, -2, 1, 0)
-        ib.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
-        ib.Text = itName:gsub(" Totem", "")
-        ib.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ib.TextSize = 10
-        ib.Font = Enum.Font.GothamMedium
-        ib.Parent = itemContainer
-
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 5)
-        c.Parent = ib
-
-        ib.MouseButton1Click:Connect(function()
-            modules.Merchant:BuyItem(itName, modules.Network)
-        end)
-    end
 
     -- ==========================================
     -- ISI KONTEN TAB 3: TOTEM & LAUT DALAM
@@ -2847,6 +2967,11 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     lcLayout.Padding = UDim.new(0, 5)
     lcLayout.SortOrder = Enum.SortOrder.LayoutOrder
     lcLayout.Parent = locContainer
+
+    -- Pastikan daftar selalu terurut ascending A-Z
+    table.sort(modules.Teleport.Locations, function(a, b)
+        return a.Name:lower() < b.Name:lower()
+    end)
 
     for _, loc in ipairs(modules.Teleport.Locations) do
         local tpCard = Instance.new("Frame")

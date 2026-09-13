@@ -8,8 +8,10 @@ Versi 3.0 menghadirkan integrasi penuh dengan ekspansi zona game terbaru (**Copp
 
 ## ⚡ Fitur Utama v3.0
 
-### 1. 🗺️ Navigasi & Teleportasi 58+ Lokasi Terkini
-Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area ekspansi terbaru dengan orientasi pandangan (`lookAt`) presisi:
+### 1. 🗺️ Navigasi & Teleportasi 59 Lokasi Terurut Ascending (A - Z)
+Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area ekspansi terbaru dengan daftar terurut rapi secara alfabetis ascending (A - Z) dari *Ancient Jungle* hingga *Weather Machine*:
+- **🌟 Urutan Lokasi Lengkap (59 Spot Ascending A-Z)**:
+  - Tersusun rapi dari A sampai Z untuk memudahkan pencarian instan tanpa perlu scrolling acak.
 - **🌟 Zona Baru & Kosmik (Benchmark Update)**:
   - **The Celestarium** & **Starfall Gardens** (Zona kosmik luar angkasa).
   - **Gloomcap Grotto** & **Sawers / The Sewers** (Gua jamur & saluran bawah tanah).
@@ -32,7 +34,7 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **🔮 Endgame & Gua Rahasia**:
   - Esoteric Depths (Enchant Stone), Lost Isle (Underwater), Sisyphus Statue, Treasure Room, Ancient Jungle, Ancient Ruin, Sacred Temple, Pirate Cove, Pirate Treasure Room, Leviathan Den, Iron Cavern, Iron Cafe, Planetary Observatory.
 - **👥 Smart Scanner, Lokasi Terpadu & Pemain**:
-  - **Daftar Lokasi Terpadu (Single List / Semua)**: Seluruh 30+ lokasi teleportasi disatukan ke dalam satu daftar ringkas dan bersih tanpa tab filter kategori yang memakan tempat, mempercepat pemilihan zona memancing.
+  - **Daftar Lokasi Terpadu (Single List Ascending A-Z)**: Seluruh 59 lokasi teleportasi disatukan ke dalam satu daftar ringkas dan bersih yang otomatis tersortir A-Z, mempercepat pemilihan zona memancing.
   - **Smart Player Scanner & Dropdown Teleport**: Memindai seluruh pemain aktif di server dengan 1 klik tombol 'Scan Player', memilih pemain lewat menu dropdown dinamis, dan langsung teleport ke posisinya secara aman tanpa tabrakan hitbox (input manual dihilangkan demi mencegah anomali).
   - **Simpan Titik Kustom (Waypoint)**: Simpan koordinat memancing favorit dan teleport kembali kapan saja.
   - **Workspace Dynamic Scanner**: Mendeteksi otomatis pergeseran posisi pulau jika terjadi update map oleh developer game (mengabaikan zona trigger `Areas`).
@@ -43,17 +45,24 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **Formasi 5 Totem (+)**: Memasang 5 totem dalam formasi salib dengan radius 50-60 studs untuk menjamin cakupan area buff maksimal tanpa jeda.
 - **Auto Pasang Totem Berkala**: Loop otomatis yang mengecek dan menempatkan kembali totem setiap 60 detik saat durasi totem sebelumnya habis.
 
-### 3. 🛒 Remote Toko, Black Market & Kontrol Cuaca
-- **Buka Black Market Jarak Jauh**: Membuka prompt menu Underground Cellar dari lokasi mana pun di peta tanpa harus berjalan ke gua.
-- **Buka Pedagang Keliling (Alien)**: Membuka prompt Traveling Merchant secara remote via simulasi proximity.
-- **Beli Totem Instan**: Pembelian cepat totem buff (*Luck Totem, Shiny Totem, Mutation Totem*) secara remote (Bait & Crate dihapus demi keamanan anti-cheat).
-- **Pengontrol Cuaca Server**: Membeli event cuaca server (*Storm, Thunderstorm, Cloudy, Wind*) secara instan.
+### 3. 🛒 Kunjungan Toko & Black Market Aman (Bebas BAC-4212)
+- **Kunjungan Black Market Aman**: Teleportasi langsung ke hadapan pedagang Black Market di Mariana Trench dengan auto proteksi O2 dan tombol kembali 1-klik.
+- **Kunjungan Pedagang Keliling (Traveling Merchant)**: Teleportasi aman ke kapal pedagang alien untuk belanja langsung di NPC secara wajar tanpa memicu tripwire interaksi.
+- **Bebas Manipulasi ProximityPrompt**: Menghapus total fungsi buatan `fireproximityprompt` dan hold bypass yang memicu peringatan anti-cheat server `BAC-4212`.
+- **Pengontrol Cuaca Server**: Membeli event cuaca server (*Storm, Thunderstorm, Cloudy, Wind*) secara terverifikasi.
 
 ### 4. 🤿 Eksplorasi Laut Dalam & Radar Ikan
-- **Tabung Oksigen Laut Dalam (Oxygen Tank)**: Mengaktifkan tabung selam agar karakter tidak kehabisan nafas saat memancing di kedalaman *Mariana Trench* atau *Lost Isle*.
+- **Tabung Oksigen Laut Dalam (Oxygen Tank)**: Mengaktifkan tabung selam aman (dengan verifikasi kepemilikan item di inventaris) agar karakter tidak kehabisan nafas di kedalaman tanpa memicu tripwire `BAC-4214`.
 - **Fishing Radar**: Mengaktifkan radar visual untuk mendeteksi posisi, jarak, dan tingkat kelangkaan (*rarity*) ikan di dalam air.
 
 ### 5. 🛡️ Keamanan Anti-BAC (Bacon Anti-Cheat Protected)
+- **BAC-4212 Guard (Zero ProximityPrompt & Remote Shop Manipulation)**:
+  - Mengeliminasi pemanggilan fungsi tiruan `fireproximityprompt(prompt, 0)` dan manipulasi engine `InputHoldBegin()` yang memicu deteksi instan interaksi NPC.
+  - Menghapus pemindaian agresif `Workspace:GetDescendants()` saat mengunjungi toko.
+  - Menghapus fitur remote buy Totem tanpa tatap muka demi mencegah anomali verifikasi jarak NPC; pemain cukup berbelanja langsung di hadapan pedagang lalu menekan tombol kembali 1-klik.
+- **BAC-4214 Guard (Rate-Limit & Inventory Verification)**:
+  - Membatasi penguncian favorit ikan maksimal 4 item per pass dengan jeda aman 0.35s ke server, hanya untuk tier tinggi (*Legendary, Mitos, Secret*).
+  - Menambahkan verifikasi kepemilikan tool sebelum memanggil `RF/EquipOxygenTank(105)` ke server.
 - **BAC-4217 Guard (Anti-Zone Boundary & Collision Tampering)**:
   - Mengeliminasi pemindaian `Workspace.Areas` yang berisi volume boundary trigger tidak kasat mata; teleportasi ke lokasi resmi langsung menggunakan koordinat `loc.CFrame` terverifikasi.
   - Menghapus manipulasi `part.CanCollide = false` permanen pada karakter yang memicu tripwire noclip server.
@@ -80,10 +89,11 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
   - Mengurangi beban GPU dan CPU hingga 80-90% dengan membatasi framerate AFK ke 15 FPS (`setfpscap(15)`) dan menurunkan shader ke level terendah, tanpa mematikan render 3D ataupun membuat layar hitam permanen.
   - Saat dinonaktifkan, kualitas grafis dan FPS langsung kembali normal 100% secara instan.
 
-### 6. 🎣 Memancing Manual Murni (Bebas Total dari BAC-3211/6215/7213)
+### 6. 🎣 Memancing Manual Murni & Auto-Sell Cerdas (Bebas BAC)
 - **100% Manual Human Play**: Fitur otomatisasi joran/pancingan (Auto Fishing & Auto Equip Rod) dihapus sepenuhnya dari script.
 - Pemain memancing secara mandiri dan wajar layaknya pemain asli, menjamin 0% risiko deteksi timing lemparan kail server.
-- **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Rare, Epic, Legendary, Mythic, Secret*) sebelum siklus jual massal saat fitur ini diaktifkan.
+- **Auto-Sell Batas Kapasitas Ikan (Threshold Input)**: Dilengkapi kolom input/textbox angka jumlah ikan pada tab *Toko & Jual* (misal diisi 100, maka saat ikan ke-101 tertangkap, script langsung otomatis mengeksekusi penjualan tanpa harus menunggu timer).
+- **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Legendary, Mitos, Secret*) sebelum siklus jual massal saat fitur ini diaktifkan.
 
 ### 7. 🎨 Antarmuka Modern 6-Tab Standalone UI
 - Tampilan elegan bernuansa *Dark-Glassmorphism* tanpa dependency library eksternal (No Rayfield/WindUI) sehingga **100% stabil, tidak bergantung CDN, dan tidak akan gagal load**.
