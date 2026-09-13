@@ -4,39 +4,22 @@
     ║                 BODOAMAT - NEON KEY SYSTEM                    ║
     ║     Cyberpunk Glassmorphism Authentication Interface         ║
     ╚═══════════════════════════════════════════════════════════════╝
-    
-    Fitur:
-    - Desain Glassmorphism Neon Modern (Cyan / Mint Accent)
-    - Kursor terminal interaktif & animasi bar
-    - Tombol [ GET KEY ] (Otomatis salin link ke clipboard)
-    - Tombol [ AUTH ] (Validasi instan)
-    - Indikator Status: Hijau (Sukses) / Merah (Gagal)
-    - Kompatibilitas Multi-Executor (Delta, Wave, Fluxus, Xeno, Synapse)
-    - Parent terisolasi via gethui() agar tidak mengotori PlayerGui game
 ]]
 
--- ============================================================
--- KONFIGURASI LINK & KUNCI
--- ============================================================
 local LINK = "https://link-target.net/1417470/g6eKEoq2bJV9"
 local MAIN_SCRIPT = "https://raw.githubusercontent.com/iMango21/bodoamat/main/Bodoamat.luau"
 
 -- Kunci otorisasi (default: "aluksx")
 local KEY = string.reverse("xskula")
 
--- ============================================================
--- INISIALISASI SERVICE & CONTAINER GUI
--- ============================================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- Cegah duplikasi GUI
 local genv = (getgenv and getgenv()) or {}
 if genv.__BODOAMAT_KEY_SYSTEM then
     pcall(function() genv.__BODOAMAT_KEY_SYSTEM:Destroy() end)
 end
 
--- Utamakan gethui() agar terisolasi dari deteksi script game
 local targetParent = nil
 if gethui then
     targetParent = gethui()
@@ -53,7 +36,6 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = targetParent
 genv.__BODOAMAT_KEY_SYSTEM = gui
 
--- Helper salin clipboard lintas executor
 local function copyToClipboard(text: string)
     local fn = setclipboard or toclipboard or (Clipboard and Clipboard.set)
     if fn then
@@ -61,9 +43,6 @@ local function copyToClipboard(text: string)
     end
 end
 
--- ============================================================
--- PEMBUATAN ELEMEN UI (NEON TERMINAL STYLE)
--- ============================================================
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 420, 0, 310)
@@ -74,7 +53,6 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Parent = gui
 
--- Corner & Stroke
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 6)
 corner.Parent = mainFrame
@@ -85,7 +63,6 @@ border.Transparency = 0.5
 border.Thickness = 1.5
 border.Parent = mainFrame
 
--- Garis Kisi Terminal Futuristik
 for i = 1, 10 do
     local line = Instance.new("Frame")
     line.Size = UDim2.new(1, 0, 0, 1)
@@ -96,14 +73,12 @@ for i = 1, 10 do
     line.Parent = mainFrame
 end
 
--- Accent Header Bar
 local accentBar = Instance.new("Frame")
 accentBar.Size = UDim2.new(1, 0, 0, 3)
 accentBar.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
 accentBar.BorderSizePixel = 0
 accentBar.Parent = mainFrame
 
--- Judul & Subtitle
 local title = Instance.new("TextLabel")
 title.Name = "Title"
 title.Size = UDim2.new(1, 0, 0, 40)
@@ -126,7 +101,6 @@ subtitle.TextSize = 12
 subtitle.Font = Enum.Font.Code
 subtitle.Parent = mainFrame
 
--- Input Box Container
 local inputContainer = Instance.new("Frame")
 inputContainer.Name = "InputContainer"
 inputContainer.Size = UDim2.new(0.85, 0, 0, 46)
@@ -146,7 +120,6 @@ inputBorder.Transparency = 0.6
 inputBorder.Thickness = 1
 inputBorder.Parent = inputContainer
 
--- Cursor terminal berkedip
 local cursor = Instance.new("Frame")
 cursor.Size = UDim2.new(0, 2, 0, 18)
 cursor.Position = UDim2.new(0, 12, 0.5, -9)
@@ -176,7 +149,6 @@ inputBox.ClearTextOnFocus = false
 inputBox.TextXAlignment = Enum.TextXAlignment.Left
 inputBox.Parent = inputContainer
 
--- Container Tombol
 local buttonContainer = Instance.new("Frame")
 buttonContainer.Name = "ButtonContainer"
 buttonContainer.Size = UDim2.new(0.85, 0, 0, 44)
@@ -184,7 +156,6 @@ buttonContainer.Position = UDim2.new(0.075, 0, 0.58, 0)
 buttonContainer.BackgroundTransparency = 1
 buttonContainer.Parent = mainFrame
 
--- Tombol [ GET KEY ]
 local getKeyBtn = Instance.new("TextButton")
 getKeyBtn.Name = "GetKeyBtn"
 getKeyBtn.Size = UDim2.new(0.48, -4, 1, 0)
@@ -207,7 +178,6 @@ getKeyBorder.Transparency = 0.5
 getKeyBorder.Thickness = 1
 getKeyBorder.Parent = getKeyBtn
 
--- Tombol [ AUTH ]
 local checkKeyBtn = Instance.new("TextButton")
 checkKeyBtn.Name = "CheckKeyBtn"
 checkKeyBtn.Size = UDim2.new(0.48, -4, 1, 0)
@@ -230,7 +200,6 @@ checkKeyBorder.Transparency = 0.5
 checkKeyBorder.Thickness = 1
 checkKeyBorder.Parent = checkKeyBtn
 
--- Bar Status / Pesan Respon
 local statusFrame = Instance.new("Frame")
 statusFrame.Name = "StatusFrame"
 statusFrame.Size = UDim2.new(0.85, 0, 0, 32)
@@ -263,9 +232,6 @@ statusLabel.Font = Enum.Font.Code
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = statusFrame
 
--- ============================================================
--- LOGIKA INTERAKSI & STATUS
--- ============================================================
 local statusThread = nil
 local function showStatus(message: string, color: Color3, duration: number?)
     if statusThread then
@@ -286,7 +252,6 @@ local function showStatus(message: string, color: Color3, duration: number?)
     end
 end
 
--- Efek Hover Tombol
 getKeyBtn.MouseEnter:Connect(function()
     getKeyBtn.BackgroundColor3 = Color3.fromRGB(0, 48, 64)
     getKeyBorder.Transparency = 0.1
@@ -305,13 +270,11 @@ checkKeyBtn.MouseLeave:Connect(function()
     checkKeyBorder.Transparency = 0.5
 end)
 
--- Event Klik: Ambil Kunci (Salin ke Clipboard)
 getKeyBtn.MouseButton1Click:Connect(function()
     copyToClipboard(LINK)
     showStatus("LINK TERSALIN KE CLIPBOARD!", Color3.fromRGB(0, 255, 200), 2.5)
 end)
 
--- Event Klik: Validasi Kunci
 checkKeyBtn.MouseButton1Click:Connect(function()
     local enteredKey = inputBox.Text:gsub("%s+", ""):lower()
     
@@ -322,7 +285,6 @@ checkKeyBtn.MouseButton1Click:Connect(function()
         gui:Destroy()
         genv.__BODOAMAT_KEY_SYSTEM = nil
         
-        -- Memuat Payload Utama (Bodoamat)
         local loadSuccess, loadErr = pcall(function()
             if isfile and readfile and isfile("Bodoamat.luau") then
                 loadstring(readfile("Bodoamat.luau"))()
@@ -340,7 +302,6 @@ checkKeyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Tekan Enter pada TextBox untuk langsung verifikasi
 inputBox.FocusLost:Connect(function(enterPressed)
     if enterPressed then
         checkKeyBtn.MouseButton1Click:Fire()
