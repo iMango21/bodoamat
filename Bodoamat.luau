@@ -311,17 +311,18 @@ function Network:Init(): boolean
     return self.HasRemotes
 end
 
--- Wrapper: Lempar Kail (Charge) - Dynamic Live Timestamp (Anti BAC-4218 & Anti BAC-52110)
+-- Wrapper: Lempar Kail (Charge) - Anti BAC-7213 & Anti BAC-4218
 function Network:ChargeRod(power: number?): boolean
     local remote = self.Remotes["ChargeRod"]
     if remote and remote:IsA("RemoteFunction") then
         local now = workspace:GetServerTimeNow()
+        local safePower = power or 1
         local ok, _ = pcall(function()
-            remote:InvokeServer(now)
+            remote:InvokeServer(safePower, nil, now, nil)
         end)
         if not ok then
             pcall(function()
-                remote:InvokeServer(power or 1)
+                remote:InvokeServer(safePower)
             end)
         end
         return true
