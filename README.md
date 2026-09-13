@@ -31,10 +31,11 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
   - Fisherman Island (Spawn), Kohana, Kohana Volcano/Lab, Coral Reefs, Tropical Grove, Crater Island, Mount Hallow, Classic Island, Esoteric Island, Stingray Shores.
 - **🔮 Endgame & Gua Rahasia**:
   - Esoteric Depths (Enchant Stone), Lost Isle (Underwater), Sisyphus Statue, Treasure Room, Ancient Jungle, Ancient Ruin, Sacred Temple, Pirate Cove, Pirate Treasure Room, Leviathan Den, Iron Cavern, Iron Cafe, Planetary Observatory.
-- **👥 Smart Scanner & Pemain**:
+- **👥 Smart Scanner, Lokasi Terpadu & Pemain**:
+  - **Daftar Lokasi Terpadu (Single List / Semua)**: Seluruh 30+ lokasi teleportasi disatukan ke dalam satu daftar ringkas dan bersih tanpa tab filter kategori yang memakan tempat, mempercepat pemilihan zona memancing.
   - **Smart Player Scanner & Dropdown Teleport**: Memindai seluruh pemain aktif di server dengan 1 klik tombol 'Scan Player', memilih pemain lewat menu dropdown dinamis, dan langsung teleport ke posisinya secara aman tanpa tabrakan hitbox (input manual dihilangkan demi mencegah anomali).
   - **Simpan Titik Kustom (Waypoint)**: Simpan koordinat memancing favorit dan teleport kembali kapan saja.
-  - **Workspace Dynamic Scanner**: Mendeteksi otomatis pergeseran posisi pulau jika terjadi update map oleh developer game.
+  - **Workspace Dynamic Scanner**: Mendeteksi otomatis pergeseran posisi pulau jika terjadi update map oleh developer game (mengabaikan zona trigger `Areas`).
 
 ### 2. 🗿 Sistem Otomasi Totem (Luck, Shiny, Mutation)
 - **Pilihan Tipe Totem**: Mendukung *Luck Totem* (+100% Luck), *Shiny Totem* (+50% Shiny), dan *Mutation Totem* (+100% Mutation).
@@ -53,9 +54,12 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **Fishing Radar**: Mengaktifkan radar visual untuk mendeteksi posisi, jarak, dan tingkat kelangkaan (*rarity*) ikan di dalam air.
 
 ### 5. 🛡️ Keamanan Anti-BAC (Bacon Anti-Cheat Protected)
+- **BAC-4217 Guard (Anti-Zone Boundary & Collision Tampering)**:
+  - Mengeliminasi pemindaian `Workspace.Areas` yang berisi volume boundary trigger tidak kasat mata; teleportasi ke lokasi resmi langsung menggunakan koordinat `loc.CFrame` terverifikasi.
+  - Menghapus manipulasi `part.CanCollide = false` permanen pada karakter yang memicu tripwire noclip server.
+  - Menggunakan fungsi pemindahan atomik `char:PivotTo(...)` dengan elevasi aman (+2.5 studs) dan peredaman kecepatan nol multi-frame (*Safe Settling*) agar tidak terlempar ataupun melanggar batas zona.
 - **BAC-10216 Guard (Safe Teleportation & Anti-Flung Velocity Stabilization)**:
   - Input text box / tombol TP manual dihapus demi menjaga kebersihan data target.
-  - Menonaktifkan part collision sementara (`CanCollide = false`) pada karakter lokal guna mencegah tabrakan/clipping fisik eksplosif saat mendarat dekat pemain lain.
   - Menerapkan penstabilan kecepatan nol multi-frame (*6-frame velocity clamp*) untuk meredam lonjakan impuls.
   - Menempatkan posisi mendarat dengan offset 4 studs di samping target pemain dan orientasi menghadap target.
   - **Zero Tool Interference**: Skrip sama sekali tidak memaksa melepas atau memasang joran pancingan karakter secara otomatis, memberikan kontrol 100% di tangan pemain.
@@ -81,6 +85,7 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 
 ### 7. 🎨 Antarmuka Modern 6-Tab Standalone UI
 - Tampilan elegan bernuansa *Dark-Glassmorphism* tanpa dependency library eksternal (No Rayfield/WindUI) sehingga **100% stabil, tidak bergantung CDN, dan tidak akan gagal load**.
+- **Ukuran Lega & Tombol Maximize (`[□]` / `[❐]`)**: Ukuran jendela default diperbesar menjadi 640x480 (responsif terhadap layar), dan dilengkapi tombol Maximize di **sebelah kanan tombol keluar `(X)`** untuk memperbesar tampilan secara instan hingga 880x620.
 - **6 Tab Kontrol**:
   1. 💰 *Toko & Jual*
   2. 🗿 *Totem & Laut*

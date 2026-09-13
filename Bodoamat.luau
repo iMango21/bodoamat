@@ -1070,7 +1070,7 @@ local Teleport = {
     CustomWaypoints = {} :: { [string]: CFrame },
 }
 
--- Eksekusi Teleportasi Aman (Bebas Flung & Anti-Tripwire Velocity)
+-- Eksekusi Teleportasi Aman (Bebas Flung, Anti-BAC 4217 & 10216 Velocity Guard)
 function Teleport:To(targetCFrame: CFrame): boolean
     local char = LocalPlayer.Character
     if not char then return false end
@@ -1080,19 +1080,14 @@ function Teleport:To(targetCFrame: CFrame): boolean
     if not hrp or not humanoid or humanoid.Health <= 0 then return false end
 
     pcall(function()
-        -- Matikan CanCollide sementara pada part karakter untuk mencegah lonjakan/flung fisik
-        for _, part in ipairs(char:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-
-        -- BAC-10216 Guard 3: Reset kecepatan awal
+        -- BAC-4217 Guard: Reset velocity & atomic PivotTo tanpa merusak CanCollide karakter
         hrp.AssemblyLinearVelocity = Vector3.zero
         hrp.AssemblyAngularVelocity = Vector3.zero
-        hrp.CFrame = targetCFrame + Vector3.new(0, 2.5, 0)
 
-        -- BAC-10216 Guard 4: Kunci kecepatan nol selama 6 frame berurutan (Safe Settling)
+        local safeDestination = targetCFrame + Vector3.new(0, 2.5, 0)
+        char:PivotTo(safeDestination)
+
+        -- BAC-10216 Guard: Kunci kecepatan nol selama 6 frame berurutan (Safe Settling)
         task.spawn(function()
             for _ = 1, 6 do
                 if hrp and hrp.Parent then
@@ -1107,26 +1102,21 @@ function Teleport:To(targetCFrame: CFrame): boolean
     return true
 end
 
--- Teleport Berdasarkan Nama Lokasi
+-- Teleport Berdasarkan Nama Lokasi (Anti BAC-4217: Langsung gunakan CFrame presisi tanpa trigger zone scan)
 function Teleport:ToNamed(name: string): boolean
     -- 1. Cek dari daftar lokasi kustom pemain
     if self.CustomWaypoints[name] then
         return self:To(self.CustomWaypoints[name])
     end
 
-    -- 2. Cek apakah ada di database lokasi statis
+    -- 2. Cek apakah ada di database lokasi statis (Gunakan CFrame terverifikasi langsung)
     for _, loc in ipairs(self.Locations) do
         if loc.Name:lower() == name:lower() then
-            -- Coba scan objek fisik map di workspace terlebih dahulu (jika ada update posisi oleh developer game)
-            local dynamicCF = self:ScanWorkspace(loc.Name)
-            if dynamicCF then
-                return self:To(dynamicCF)
-            end
             return self:To(loc.CFrame)
         end
     end
 
-    -- 3. Fallback: Scan bebas di Workspace
+    -- 3. Fallback: Scan objek fisik di Workspace (non-area containers)
     local foundCF = self:ScanWorkspace(name)
     if foundCF then
         return self:To(foundCF)
@@ -1135,11 +1125,10 @@ function Teleport:ToNamed(name: string): boolean
     return false
 end
 
--- Smart Workspace Auto-Discovery Scanner
+-- Smart Workspace Auto-Discovery Scanner (Anti BAC-4217: Abaikan container trigger Areas)
 function Teleport:ScanWorkspace(query: string): CFrame?
     local cleanQuery = query:lower():gsub("%s+", "")
     local containers = {
-        Workspace:FindFirstChild("Areas"),
         Workspace:FindFirstChild("Islands"),
         Workspace:FindFirstChild("Locations"),
         Workspace:FindFirstChild("Map"),
@@ -1939,11 +1928,16 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     genv.__BODOAMAT_GUI = screenGui
     self.ScreenGui = screenGui
 
-    -- 3. Frame Jendela Utama
+    -- 3. Frame Jendela Utama (Ukuran lebih lega dan mendukung Maximize)
+    local cam = Workspace.CurrentCamera
+    local vp = (cam and cam.ViewportSize) or Vector2.new(1280, 720)
+    local initW = math.min(640, math.max(560, vp.X - 40))
+    local initH = math.min(480, math.max(420, vp.Y - 40))
+
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
-    mainFrame.Size = UDim2.new(0, 560, 0, 420)
-    mainFrame.Position = UDim2.new(0.5, -280, 0.5, -210)
+    mainFrame.Size = UDim2.new(0, initW, 0, initH)
+    mainFrame.Position = UDim2.new(0.5, -math.floor(initW / 2), 0.5, -math.floor(initH / 2))
     mainFrame.BackgroundColor3 = config.UI.Theme.Background
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
@@ -2035,8 +2029,9 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     subtitleLabel.Parent = header
 
     local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "CloseButton"
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -38, 0, 9)
+    closeBtn.Position = UDim2.new(1, -74, 0, 9)
     closeBtn.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
     closeBtn.Text = "X"
     closeBtn.TextColor3 = Color3.fromRGB(240, 90, 90)
@@ -2050,6 +2045,46 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     closeBtn.MouseButton1Click:Connect(function()
         mainFrame.Visible = false
+    end)
+
+    -- Tombol Maximize / Perbesar Tampilan (Sebelah kanan dari tombol X)
+    local maxBtn = Instance.new("TextButton")
+    maxBtn.Name = "MaximizeButton"
+    maxBtn.Size = UDim2.new(0, 30, 0, 30)
+    maxBtn.Position = UDim2.new(1, -38, 0, 9)
+    maxBtn.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+    maxBtn.Text = "□"
+    maxBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
+    maxBtn.TextSize = 15
+    maxBtn.Font = Enum.Font.GothamBold
+    maxBtn.Parent = header
+
+    local maxCorner = Instance.new("UICorner")
+    maxCorner.CornerRadius = UDim.new(0, 6)
+    maxCorner.Parent = maxBtn
+
+    local isMaximized = false
+    maxBtn.MouseButton1Click:Connect(function()
+        isMaximized = not isMaximized
+        local currentCam = Workspace.CurrentCamera
+        local currentVp = (currentCam and currentCam.ViewportSize) or Vector2.new(1280, 720)
+        if isMaximized then
+            local targetW = math.min(880, currentVp.X - 30)
+            local targetH = math.min(620, currentVp.Y - 30)
+            mainFrame.Size = UDim2.new(0, targetW, 0, targetH)
+            mainFrame.Position = UDim2.new(0.5, -math.floor(targetW / 2), 0.5, -math.floor(targetH / 2))
+            maxBtn.Text = "❐"
+            maxBtn.TextColor3 = Color3.fromRGB(255, 180, 50)
+            state.LastStatusMessage = "🗖 GUI diperbesar (Maximized)"
+        else
+            local targetW = math.min(640, math.max(560, currentVp.X - 40))
+            local targetH = math.min(480, math.max(420, currentVp.Y - 40))
+            mainFrame.Size = UDim2.new(0, targetW, 0, targetH)
+            mainFrame.Position = UDim2.new(0.5, -math.floor(targetW / 2), 0.5, -math.floor(targetH / 2))
+            maxBtn.Text = "□"
+            maxBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
+            state.LastStatusMessage = "▫ GUI ukuran normal"
+        end
     end)
 
     -- 5. Sidebar Navigasi Tab (Kiri)
@@ -2859,29 +2894,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         state.LastStatusMessage = "📌 Waypoint tersimpan: " .. wpName
     end)
 
-    createSectionHeader(tpPage, "📍 DAFTAR LOKASI RESMI (30+ ZONA)")
-
-    -- Filter Kategori Lokasi
-    local currentFilter = "Semua"
-    local catFilterCard = Instance.new("Frame")
-    catFilterCard.Size = UDim2.new(1, -4, 0, 32)
-    catFilterCard.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
-    catFilterCard.BorderSizePixel = 0
-    catFilterCard.Parent = tpPage
-
-    local cfLayout = Instance.new("UIListLayout")
-    cfLayout.FillDirection = Enum.FillDirection.Horizontal
-    cfLayout.Padding = UDim.new(0, 4)
-    cfLayout.Parent = catFilterCard
-
-    local filterButtons = {}
-    local catFilters = {
-        { Id = "Semua",  Label = "Semua" },
-        { Id = "New",    Label = "🌟 Zona Baru" },
-        { Id = "Shop",   Label = "🛒 Toko/Cellar" },
-        { Id = "Island", Label = "🏝️ Pulau" },
-        { Id = "Secret", Label = "🔮 Secret" },
-    }
+    createSectionHeader(tpPage, "📍 DAFTAR LOKASI RESMI (SEMUA ZONA)")
 
     local locContainer = Instance.new("Frame")
     locContainer.Size = UDim2.new(1, 0, 0, 0)
@@ -2890,90 +2903,53 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     locContainer.Parent = tpPage
 
     local lcLayout = Instance.new("UIListLayout")
-    lcLayout.Padding = UDim.new(0, 6)
+    lcLayout.Padding = UDim.new(0, 5)
     lcLayout.SortOrder = Enum.SortOrder.LayoutOrder
     lcLayout.Parent = locContainer
 
-    local function refreshLocList()
-        for _, child in ipairs(locContainer:GetChildren()) do
-            if child:IsA("Frame") then
-                child:Destroy()
+    for _, loc in ipairs(modules.Teleport.Locations) do
+        local tpCard = Instance.new("Frame")
+        tpCard.Size = UDim2.new(1, -4, 0, 34)
+        tpCard.BackgroundColor3 = config.UI.Theme.CardBg
+        tpCard.BorderSizePixel = 0
+        tpCard.Parent = locContainer
+
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 6)
+        cCorner.Parent = tpCard
+
+        local locLabel = Instance.new("TextLabel")
+        locLabel.Size = UDim2.new(1, -85, 1, 0)
+        locLabel.Position = UDim2.new(0, 10, 0, 0)
+        locLabel.BackgroundTransparency = 1
+        locLabel.Text = (loc.Category == "New" and "⭐ " or "📍 ") .. loc.Name
+        locLabel.TextColor3 = (loc.Category == "New") and Color3.fromRGB(255, 215, 0) or config.UI.Theme.Text
+        locLabel.TextSize = 11
+        locLabel.Font = Enum.Font.GothamMedium
+        locLabel.TextXAlignment = Enum.TextXAlignment.Left
+        locLabel.Parent = tpCard
+
+        local goBtn = Instance.new("TextButton")
+        goBtn.Size = UDim2.new(0, 68, 0, 24)
+        goBtn.Position = UDim2.new(1, -74, 0.5, -12)
+        goBtn.BackgroundColor3 = (loc.Category == "New") and Color3.fromRGB(230, 126, 34) or Color3.fromRGB(0, 150, 230)
+        goBtn.Text = "Teleport"
+        goBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        goBtn.TextSize = 10
+        goBtn.Font = Enum.Font.GothamBold
+        goBtn.Parent = tpCard
+
+        local bCorner = Instance.new("UICorner")
+        bCorner.CornerRadius = UDim.new(0, 5)
+        bCorner.Parent = goBtn
+
+        goBtn.MouseButton1Click:Connect(function()
+            local success = modules.Teleport:To(loc.CFrame)
+            if success then
+                state.LastStatusMessage = "📍 Teleport ke " .. loc.Name
             end
-        end
-
-        for _, loc in ipairs(modules.Teleport.Locations) do
-            if currentFilter == "Semua" or loc.Category == currentFilter then
-                local tpCard = Instance.new("Frame")
-                tpCard.Size = UDim2.new(1, -4, 0, 36)
-                tpCard.BackgroundColor3 = config.UI.Theme.CardBg
-                tpCard.BorderSizePixel = 0
-                tpCard.Parent = locContainer
-
-                local cCorner = Instance.new("UICorner")
-                cCorner.CornerRadius = UDim.new(0, 7)
-                cCorner.Parent = tpCard
-
-                local locLabel = Instance.new("TextLabel")
-                locLabel.Size = UDim2.new(1, -85, 1, 0)
-                locLabel.Position = UDim2.new(0, 10, 0, 0)
-                locLabel.BackgroundTransparency = 1
-                locLabel.Text = (loc.Category == "New" and "⭐ " or "📍 ") .. loc.Name
-                locLabel.TextColor3 = (loc.Category == "New") and Color3.fromRGB(255, 215, 0) or config.UI.Theme.Text
-                locLabel.TextSize = 11
-                locLabel.Font = Enum.Font.GothamMedium
-                locLabel.TextXAlignment = Enum.TextXAlignment.Left
-                locLabel.Parent = tpCard
-
-                local goBtn = Instance.new("TextButton")
-                goBtn.Size = UDim2.new(0, 68, 0, 24)
-                goBtn.Position = UDim2.new(1, -74, 0.5, -12)
-                goBtn.BackgroundColor3 = (loc.Category == "New") and Color3.fromRGB(230, 126, 34) or Color3.fromRGB(0, 150, 230)
-                goBtn.Text = "Teleport"
-                goBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                goBtn.TextSize = 10
-                goBtn.Font = Enum.Font.GothamBold
-                goBtn.Parent = tpCard
-
-                local bCorner = Instance.new("UICorner")
-                bCorner.CornerRadius = UDim.new(0, 5)
-                bCorner.Parent = goBtn
-
-                goBtn.MouseButton1Click:Connect(function()
-                    local success = modules.Teleport:To(loc.CFrame)
-                    if success then
-                        state.LastStatusMessage = "📍 Teleport ke " .. loc.Name
-                    end
-                end)
-            end
-        end
-    end
-
-    for _, cf in ipairs(catFilters) do
-        local fb = Instance.new("TextButton")
-        fb.Size = UDim2.new(0.19, -2, 1, 0)
-        fb.BackgroundColor3 = (currentFilter == cf.Id) and config.UI.Theme.Accent or Color3.fromRGB(32, 35, 48)
-        fb.Text = cf.Label
-        fb.TextColor3 = Color3.fromRGB(255, 255, 255)
-        fb.TextSize = 9
-        fb.Font = Enum.Font.GothamMedium
-        fb.Parent = catFilterCard
-
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 5)
-        c.Parent = fb
-
-        filterButtons[cf.Id] = fb
-
-        fb.MouseButton1Click:Connect(function()
-            currentFilter = cf.Id
-            for id, b in pairs(filterButtons) do
-                b.BackgroundColor3 = (id == cf.Id) and config.UI.Theme.Accent or Color3.fromRGB(32, 35, 48)
-            end
-            refreshLocList()
         end)
     end
-
-    refreshLocList()
 
     -- ==========================================
     -- ISI KONTEN TAB 5: MOBILITAS (MOVEMENT)
