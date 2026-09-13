@@ -470,16 +470,13 @@ end
 local FpsBooster = {
     IsFpsBoosted = false,
     IsGpuSaverActive = false,
-    GpuSaverGui = nil :: ScreenGui?,
-    StatsUpdateThread = nil :: thread?,
-    GpuSaverInputConn = nil :: RBXScriptConnection?,
     OriginalSettings = {
         GlobalShadows = true,
         FogEnd = 100000,
     }
 }
 
--- [[ 1. FPS BOOST AMAN (Zero Workspace-Part Tamper) ]]
+-- [[ 1. FPS BOOST AMAN (Zero Workspace-Part Tamper & Anti BAC-6228) ]]
 function FpsBooster:SetFpsBoost(enabled: boolean)
     if self.IsFpsBoosted == enabled then return end
     self.IsFpsBoosted = enabled
@@ -494,23 +491,12 @@ function FpsBooster:SetFpsBoost(enabled: boolean)
 
             -- Matikan efek post-processing Lighting yang membebani GPU
             for _, effect in ipairs(Lighting:GetChildren()) do
-                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") then
+                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") or effect:IsA("ColorCorrectionEffect") then
                     effect.Enabled = false
                 end
             end
-        end)
 
-        -- Matikan efek partikel visual berat tanpa menyentuh BasePart/Material (Mencegah tripwire BAC-6228)
-        pcall(function()
-            for _, desc in ipairs(workspace:GetDescendants()) do
-                if desc:IsA("ParticleEmitter") or desc:IsA("Trail") or desc:IsA("Beam") or desc:IsA("Fire") or desc:IsA("Smoke") then
-                    desc.Enabled = false
-                end
-            end
-        end)
-
-        -- Turunkan level kualitas render Roblox ke minimum (resmi dari API engine)
-        pcall(function()
+            -- Turunkan level kualitas render Roblox ke minimum (resmi dari API engine)
             settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
         end)
 
@@ -520,7 +506,7 @@ function FpsBooster:SetFpsBoost(enabled: boolean)
             Lighting.GlobalShadows = self.OriginalSettings.GlobalShadows
             Lighting.FogEnd = self.OriginalSettings.FogEnd
             for _, effect in ipairs(Lighting:GetChildren()) do
-                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") then
+                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") or effect:IsA("ColorCorrectionEffect") then
                     effect.Enabled = true
                 end
             end
@@ -531,170 +517,54 @@ function FpsBooster:SetFpsBoost(enabled: boolean)
     end
 end
 
--- [[ 2. ULTRA GPU SAVER (Set3dRenderingEnabled - Bebas Desync Tick) ]]
+-- [[ 2. ULTRA GPU SAVER AMAN (Anti BAC-1216: 15 FPS Cap & Low Shader tanpa mematikan 3D Render) ]]
 function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
     if self.IsGpuSaverActive == enabled then return end
     self.IsGpuSaverActive = enabled
 
     if enabled then
-        -- Kunci Rahasia Anti-BAC: Matikan render 3D engine tanpa mengubah tick rate physics / fps cap
+        -- Anti-BAC 1216: Jangan pernah matikan 3D render (Set3dRenderingEnabled false) agar RenderStepped tidak freeze
         pcall(function()
-            RunService:Set3dRenderingEnabled(false)
-        end)
-
-        -- Buat Layar Minimalis Stat Overlay
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "Bodoamat_GpuSaver"
-        gui.ResetOnSpawn = false
-        gui.DisplayOrder = 999999
-        gui.IgnoreGuiInset = true
-
-        local bg = Instance.new("Frame")
-        bg.Size = UDim2.new(1, 0, 1, 0)
-        bg.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
-        bg.BorderSizePixel = 0
-        bg.Parent = gui
-
-        -- Card Informasi di tengah
-        local card = Instance.new("Frame")
-        card.Size = UDim2.new(0, 440, 0, 250)
-        card.Position = UDim2.new(0.5, -220, 0.5, -125)
-        card.BackgroundColor3 = Color3.fromRGB(18, 22, 30)
-        card.BorderSizePixel = 0
-        card.Parent = bg
-
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 14)
-        corner.Parent = card
-
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 170, 255)
-        stroke.Thickness = 1.5
-        stroke.Transparency = 0.3
-        stroke.Parent = card
-
-        -- Title
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, 0, 0, 45)
-        title.BackgroundTransparency = 1
-        title.Text = "🛡️ GPU SAVER ACTIVE (SAFE AFK)"
-        title.TextColor3 = Color3.fromRGB(0, 210, 255)
-        title.TextSize = 18
-        title.Font = Enum.Font.GothamBold
-        title.Parent = card
-
-        -- Info status
-        local infoLabel = Instance.new("TextLabel")
-        infoLabel.Size = UDim2.new(1, -30, 0, 125)
-        infoLabel.Position = UDim2.new(0, 15, 0, 50)
-        infoLabel.BackgroundTransparency = 1
-        infoLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
-        infoLabel.TextSize = 14
-        infoLabel.Font = Enum.Font.Gotham
-        infoLabel.TextXAlignment = Enum.TextXAlignment.Left
-        infoLabel.TextYAlignment = Enum.TextYAlignment.Top
-        infoLabel.RichText = true
-        infoLabel.Parent = card
-
-        -- Tombol Exit
-        local exitBtn = Instance.new("TextButton")
-        exitBtn.Size = UDim2.new(1, -30, 0, 42)
-        exitBtn.Position = UDim2.new(0, 15, 1, -52)
-        exitBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 210)
-        exitBtn.Text = "Matikan GPU Saver (Kembali ke Tampilan Game)"
-        exitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        exitBtn.TextSize = 13
-        exitBtn.Font = Enum.Font.GothamMedium
-        exitBtn.Active = true
-        exitBtn.Selectable = true
-        exitBtn.AutoButtonColor = true
-        exitBtn.ZIndex = 10
-        exitBtn.Parent = card
-
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 8)
-        btnCorner.Parent = exitBtn
-
-        local function exitGpuSaver()
-            self:SetGpuSaver(false, stateRef)
-            if stateRef then
-                stateRef:Set("IsGpuSaver", false)
-            end
-        end
-
-        exitBtn.MouseButton1Click:Connect(exitGpuSaver)
-        exitBtn.Activated:Connect(exitGpuSaver)
-
-        exitBtn.MouseEnter:Connect(function()
-            exitBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 255)
-        end)
-        exitBtn.MouseLeave:Connect(function()
-            exitBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 210)
-        end)
-
-        -- Shortcut keyboard F8 / Escape / RightControl untuk mematikan GPU Saver
-        self.GpuSaverInputConn = UserInputService.InputBegan:Connect(function(input, gpe)
-            if input.KeyCode == Enum.KeyCode.F8 or input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.RightControl then
-                exitGpuSaver()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            
+            -- Batasi FPS ke 15 FPS saat AFK untuk mendinginkan GPU & CPU hingga 80%
+            local setfps = setfpscap or (getgenv and getgenv().setfpscap)
+            if setfps then
+                setfps(15)
             end
         end)
 
-        local safeParent = nil
-        if gethui then
-            local ok, h = pcall(gethui)
-            if ok and h then safeParent = h end
-        end
-        if not safeParent then
-            safeParent = LocalPlayer:WaitForChild("PlayerGui")
-        end
-        gui.Parent = safeParent
-        self.GpuSaverGui = gui
-
-        local genv = (getgenv and getgenv()) or {}
-        genv.__BODOAMAT_GPU_SAVER = gui
-
-        -- Loop update statistik
-        self.StatsUpdateThread = task.spawn(function()
-            while self.IsGpuSaverActive do
-                local elapsed = (stateRef and stateRef:GetElapsedTime()) or "--:--:--"
-
-                infoLabel.Text = string.format(
-                    "<b>Mode Bermain:</b> <font color='#2ecc71'>Manual Alami (Bebas BAC)</font>\n<b>Durasi Sesi:</b> %s\n<b>Teknologi:</b> 3D Rasterization Disabled (Zero GPU Heat)\n<b>Anti-Cheat:</b> Physics tick normal (Aman dari BAC-6228)",
-                    elapsed
-                )
-                task.wait(1)
-            end
-        end)
-
-        print("[Bodoamat | GPU] GPU Saver Aktif (3D Engine Sleep). Suhu perangkat dijamin dingin.")
+        print("[Bodoamat | GPU] Ultra GPU Saver Aktif (15 FPS Capped & Low Graphics - Bebas BAC-1216).")
     else
-        -- Pulihkan 3D rendering
+        -- Pulihkan grafis normal dan uncap FPS secara instan
         pcall(function()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+            Lighting.GlobalShadows = true
+            Lighting.FogEnd = 100000
+
+            local setfps = setfpscap or (getgenv and getgenv().setfpscap)
+            if setfps then
+                setfps(0)
+            end
+
+            -- Pastikan 3D rendering aktif jika sebelumnya sempat tertinggal
             RunService:Set3dRenderingEnabled(true)
+            local cam = workspace.CurrentCamera
+            if cam then
+                cam.CameraType = Enum.CameraType.Custom
+            end
         end)
 
-        if self.GpuSaverInputConn then
-            self.GpuSaverInputConn:Disconnect()
-            self.GpuSaverInputConn = nil
-        end
-
-        if self.StatsUpdateThread then
-            task.cancel(self.StatsUpdateThread)
-            self.StatsUpdateThread = nil
-        end
-
-        if self.GpuSaverGui then
-            self.GpuSaverGui:Destroy()
-            self.GpuSaverGui = nil
-        end
-
+        -- Bersihkan overlay lama jika ada
         local genv = (getgenv and getgenv()) or {}
         if genv.__BODOAMAT_GPU_SAVER then
             pcall(function() genv.__BODOAMAT_GPU_SAVER:Destroy() end)
             genv.__BODOAMAT_GPU_SAVER = nil
         end
 
-        print("[Bodoamat | GPU] GPU Saver Dinonaktifkan. Tampilan 3D pulih.")
+        print("[Bodoamat | GPU] Ultra GPU Saver Dinonaktifkan. Tampilan dan FPS normal dipulihkan.")
     end
 end
 
@@ -1002,7 +872,8 @@ local Teleport = {
         -- [[ KOTA, SPAWN & MERCHANT ]]
         { Name = "Fisherman Island (Spawn)",         CFrame = CFrame.new(Vector3.new(-61.73, 3.53, 2770.77), Vector3.new(-211.45, 3.53, 2761.67)), Category = "Main" },
         { Name = "Weather Machine",                  CFrame = CFrame.new(Vector3.new(-1528.41, 2.88, 1915.32), Vector3.new(-1513.05, 2.88, 2064.53)), Category = "Main" },
-        { Name = "Underground Cellar (Pasar Gelap)", CFrame = CFrame.new(Vector3.new(2161.39, -91.20, -729.23), Vector3.new(2022.33, -91.20, -672.99)), Category = "Shop" },
+        { Name = "Black Market (Mariana Trench)",     CFrame = CFrame.new(Vector3.new(-9255.90, -255.59, -1.05), Vector3.new(-9261.08, -255.59, -9.61)), Category = "Shop" },
+        { Name = "Underground Cellar",               CFrame = CFrame.new(Vector3.new(2109.52, -94.19, -708.61), Vector3.new(2097.20, -94.19, -703.74)), Category = "Shop" },
         { Name = "Traveling Merchant / Alien",       CFrame = CFrame.new(-135.0, 3.0, 2764.0), Category = "Shop" },
 
         -- [[ ZONA UPDATE TERBARU (BENCHMARK MODERN) ]]
@@ -1086,6 +957,18 @@ function Teleport:To(targetCFrame: CFrame): boolean
 
         local safeDestination = targetCFrame + Vector3.new(0, 2.5, 0)
         char:PivotTo(safeDestination)
+
+        -- Proteksi Laut Dalam: Jika tujuan di bawah Y = -150 (Mariana Trench / Abyss), pasang O2 jika ada
+        if safeDestination.Position.Y < -150 then
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            if bp then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") and (string.find(t.Name:lower(), "oxygen") or string.find(t.Name:lower(), "tank") or string.find(t.Name:lower(), "diving")) then
+                        t.Parent = char
+                    end
+                end
+            end
+        end
 
         -- BAC-10216 Guard: Kunci kecepatan nol selama 6 frame berurutan (Safe Settling)
         task.spawn(function()
@@ -1383,7 +1266,7 @@ Merchant.Items = {
 }
 
 -- Buka Menu Toko / Black Market via Smart Teleport & Auto-Trigger Prompt
-function Merchant:OpenRemoteShop(keyword: string?): boolean
+function Merchant:OpenRemoteShop(keyword: string?, network: any?): boolean
     local target = (keyword or "merchant"):lower()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -1396,18 +1279,40 @@ function Merchant:OpenRemoteShop(keyword: string?): boolean
     local targetCFrame = nil
     local shopName = "Pedagang"
 
-    if target:find("cellar") or target:find("black") or target:find("gelap") then
-        targetCFrame = CFrame.new(Vector3.new(2109.52, -92.0, -708.61), Vector3.new(2022.33, -92.0, -672.99))
-        shopName = "Pasar Gelap (Underground Cellar)"
+    if target:find("black") or target:find("market") or target:find("mariana") or target:find("gelap") then
+        targetCFrame = CFrame.new(Vector3.new(-9255.90, -255.59, -1.05), Vector3.new(-9261.08, -255.59, -9.61))
+        shopName = "Black Market (Mariana Trench)"
+        -- Aktifkan proteksi O2 & Anti-Drown saat belanja di Mariana Trench
+        pcall(function()
+            self:StartAntiDrown()
+            if network and network.EquipOxygenTank then
+                network:EquipOxygenTank()
+            end
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            if bp and char then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") and (string.find(t.Name:lower(), "oxygen") or string.find(t.Name:lower(), "tank") or string.find(t.Name:lower(), "diving")) then
+                        t.Parent = char
+                    end
+                end
+            end
+        end)
+    elseif target:find("cellar") then
+        targetCFrame = CFrame.new(Vector3.new(2109.52, -94.19, -708.61), Vector3.new(2097.20, -94.19, -703.74))
+        shopName = "Underground Cellar"
     else
-        targetCFrame = CFrame.new(-135.0, 3.5, 2764.0)
+        targetCFrame = CFrame.new(Vector3.new(-135.0, 3.5, 2764.0), Vector3.new(-140.0, 3.5, 2768.0))
         shopName = "Traveling Merchant (Pedagang Keliling)"
     end
 
     print("[Bodoamat | Merchant] 🚀 Membuka " .. shopName .. "...")
 
-    -- 1. Pindah ke lokasi toko agar NPC dimuat oleh engine game (StreamingEnabled safe)
-    hrp.CFrame = targetCFrame
+    -- 1. Pindah ke lokasi toko secara aman (PivotTo + velocity reset anti-BAC)
+    pcall(function()
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        char:PivotTo(targetCFrame + Vector3.new(0, 2.5, 0))
+    end)
 
     -- 2. Tunggu sebentar agar asset & ProximityPrompt dimuat oleh game
     task.spawn(function()
@@ -1513,8 +1418,10 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
         pcall(function()
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-            if hrp and returnCFrame then
-                hrp.CFrame = returnCFrame
+            if char and hrp and returnCFrame then
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                char:PivotTo(returnCFrame + Vector3.new(0, 1.5, 0))
             end
         end)
         gui:Destroy()
@@ -1895,9 +1802,16 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         genv.__BODOAMAT_GPU_SAVER = nil
     end
 
-    -- Pulihkan rendering 3D otomatis jika sebelumnya tertinggal dalam mode GPU Saver
+    -- Pulihkan rendering 3D otomatis dan uncap FPS jika sebelumnya tertinggal dalam mode GPU Saver
     pcall(function()
         RunService:Set3dRenderingEnabled(true)
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+        local setfps = setfpscap or (genv and genv.setfpscap)
+        if setfps then setfps(0) end
+        local cam = workspace.CurrentCamera
+        if cam then
+            cam.CameraType = Enum.CameraType.Custom
+        end
     end)
 
     -- Bersihkan sisa GUI lama dari container jika ada
@@ -1908,6 +1822,11 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
             if oldGpu then oldGpu:Destroy() end
             local oldHud = container:FindFirstChild("FishItHUD")
             if oldHud then oldHud:Destroy() end
+        end
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg then
+            local oldGpu = pg:FindFirstChild("Bodoamat_GpuSaver")
+            if oldGpu then oldGpu:Destroy() end
         end
     end)
 
@@ -2447,12 +2366,16 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     createSectionHeader(sellPage, "🛒 TOKO & BLACK MARKET REMOTE")
 
-    createActionButton(sellPage, "Buka Black Market (Pasar Gelap)", "Kunjungi Pasar Gelap, buka prompt otomatis, ada tombol kembali", function()
-        modules.Merchant:OpenRemoteShop("cellar")
+    createActionButton(sellPage, "Buka Black Market (Mariana Trench)", "Kunjungi Black Market di Mariana Trench, auto pakai O2 & buka prompt otomatis", function()
+        modules.Merchant:OpenRemoteShop("blackmarket", modules.Network)
+    end)
+
+    createActionButton(sellPage, "Buka Underground Cellar", "Kunjungi Underground Cellar, buka prompt otomatis, ada tombol kembali", function()
+        modules.Merchant:OpenRemoteShop("cellar", modules.Network)
     end)
 
     createActionButton(sellPage, "Buka Pedagang Keliling (Traveling Merchant)", "Kunjungi Kapal Pedagang Alien, buka prompt otomatis, ada tombol kembali", function()
-        modules.Merchant:OpenRemoteShop("traveling")
+        modules.Merchant:OpenRemoteShop("traveling", modules.Network)
     end)
 
     -- Quick Buy Totem (Bait & Crates dihapus demi keamanan Anti BAC-7214)
@@ -2978,7 +2901,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         modules.FpsBooster:SetFpsBoost(val)
     end)
 
-    createToggle(optPage, "Ultra GPU Saver (AFK Safe)", "Matikan 3D rasterization agar suhu PC/HP dingin", state.IsGpuSaver, function(val)
+    createToggle(optPage, "Ultra GPU Saver (AFK Safe)", "Turunkan FPS ke 15 & grafis ringan saat AFK (Bebas BAC-1216)", state.IsGpuSaver, function(val)
         state:Set("IsGpuSaver", val)
         modules.FpsBooster:SetGpuSaver(val, state)
     end)

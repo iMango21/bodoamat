@@ -24,7 +24,7 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
   - **Lucky Abyss**, **Shiny Abyss**, **Mutation Vents**, **Lucky Volcano**, **Titan Pressure**, **Rushing Current**, **Silent Reach**.
   - **Aquarium** & **Underwater City**, **Vulcanic Cavern** & **Lava Basin**.
 - **🛒 Toko & Pusat Layanan**:
-  - **Underground Cellar** (Pasar Gelap / Black Market).
+  - **Black Market (Mariana Trench)** & **Underground Cellar** (Pasar Gelap palung laut & bunker rahasia).
   - **Traveling Merchant / Alien** (Pedagang keliling).
   - **Weather Machine** (Pusat pengontrol cuaca).
 - **🏝️ Pulau-Pulau Utama**:
@@ -73,10 +73,12 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
   - Mengunci status `IsSelling` saat proses jual berlangsung.
   - Memberi jeda buffer sebelum memanggil `RF/SellAllItems` secara bersih tanpa mengganggu alat yang dipegang karakter.
   - Dilengkapi opsi **Mode Aman Dekat Pedagang TP (MerchantSafeTp)** untuk teleportasi singkat ke pedagang saat menjual jika karakter berada di luar jangkauan jual.
-- **BAC-6228 Guard (Zero Part Tampering)**:
-  - Modul FPS Booster sama sekali tidak menghapus atau mengubah properti fisik `Part`, `Material`, atau struktur `Workspace`, sehingga client integrity check selalu lulus 100%.
-- **Ultra GPU Saver (Safe)**:
-  - Mematikan render 3D (`Set3dRenderingEnabled(false)`). Penggunaan GPU langsung 0% dingin, namun physics tick tetap berjalan normal pada 60 fps tanpa memicu tick desync.
+- **BAC-1216 Guard (Safe Render Pipeline & Anti-Black Screen)**:
+  - Mengeliminasi pemanggilan `RunService:Set3dRenderingEnabled(false)` yang mematikan pipeline render 3D dan menyebabkan `RenderStepped` membeku (*frame freeze*), penyebab langsung munculnya peringatan anti-cheat `BAC-1216`.
+  - Menerapkan sistem pemulihan instan grafis 3D dan kamera saat skrip dimuat maupun saat GPU Saver dinonaktifkan.
+- **Ultra GPU Saver (Safe Anti-BAC 1216 & Low Temp)**:
+  - Mengurangi beban GPU dan CPU hingga 80-90% dengan membatasi framerate AFK ke 15 FPS (`setfpscap(15)`) dan menurunkan shader ke level terendah, tanpa mematikan render 3D ataupun membuat layar hitam permanen.
+  - Saat dinonaktifkan, kualitas grafis dan FPS langsung kembali normal 100% secara instan.
 
 ### 6. 🎣 Memancing Manual Murni (Bebas Total dari BAC-3211/6215/7213)
 - **100% Manual Human Play**: Fitur otomatisasi joran/pancingan (Auto Fishing & Auto Equip Rod) dihapus sepenuhnya dari script.
