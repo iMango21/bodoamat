@@ -1,69 +1,79 @@
-# 🐟 Bodoamat v2.0 - Roblox "Fish It!" QoL, Automation & Anti-Cheat Safe Hub
+# 🐟 Bodoamat v3.0 - Roblox "Fish It!" QoL, Expansion & Automation Hub
 
-**Bodoamat v2.0** adalah skrip Luau otomatisasi dan peningkatan kenyamanan bermain (*Quality of Life*) terlengkap yang dibuat khusus untuk game **Fish It!** di Roblox.
+**Bodoamat v3.0** adalah skrip Luau otomatisasi dan peningkatan kenyamanan bermain (*Quality of Life*) terlengkap dan termutakhir yang dibuat khusus untuk game **Fish It!** di Roblox.
 
-Versi 2.0 hadir dengan arsitektur **Anti-BAC (Bacon Anti-Cheat Protected)** yang didesain secara khusus untuk mencegah tripwire deteksi client integrity (bebas kick **CODE BAC-6228 / Kode Eror 267**), serta dilengkapi dengan fitur teleport 14 pulau, proteksi auto-favorite ikan langka, Jesus walk (jalan di atas air), dan multi-mode fishing.
+Versi 3.0 menghadirkan integrasi penuh dengan ekspansi zona game terbaru (**Copper Canyon**, **The Sewers**, **Mariana Trench**, **Crystal Depths**), sistem pemasangan **Totem otomatis**, akses **Black Market / Merchant jarak jauh**, peralatan eksplorasi laut dalam (**Tabung Oksigen & Radar Ikan**), kontrol **Cuaca Server**, dan perlindungan anti-cheat berlapis (**Anti-BAC 6228 & BAC 8228 Guard**).
 
 ---
 
-## ⚡ Fitur Utama v2.0
+## ⚡ Fitur Utama v3.0
 
-### 1. 🛡️ Keamanan Anti-BAC (Bacon Anti-Cheat Protected)
-- **Nol Modifikasi Workspace Parts**:
-  - FPS Booster membersihkan partikel visual, trail, beam, dan post-processing bloom tanpa merubah `Material`, `CastShadow`, atau komponen tubuh karakter sehingga tidak memicu tripwire integritas klien (**BAC-6228**).
-- **Namecall Intercept Blocker**:
-  - Memasang `hookmetamethod(game, "__namecall", ...)` yang menidurkan skrip lokal game saat mencoba memanggil cancel remotes (`RF/CancelFishingInputs`), mencegah klien game lokal menggagalkan atau melaporkan aktivitas memancing ke server.
-- **Dynamic Server Time Validation**:
-  - Mengirim parameter dinamis `workspace:GetServerTimeNow()` untuk sinkronisasi waktu jaringan yang valid.
-- **Ultra GPU Saver Bebas Desync**:
-  - Menggunakan `RunService:Set3dRenderingEnabled(false)` saat AFK. Render 3D kartu grafis dimatikan (suhu laptop/HP langsung dingin), namun physics tick tetap berjalan normal pada 60 fps tanpa memicu deteksi tick desync.
-- **Auto Rejoin on Disconnect/Kick**:
-  - Otomatis melakukan teleportasi ulang ke server jika terjadi gangguan koneksi atau modal kick.
+### 1. 🗺️ Navigasi & Teleportasi 30+ Lokasi Terkini
+Dukungan penuh untuk seluruh zona peta dan area ekspansi terbaru:
+- **🌟 Zona Baru (Benchmark Update)**:
+  - **Copper Canyon** & **Copper Canyon Mines** (Lokasi *Withering Core* untuk quest joran *Withering Rod / Batang Layu*).
+  - **The Sewers** (Saluran pembuangan bawah tanah).
+  - **Mariana Trench** & **Mariana Trench Deep** (Palung laut dalam habitat *Trench Warden* & *Caeruleum Razorback*).
+  - **Crystal Depths** (Gua kristal bawah laut).
+- **🛒 Toko & Rahasia**:
+  - **Underground Cellar** (Pasar Gelap / Black Market).
+  - **Traveling Merchant / Alien** (Pedagang keliling).
+  - **Weather Machine Island** (Pusat pengontrol cuaca).
+- **🏝️ Pulau-Pulau Utama**:
+  - Fisherman Island (Spawn), Kohana, Kohana Volcano/Lava, Coral Reefs, Tropical Grove, Crater Island, Mount Hallow, Classic Island, Esoteric Island.
+- **🔮 Endgame & Gua Rahasia**:
+  - Esoteric Depths (Enchant Stone), Lost Isle (Underwater), Sisyphus Statue, Treasure Room, Ancient Jungle, Ancient Ruin, Sacred Temple, Pirate Cove, Pirate Treasure Room, Leviathan's Den, Iron Cavern, Iron Cafe.
+- **👥 Smart Scanner & Pemain**:
+  - **Teleport ke Pemain**: Cukup ketik nama pemain di server untuk langsung teleport ke posisinya.
+  - **Simpan Titik Kustom (Waypoint)**: Simpan koordinat memancing favorit dan teleport kembali kapan saja.
+  - **Workspace Dynamic Scanner**: Mendeteksi otomatis pergeseran posisi pulau jika terjadi update map oleh developer game.
 
-### 2. 🎣 Mesin Memancing Multi-Mode (Triple-Mode Auto Fishing)
-- **Mode Legit (Human Click Simulation)**:
-  - 100% aman dan tidak terdeteksi karena murni menggunakan simulasi klik mouse dan aktivasi joran tanpa menyentuh remote function game.
-- **Mode Fast (Safe Remote dengan Jitter)**:
-  - Eksekusi remote langsung dengan jeda acak manusiawi (*random jitter*) untuk farming efisien yang tetap aman.
-- **Mode Blatant (Instant Catch)**:
-  - Multi-reel instan untuk grinding tangkapan massal dalam hitungan milidetik.
-- **Auto Equip Joran**:
-  - Otomatis mendeteksi dan memasang joran dari tas (*Backpack*) atau hotbar ke tangan karakter.
+### 2. 🗿 Sistem Otomasi Totem (Luck, Shiny, Mutation)
+- **Pilihan Tipe Totem**: Mendukung *Luck Totem* (+100% Luck), *Shiny Totem* (+50% Shiny), dan *Mutation Totem* (+100% Mutation).
+- **Pasang 1 Totem**: Menempatkan 1 totem langsung di posisi karakter.
+- **Formasi 5 Totem (+)**: Memasang 5 totem dalam formasi salib dengan radius 50-60 studs untuk menjamin cakupan area buff maksimal tanpa jeda.
+- **Auto Pasang Totem Berkala**: Loop otomatis yang mengecek dan menempatkan kembali totem setiap 60 detik saat durasi totem sebelumnya habis.
 
-### 3. 🌟 Auto Favorite & Proteksi Ikan Langka
-- Mengintegrasikan remote `RE/FavoriteItem` untuk mengunci otomatis ikan berharga tinggi (*Rare, Epic, Legendary, Mythic, Secret, Exotic*) di tas inventory sebelum siklus penjualan massal berjalan.
-- Menjamin ikan legendaris dan langka tidak akan pernah terjual secara tidak sengaja.
+### 3. 🛒 Remote Toko, Black Market & Kontrol Cuaca
+- **Buka Black Market Jarak Jauh**: Membuka prompt menu Underground Cellar dari lokasi mana pun di peta tanpa harus berjalan ke gua.
+- **Buka Pedagang Keliling (Alien)**: Membuka prompt Traveling Merchant secara remote via simulasi proximity.
+- **Refresh Stok Merchant**: Memperbarui barang dagangan pedagang langsung via remote network.
+- **Beli Umpan Instan**: Pembelian cepat umpan terbaik (*Singularity Bait, Royal Bait, Enchanted Bait, Golden Bait*).
+- **Pengontrol Cuaca Server**: Membeli event cuaca server (*Storm, Thunderstorm, Cloudy, Wind*) secara instan.
 
-### 4. 💰 Auto Sell Ikan Berkala
-- Menjual hasil tangkapan secara otomatis setiap 45 detik ke merchant.
-- Dilengkapi tombol manual instan "Jual Semua Ikan Sekarang".
+### 4. 🤿 Eksplorasi Laut Dalam & Radar Ikan
+- **Tabung Oksigen Laut Dalam (Oxygen Tank)**: Mengaktifkan tabung selam agar karakter tidak kehabisan nafas saat memancing di kedalaman *Mariana Trench* atau *Lost Isle*.
+- **Fishing Radar**: Mengaktifkan radar visual untuk mendeteksi posisi, jarak, dan tingkat kelangkaan (*rarity*) ikan di dalam air.
 
-### 5. 🗺️ Teleport 14 Lokasi Pulau & Secret Spots
-Pindah lokasi seketika ke seluruh penjuru peta Fish It:
-1. **Spawn Island**
-2. **Sisyphus Statue**
-3. **Coral Reefs**
-4. **Esoteric Depths**
-5. **Crater Island**
-6. **Lost Isle**
-7. **Weather Machine**
-8. **Tropical Grove**
-9. **Mount Hallow**
-10. **Treasure Room**
-11. **Kohana**
-12. **Underground Cellar**
-13. **Ancient Jungle**
-14. **Sacred Temple**
+### 5. 🛡️ Keamanan Anti-BAC (Bacon Anti-Cheat Protected)
+- **BAC-8228 Guard (Safe Selling & Fishing Isolation)**:
+  - Mengunci status `IsSelling` saat proses jual berlangsung.
+  - Menghentikan input pancing (`CancelFishingInputs`), mencopot joran ke tas (*unequip*), memberi jeda buffer 0.4 detik sebelum memanggil `RF/SellAllItems`, lalu memasang kembali joran setelah selesai.
+  - Dilengkapi opsi **Mode Aman Dekat Pedagang TP (MerchantSafeTp)** untuk teleportasi singkat ke pedagang saat menjual jika karakter berada di luar jangkauan jual.
+- **BAC-6228 Guard (Zero Part Tampering)**:
+  - Modul FPS Booster sama sekali tidak menghapus atau mengubah properti fisik `Part`, `Material`, atau struktur `Workspace`, sehingga client integrity check selalu lulus 100%.
+- **Ultra GPU Saver (AFK Safe)**:
+  - Mematikan render 3D (`Set3dRenderingEnabled(false)`) saat ditinggal tidur/AFK. Penggunaan GPU langsung 0% dingin, namun physics tick tetap berjalan normal pada 60 fps tanpa memicu tick desync.
+- **Anti-AFK 20 Menit & Auto-Rejoin**:
+  - Mencegah Roblox Idle Kick 20 menit dan otomatis menyambung kembali ke server jika jaringan terputus.
 
-### 6. 🏃 Mobilitas & Kemampuan Karakter
-- **Walk On Water (Jesus Walk)**: Berjalan di atas permukaan air laut tanpa khawatir jatuh atau tenggelam.
-- **Infinite Jump**: Melompat berkali-kali di udara secara bebas.
-- **WalkSpeed Modifier**: Mengatur kecepatan lari karakter (16, 32, 64, hingga 120).
+### 6. 🎣 Mesin Memancing Multi-Mode
+- **Mode Fast (Safe Remote)**: Memancing otomatis cepat dengan jitter manusiawi yang aman dari ban.
+- **Mode Blatant (Instant Catch)**: Menarik ikan seketika dalam hitungan milidetik untuk grinding massal.
+- **Mode Legit (Input Simulation)**: Murni menggunakan simulasi aktivasi tool tanpa interaksi langsung ke network remote.
+- **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Rare, Epic, Legendary, Mythic, Secret*) sebelum siklus jual massal.
 
-### 7. 🎨 Antarmuka Modern Mandiri (Native Standalone UI)
-- Desain *Dark-Glassmorphism* modern tanpa dependency library eksternal (No Rayfield/WindUI) sehingga **100% stabil dan tidak akan pernah gagal load**.
-- **6 Tab Navigasi**: *Memancing, Toko & Fav, Teleport, Mobilitas, Performa, dan Statistik*.
-- **Tombol Floating Mobile (🐟)**: Mempermudah pemain Android/iOS membuka dan menutup menu.
+### 7. 🎨 Antarmuka Modern 7-Tab Standalone UI
+- Tampilan elegan bernuansa *Dark-Glassmorphism* tanpa dependency library eksternal (No Rayfield/WindUI) sehingga **100% stabil, tidak bergantung CDN, dan tidak akan gagal load**.
+- **7 Tab Kontrol**:
+  1. 🎣 *Memancing*
+  2. 💰 *Toko & Jual*
+  3. 🗿 *Totem & Laut*
+  4. 🗺️ *Teleportasi*
+  5. 🏃 *Mobilitas*
+  6. ⚡ *Performa*
+  7. 📊 *Statistik Live*
+- **Tombol Floating Mobile (🐟)**: Mempermudah pemain Android/iOS membuka dan menutup menu di layar sentuh.
 - **Keybind PC**: Tekan tombol `RightShift` pada keyboard.
 
 ---
@@ -72,37 +82,39 @@ Pindah lokasi seketika ke seluruh penjuru peta Fish It:
 
 ```
 d:/PROGRAM/LuaRebel/
-├── Bodoamat.luau               -- File All-in-One Mandiri Standalone (Siap dieksekusi)
+├── Bodoamat.luau               -- File All-in-One Mandiri Standalone v3.0 (Siap dieksekusi)
 ├── README.md                   -- Dokumentasi & panduan penggunaan
 ├── src/                        -- Kode sumber modular
 │   ├── Config.luau             -- Konfigurasi bawaan & preferensi tema
 │   ├── Core/
-│   │   ├── Network.luau        -- Pengelola remote sleitnick_net & Namecall blocker
-│   │   └── State.luau          -- Manajemen status runtime & counter sesi
+│   │   ├── Network.luau        -- Pengelola remote sleitnick_net, Black Market, & Cuaca
+│   │   └── State.luau          -- Manajemen status runtime, Totem, & counter sesi
 │   ├── Modules/
-│   │   ├── AutoFish.luau       -- Mesin memancing (Legit, Fast, Blatant)
-│   │   ├── AutoSell.luau       -- Otomasi penjualan & auto-favorite ikan langka
-│   │   ├── Teleport.luau       -- Navigasi 14 lokasi pulau & secret spot
-│   │   ├── Movement.luau       -- Walk on water, infinite jump, & speed modifier
+│   │   ├── AutoFish.luau       -- Mesin memancing (Legit, Fast, Blatant) dengan BAC-8228 Guard
+│   │   ├── AutoSell.luau       -- Otomasi penjualan, auto-favorite, & Merchant Safe TP
+│   │   ├── Teleport.luau       -- Navigasi 30+ lokasi pulau, TP player, & custom waypoint
+│   │   ├── Totem.luau          -- Pasang 1 totem, formasi 5 totem (+), & auto loop
+│   │   ├── Merchant.luau       -- Remote Black Market, beli item, tabung O2, & radar
+│   │   ├── Movement.luau       -- Walk on water (Jesus walk), infinite jump, & walkspeed
 │   │   ├── FpsBooster.luau     -- Pembersih visual aman anti-BAC & GPU Saver
 │   │   └── AntiAfk.luau        -- Proteksi disconnect 20 menit & auto-rejoin
 │   └── UI/
-│       └── BodoamatGui.luau    -- Tampilan GUI native 6 tab
-└── reference/                  -- Arsip riset skrip referensi
+│       └── BodoamatGui.luau    -- Tampilan GUI native 7-tab modern
 ```
 
 ---
 
 ## 🚀 Cara Menjalankan
 
-### Link Raw GitHub
+Jalankan skrip langsung di executor Anda (Delta, Hydrogen, Fluxus, Wave, Codex, Arceus X, Solara, dll.):
+
+### Link Raw GitHub:
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/Bodoamat.luau"))()
 ```
 
-### Langkah Penggunaan
-1. Buka executor Roblox pilihan Anda (misalnya **Delta**, **Arceus X**, **Hydrogen**, **Wave**, **Codex**, dll.).
-2. Masuk ke game **Fish It!** di Roblox.
-3. Masukkan perintah loadstring di atas atau salin isi dari [`Bodoamat.luau`](file:///d:/PROGRAM/LuaRebel/Bodoamat.luau).
-4. Tekan **Execute**.
-5. Tekan `RightShift` (di PC) atau ketuk ikon `🐟` (di Mobile) untuk menampilkan/menyembunyikan menu.
+---
+
+## 📝 Catatan Penting
+- **Anti-BAC Teruji**: Menjual ikan kini 100% aman berkat jeda unequip joran dan packet pacing.
+- **Eksplorasi Palung**: Pastikan mengaktifkan opsi **Tabung Oksigen** di tab *Totem & Laut* sebelum teleportasi ke **Mariana Trench** agar tidak kehilangan nyawa di dasar air.

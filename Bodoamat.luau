@@ -1,22 +1,20 @@
 --!strict
 --[[
     ╔═══════════════════════════════════════════════════════════════╗
-    ║                     BODOAMAT v2.0 - FISH IT                   ║
+    ║                     BODOAMAT v3.0 - FISH IT                   ║
     ║   Quality of Life, Automation Hub & Anti-BAC Protected       ║
     ║   Hosted at: https://github.com/iMango21/bodoamat            ║
     ╚═══════════════════════════════════════════════════════════════╝
     
-    Fitur Unggulan v2.0:
-    - 🛡️ Safe Anti-BAC: Nol modifikasi Workspace parts, bebas error CODE BAC-6228
-    - ⚡ Namecall Intercept Blocker: Menidurkan skrip lokal game agar tidak cancel kail
-    - 🎣 3 Mode Memancing: Legit (Human Input), Fast (Safe Remote), Blatant (Instant)
-    - 🌟 Auto Favorite: Mengamankan ikan langka (Legendary, Mythic, Secret) dari penjualan
-    - 💰 Auto Sell: Menjual ikan otomatis berkala dengan filter proteksi
-    - 🗺️ Teleport 14 Lokasi Pulau & Secret Spots (Sisyphus, Esoteric, Sacred Temple, dll.)
-    - 🌊 Walk On Water (Jesus Walk): Berjalan aman di atas air tanpa tenggelam
-    - 🦘 Infinite Jump & WalkSpeed Modifier
-    - ❄️ Ultra GPU Saver: Mematikan 3D rasterization (Laptop/HP dingin 0% panas, bebas tick desync)
-    - 🔄 Anti-AFK 20 Menit & Auto-Rejoin saat terputus
+    Changelog v3.0:
+    - 🗺️ 30+ Lokasi Teleportasi Baru: Copper Canyon, Sewers, Mariana Trench, Crystal Depths, dll.
+    - 🗿 Sistem Totem Otomatis: Pasang 1 Totem, Formasi 5 Totem (+), dan Auto-Deploy Loop (Luck/Shiny/Mutation)
+    - 🛒 Remote Merchant & Black Market: Buka Pasar Gelap & Traveling Merchant jarak jauh via prompt
+    - 🤿 Eksplorasi Laut Dalam & Radar: Tabung Oksigen Anti-Tenggelam & Radar Ikan
+    - ⛈️ Pengontrol Cuaca Server: Beli Storm, Thunderstorm, Cloudy, Wind langsung
+    - 🛡️ Safe Auto-Sell (BAC-8228 Guard): Buffer 0.4s, CancelInput, unequip, dan Merchant-Safe TP
+    - 🎣 3 Mode Auto-Fishing: Blatant (Instant), Fast (Safe Remote), Legit (Input Humanoid)
+    - 🎨 7-Tab Glassmorphism GUI: Mobile & PC touch-friendly dengan tombol floating 🐟
 ]]
 
 -- Proteksi Instance Duplikat
@@ -27,41 +25,80 @@ end
 _G.__BODOAMAT_LOADED = true
 
 -- ============================================================
--- 1. KONFIGURASI SISTEM
+-- GLOBAL SERVICES & SHORTCUTS
+-- ============================================================
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ============================================================
+-- 1. CONFIGURATION
 -- ============================================================
 local Config = {
+    -- Auto Fishing
     AutoFish = {
         Enabled = false,
-        Mode = "Fast",          -- "Fast", "Blatant", atau "Legit"
-        CastDelay = 0.4,
-        CatchDelay = 0.25,
-        AutoEquipRod = true,
+        Mode = "Fast",          -- "Fast" (Safe Remote), "Blatant" (Instant Reel), "Legit" (Human Click)
+        CastDelay = 0.4,        -- Delay sebelum menarik/proses gigitan (detik)
+        CatchDelay = 0.25,      -- Delay jeda antar tangkapan (detik)
+        AutoEquipRod = true,    -- Otomatis mencari & equip joran jika belum dipakai
     },
+
+    -- Anti-AFK & Disconnect Protection
     AntiAfk = {
         Enabled = true,
-        AutoRejoin = true,
-        MicroMovement = true,
-        MoveInterval = 240,
+        AutoRejoin = true,      -- Otomatis re-teleport ke server jika terjadi disconnect / kick
+        MicroMovement = true,   -- Gerakan mikro karakter setiap beberapa menit
+        MoveInterval = 240,     -- Interval gerakan mikro (detik)
     },
+
+    -- Optimasi Grafis & Kinerja (Safe Anti-BAC)
     Performance = {
-        FpsBoost = false,
-        GpuSaver = false,
+        FpsBoost = false,       -- Menghilangkan partikel & post-effects (tanpa merusak model/parts)
+        GpuSaver = false,       -- Mematikan raster 3D (GPU 0% panas, physics tick normal)
     },
+
+    -- Auto Sell & Auto Favorite
     AutoSell = {
         Enabled = false,
-        Interval = 45,
-        AutoFavorite = true,
-        MinRarity = "Legendary",
+        Interval = 45,          -- Menjual otomatis setiap N detik
+        AutoFavorite = true,    -- Mengunci ikan langka sebelum dijual
+        MinRarity = "Legendary",-- Tingkat kelangkaan minimal yang diamankan
+        MerchantSafeTp = true,  -- TP sementara ke pedagang saat menjual jika di luar jarak
     },
+
+    -- Totem Automation
+    Totem = {
+        AutoTotem = false,
+        Type = "Luck Totem",    -- "Luck Totem", "Shiny Totem", "Mutation Totem"
+        Interval = 60,
+    },
+
+    -- Deep Sea & Merchant Tools
+    DeepSea = {
+        OxygenTank = false,
+        FishingRadar = false,
+    },
+
+    -- Movement & QoL
     Movement = {
-        WaterWalk = false,
-        InfiniteJump = false,
+        WaterWalk = false,      -- Berjalan di atas air (Jesus Walk)
+        InfiniteJump = false,   -- Lompat di udara tanpa batas
         WalkSpeed = 16,
         JumpPower = 50,
     },
+
+    -- Desain UI
     UI = {
-        Title = "BODOAMAT v2.0",
-        Subtitle = "Fish It! Automation & Anti-Cheat Safe Hub",
+        Title = "BODOAMAT",
+        Subtitle = "Fish It! v3.0 - Expansion & Complete Automation",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background = Color3.fromRGB(16, 18, 26),
@@ -81,24 +118,37 @@ local Config = {
 -- 2. CORE: STATE MANAGEMENT
 -- ============================================================
 local State = {
+    -- Runtime states
     IsFishing = false,
+    IsSelling = false,
     FishingMode = "Fast",
     IsAntiAfk = true,
     IsFpsBoost = false,
     IsGpuSaver = false,
     IsAutoSell = false,
+    MerchantSafeTp = false,
     IsAutoFavorite = true,
     MinFavoriteRarity = "Legendary",
+
+    -- Totem & Laut Dalam (v3.0)
+    IsAutoTotem = false,
+    TotemType = "Luck Totem",
+    IsRadar = false,
+    IsOxygenEquipped = false,
+    
+    -- Movement
     IsWaterWalk = false,
     IsInfJump = false,
     WalkSpeed = 16,
     JumpPower = 50,
 
+    -- Statistika Session
     StartTime = os.time(),
     FishCaught = 0,
     TotalCoinsEarned = 0,
     LastStatusMessage = "Sistem Siap",
 
+    -- Listeners
     Listeners = {} :: { [string]: { (any) -> () } }
 }
 
@@ -127,21 +177,16 @@ function State:OnChange(key: string, callback: (any) -> ())
 end
 
 -- ============================================================
--- 3. CORE: NETWORK HANDLER & NAMECALL BLOCKER (ANTI-BAC)
+-- 3. CORE: NETWORK HANDLER
 -- ============================================================
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
 local Network = {
     HasRemotes = false,
     Remotes = {} :: { [string]: Instance? },
-    BlockClientCancel = true,
-    HookInstalled = false,
 }
 
-function Network:Init()
-    pcall(function()
+-- Inisialisasi dan pencarian remote sleitnick_net
+function Network:Init(): boolean
+    local success, err = pcall(function()
         local packages = ReplicatedStorage:WaitForChild("Packages", 5)
         if not packages then return end
 
@@ -160,77 +205,63 @@ function Network:Init()
         local netFolder = netPackage:FindFirstChild("net")
         if not netFolder then return end
 
-        self.Remotes["ChargeRod"]      = netFolder:FindFirstChild("RF/ChargeFishingRod")
-        self.Remotes["RequestGame"]    = netFolder:FindFirstChild("RF/RequestFishingMinigameStarted")
-        self.Remotes["CompleteGame"]   = netFolder:FindFirstChild("RE/FishingCompleted")
-        self.Remotes["CancelInput"]    = netFolder:FindFirstChild("RF/CancelFishingInputs")
-        self.Remotes["SellAll"]        = netFolder:FindFirstChild("RF/SellAllItems")
-        self.Remotes["EquipHotbar"]    = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
-        self.Remotes["Favorite"]       = netFolder:FindFirstChild("RE/FavoriteItem")
-        self.Remotes["AutoFishState"]  = netFolder:FindFirstChild("RF/UpdateAutoFishingState")
+        -- Petakan remote yang dibutuhkan sesuai referensi proven working (moron_fish_it & raw_nanda)
+        self.Remotes["ChargeRod"]       = netFolder:WaitForChild("RF/ChargeFishingRod", 5)
+        self.Remotes["RequestGame"]     = netFolder:WaitForChild("RF/RequestFishingMinigameStarted", 5)
+        self.Remotes["CompleteGame"]    = netFolder:WaitForChild("RE/FishingCompleted", 5)
+        self.Remotes["CancelInput"]     = netFolder:WaitForChild("RF/CancelFishingInputs", 5)
+        self.Remotes["SellAll"]         = netFolder:WaitForChild("RF/SellAllItems", 5)
+        self.Remotes["EquipHotbar"]     = netFolder:WaitForChild("RE/EquipToolFromHotbar", 5)
+        self.Remotes["UnequipHotbar"]   = netFolder:WaitForChild("RE/UnequipToolFromHotbar", 5)
+        self.Remotes["Favorite"]        = netFolder:WaitForChild("RE/FavoriteItem", 5)
+        self.Remotes["AutoFishState"]   = netFolder:FindFirstChild("RF/UpdateAutoFishingState")
+        
+        -- Remote Tambahan untuk Fitur Modern (Laut Dalam, Toko & Cuaca)
+        self.Remotes["EquipTank"]       = netFolder:FindFirstChild("RF/EquipOxygenTank")
+        self.Remotes["UpdateRadar"]     = netFolder:FindFirstChild("RF/UpdateFishingRadar")
+        self.Remotes["BuyWeather"]      = netFolder:FindFirstChild("RF/PurchaseWeatherEvent")
+        self.Remotes["BuyItem"]         = netFolder:FindFirstChild("RF/BuyItem")
+        self.Remotes["RefreshMerchant"] = netFolder:FindFirstChild("RF/RefreshMerchant")
 
         self.HasRemotes = (self.Remotes["ChargeRod"] ~= nil and self.Remotes["CompleteGame"] ~= nil)
     end)
 
-    -- Pasang Hook Metamethod Namecall untuk memblokir interupsi skrip game lokal (Anti-BAC Tripwire)
-    if not self.HookInstalled then
-        pcall(function()
-            local hook = (hookmetamethod :: any)
-            local getNamecall = (getnamecallmethod :: any)
-            local isCaller = (checkcaller :: any)
-
-            if typeof(hook) == "function" and typeof(getNamecall) == "function" and typeof(isCaller) == "function" then
-                local blocked = {
-                    [self.Remotes["ChargeRod"]] = true,
-                    [self.Remotes["RequestGame"]] = true,
-                    [self.Remotes["CompleteGame"]] = true,
-                    [self.Remotes["CancelInput"]] = true,
-                }
-
-                local oldNamecall
-                oldNamecall = hook(game, "__namecall", function(selfObj, ...)
-                    local method = getNamecall()
-                    if Network.BlockClientCancel and blocked[selfObj] and not isCaller() then
-                        if method == "InvokeServer" then
-                            return task.wait(9e9)
-                        elseif method == "FireServer" then
-                            return nil
-                        end
-                    end
-                    return oldNamecall(selfObj, ...)
-                end)
-                self.HookInstalled = true
-                print("[Bodoamat | Security] Metamethod Namecall Anti-Interupsi terpasang.")
-            end
-        end)
+    if self.HasRemotes then
+        print("[Bodoamat] Jaringan game (sleitnick_net) berhasil terhubung 100%.")
+    else
+        warn("[Bodoamat] Remote jaringan belum lengkap: " .. tostring(err))
     end
 
     return self.HasRemotes
 end
 
+-- Wrapper: Lempar Kail (Charge)
 function Network:ChargeRod(power: number?): boolean
     local remote = self.Remotes["ChargeRod"]
     if remote and remote:IsA("RemoteFunction") then
         local ok, _ = pcall(function()
-            remote:InvokeServer(power or 1)
+            -- 1755848498.4834 adalah konstanta full charge yang terbukti berfungsi di Fish It
+            remote:InvokeServer(power or 1755848498.4834)
         end)
         return ok
     end
     return false
 end
 
-function Network:RequestMinigame(): boolean
+-- Wrapper: Permintaan Minigame
+function Network:RequestMinigame(arg1: number?, arg2: number?): boolean
     local remote = self.Remotes["RequestGame"]
     if remote and remote:IsA("RemoteFunction") then
         local ok, _ = pcall(function()
-            local args = {-1.233, 1, workspace:GetServerTimeNow()}
-            remote:InvokeServer(unpack(args))
+            -- Parameter teruji: 1.2854545116425, 1
+            remote:InvokeServer(arg1 or 1.2854545116425, arg2 or 1)
         end)
         return ok
     end
     return false
 end
 
+-- Wrapper: Selesaikan Tangkapan (Reel)
 function Network:CompleteFishing(): boolean
     local remote = self.Remotes["CompleteGame"]
     if remote and remote:IsA("RemoteEvent") then
@@ -242,6 +273,19 @@ function Network:CompleteFishing(): boolean
     return false
 end
 
+-- Wrapper: Batalkan Input Kail
+function Network:CancelInput(): boolean
+    local remote = self.Remotes["CancelInput"]
+    if remote and remote:IsA("RemoteFunction") then
+        local ok, _ = pcall(function()
+            remote:InvokeServer()
+        end)
+        return ok
+    end
+    return false
+end
+
+-- Wrapper: Jual Semua Ikan
 function Network:SellAll(): boolean
     local remote = self.Remotes["SellAll"]
     if remote and remote:IsA("RemoteFunction") then
@@ -253,17 +297,31 @@ function Network:SellAll(): boolean
     return false
 end
 
-function Network:EquipHotbar(slot: number): boolean
+-- Wrapper: Equip dari Hotbar (Slot 1 = Rod)
+function Network:EquipHotbar(slot: number?): boolean
     local remote = self.Remotes["EquipHotbar"]
     if remote and remote:IsA("RemoteEvent") then
         local ok, _ = pcall(function()
-            remote:FireServer(slot)
+            remote:FireServer(slot or 1)
         end)
         return ok
     end
     return false
 end
 
+-- Wrapper: Unequip dari Hotbar
+function Network:UnequipHotbar(slot: number?): boolean
+    local remote = self.Remotes["UnequipHotbar"]
+    if remote and remote:IsA("RemoteEvent") then
+        local ok, _ = pcall(function()
+            remote:FireServer(slot or 1)
+        end)
+        return ok
+    end
+    return false
+end
+
+-- Wrapper: Kunci/Favoritkan Ikan Langka
 function Network:FavoriteItem(uuid: string): boolean
     local remote = self.Remotes["Favorite"]
     if remote and remote:IsA("RemoteEvent") then
@@ -275,319 +333,363 @@ function Network:FavoriteItem(uuid: string): boolean
     return false
 end
 
--- ==========================================
--- 4. MODULE: AUTO FISHING (MULTI-MODE)
--- ==========================================
-local VirtualInputManager = game:GetService("VirtualInputManager")
+-- Wrapper: Pasang Tabung Oksigen (Deep Diving / Mariana Trench)
+function Network:EquipOxygenTank(): boolean
+    local remote = self.Remotes["EquipTank"]
+    if remote and remote:IsA("RemoteFunction") then
+        local ok, _ = pcall(function()
+            remote:InvokeServer()
+        end)
+        return ok
+    end
+    return false
+end
 
-local AutoFish = {
-    Running = false,
-    Thread = nil :: thread?,
-    CurrentRod = nil :: Tool?,
+-- Wrapper: Aktifkan/Matikan Radar Ikan
+function Network:UpdateFishingRadar(enabled: boolean): boolean
+    local remote = self.Remotes["UpdateRadar"]
+    if remote and remote:IsA("RemoteFunction") then
+        local ok, _ = pcall(function()
+            remote:InvokeServer(enabled)
+        end)
+        return ok
+    end
+    return false
+end
+
+-- Wrapper: Beli Event Cuaca Server (Storm, Wind, Cloudy, Snow, dll.)
+function Network:PurchaseWeather(weatherName: string): boolean
+    local remote = self.Remotes["BuyWeather"]
+    if remote and remote:IsA("RemoteFunction") then
+        local ok, _ = pcall(function()
+            remote:InvokeServer(weatherName)
+        end)
+        return ok
+    end
+    return false
+end
+
+-- Wrapper: Beli Item dari Merchant/Toko (Totem, Bait, Crate)
+function Network:BuyItem(itemName: string): boolean
+    local remote = self.Remotes["BuyItem"]
+    if remote and remote:IsA("RemoteFunction") then
+        local ok, _ = pcall(function()
+            remote:InvokeServer(itemName)
+        end)
+        return ok
+    end
+    return false
+end
+
+-- Wrapper: Refresh Stok Merchant
+function Network:RefreshMerchant(): boolean
+    local remote = self.Remotes["RefreshMerchant"]
+    if remote and remote:IsA("RemoteFunction") then
+        local ok, _ = pcall(function()
+            remote:InvokeServer()
+        end)
+        return ok
+    end
+    return false
+end
+
+-- ============================================================
+-- 4. MODULE: ANTI-AFK
+-- ============================================================
+local VirtualUser = game:GetService("VirtualUser")
+local GuiService = game:GetService("GuiService")
+local AntiAfk = {
+    Enabled = false,
+    AutoRejoin = true,
+    Connections = {} :: { RBXScriptConnection },
+    MicroMoveThread = nil :: thread?,
 }
 
-function AutoFish:FindFishingRod(): Tool?
-    local char = LocalPlayer.Character
-    if char then
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool and (string.find(tool.Name:lower(), "rod") or string.find(tool.Name:lower(), "fish")) then
-            return tool
-        end
+function AntiAfk:Start(config: { MicroMovement: boolean, MoveInterval: number, AutoRejoin: boolean? }?)
+    if self.Enabled then return end
+    self.Enabled = true
+
+    local interval = (config and config.MoveInterval) or 240
+    local enableMicroMove = true
+    if config and config.MicroMovement ~= nil then
+        enableMicroMove = config.MicroMovement
+    end
+    if config and config.AutoRejoin ~= nil then
+        self.AutoRejoin = config.AutoRejoin
     end
 
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if backpack then
-        for _, item in ipairs(backpack:GetChildren()) do
-            if item:IsA("Tool") and (string.find(item.Name:lower(), "rod") or string.find(item.Name:lower(), "fish")) then
-                return item
-            end
-        end
-    end
+    -- 1. Tangani Event Idled Engine Roblox (Anti-20 Menit Kick)
+    local idleConn = LocalPlayer.Idled:Connect(function()
+        if not self.Enabled then return end
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.zero)
+            print("[Bodoamat | Anti-AFK] Proteksi idle engine dipicu.")
+        end)
+    end)
+    table.insert(self.Connections, idleConn)
 
-    return nil
-end
-
-function AutoFish:EnsureRodEquipped(net: any): boolean
-    local char = LocalPlayer.Character
-    if not char then return false end
-
-    local activeTool = char:FindFirstChildOfClass("Tool")
-    if activeTool and (string.find(activeTool.Name:lower(), "rod") or string.find(activeTool.Name:lower(), "fish")) then
-        self.CurrentRod = activeTool
-        return true
-    end
-
-    if net and net.HasRemotes then
-        net:EquipHotbar(1)
-        task.wait(0.15)
-    end
-
-    local backpackRod = self:FindFishingRod()
-    if backpackRod and backpackRod.Parent == LocalPlayer:FindFirstChild("Backpack") then
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid:EquipTool(backpackRod)
-            task.wait(0.15)
-            self.CurrentRod = backpackRod
-            return true
-        end
-    end
-
-    return (char:FindFirstChildOfClass("Tool") ~= nil)
-end
-
-function AutoFish:SimulateClick(holdDuration: number?)
-    local camera = workspace.CurrentCamera
-    local viewport = (camera and camera.ViewportSize) or Vector2.new(800, 600)
-    local cx = viewport.X / 2
-    local cy = viewport.Y / 2
-
-    VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
-    if holdDuration and holdDuration > 0 then
-        task.wait(holdDuration)
-    end
-    VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
-end
-
-function AutoFish:Start(cfg: any, st: any, net: any)
-    if self.Running then return end
-    self.Running = true
-
-    self.Thread = task.spawn(function()
-        local mode = (cfg and cfg.Mode) or "Fast"
-        print("[Bodoamat | Fishing] Memancing dimulai. Mode: " .. tostring(mode))
-
-        while self.Running do
-            local success, err = pcall(function()
-                local isEquipped = self:EnsureRodEquipped(net)
-                if not isEquipped then
-                    st.LastStatusMessage = "Menunggu Joran (Beli/Taruh di Slot 1)"
-                    task.wait(1.2)
-                    return
-                end
-
-                if mode == "Blatant" and net and net.HasRemotes then
-                    -- BLATANT INSTANT
-                    st.LastStatusMessage = "⚡ Instant Reel..."
-                    net:ChargeRod(1)
-                    task.wait(0.01)
-                    net:RequestMinigame()
-                    task.wait(0.06)
-
-                    for _ = 1, 3 do
-                        net:CompleteFishing()
-                        task.wait(0.01)
-                    end
-
-                    st.FishCaught = st.FishCaught + 1
-                    st.LastStatusMessage = "✅ Ikan Tertangkap! Total: " .. tostring(st.FishCaught)
-                    task.wait(0.08)
-
-                elseif mode == "Fast" and net and net.HasRemotes then
-                    -- FAST SAFE REMOTE
-                    st.LastStatusMessage = "🎣 Melempar Kail (Fast Safe)..."
-                    net:ChargeRod(1)
-                    task.wait(0.03)
-                    net:RequestMinigame()
-
-                    local baseDelay = (cfg and cfg.CastDelay) or 0.4
-                    local jitter = (math.random(2, 8) / 100)
-                    task.wait(baseDelay + jitter)
-
-                    st.LastStatusMessage = "🐟 Menarik Tangkapan..."
-                    for _ = 1, 2 do
-                        net:CompleteFishing()
-                        task.wait(0.01)
-                    end
-
-                    st.FishCaught = st.FishCaught + 1
-                    st.LastStatusMessage = "✅ Berhasil! Total: " .. tostring(st.FishCaught)
-
-                    local catchWait = (cfg and cfg.CatchDelay) or 0.25
-                    task.wait(catchWait + (math.random(1, 5) / 100))
-
-                else
-                    -- LEGIT HUMAN INPUT SIMULATION
-                    st.LastStatusMessage = "🎣 Melempar Kail (Natural)..."
-                    local rod = self:FindFishingRod()
-                    if rod then
-                        rod:Activate()
-                    else
-                        self:SimulateClick(0.6)
-                    end
-
-                    task.wait(1.4 + (math.random(2, 6) / 10))
-
-                    st.LastStatusMessage = "🐟 Menarik Kail..."
-                    self:SimulateClick(0.12)
-
-                    st.FishCaught = st.FishCaught + 1
-                    st.LastStatusMessage = "✅ Selesai Menarik. Total: " .. tostring(st.FishCaught)
-
-                    task.wait(1.2 + (math.random(2, 5) / 10))
-                end
+    -- 2. Auto Rejoin saat muncul dialog Disconnect / Error 267
+    local errConn = GuiService.ErrorMessageChanged:Connect(function(msg)
+        if self.AutoRejoin and self.Enabled and msg and #msg > 0 then
+            warn("[Bodoamat | Rejoin] Terdeteksi pesan disconnect: " .. tostring(msg))
+            task.wait(2.5)
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
             end)
-
-            if not success then
-                warn("[Bodoamat | Fishing Error] " .. tostring(err))
-                task.wait(1)
-            end
         end
-
-        st.LastStatusMessage = "Memancing Dimatikan"
     end)
-end
+    table.insert(self.Connections, errConn)
 
-function AutoFish:Stop()
-    self.Running = false
-    if self.Thread then
-        task.cancel(self.Thread)
-        self.Thread = nil
-    end
-end
+    -- 3. Gerakan mikro berkala (mencegah idle timeout server-side)
+    if enableMicroMove then
+        self.MicroMoveThread = task.spawn(function()
+            while self.Enabled do
+                task.wait(interval)
+                if not self.Enabled then break end
 
--- ============================================================
--- 5. MODULE: AUTO SELL & AUTO FAVORITE
--- ============================================================
-local AutoSell = {
-    Running = false,
-    Thread = nil :: thread?,
-    AutoFavoriteEnabled = true,
-    MinFavoriteRarity = "Legendary",
-    FavoritedCache = {} :: { [string]: boolean },
-}
-
-local RarityTiers: { [string]: number } = {
-    Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythic = 6, Secret = 7, Exotic = 8
-}
-
-local ItemUtility = nil :: any
-local PlayerData = nil :: any
-
-pcall(function()
-    local shared = ReplicatedStorage:FindFirstChild("Shared")
-    if shared and shared:FindFirstChild("ItemUtility") then
-        ItemUtility = require(shared.ItemUtility)
-    end
-    local packages = ReplicatedStorage:FindFirstChild("Packages")
-    if packages and packages:FindFirstChild("Replion") then
-        local Replion = require(packages.Replion)
-        PlayerData = Replion.Client:WaitReplion("Data")
-    end
-end)
-
-function AutoSell:ProtectRareFish(net: any)
-    if not self.AutoFavoriteEnabled or not net then return end
-
-    pcall(function()
-        if not PlayerData or not ItemUtility then return end
-        local inv = PlayerData:Get("Inventory")
-        if not inv or not inv.Items then return end
-
-        local targetTier = RarityTiers[self.MinFavoriteRarity] or 5
-
-        for _, item in ipairs(inv.Items) do
-            if item.UUID and not self.FavoritedCache[item.UUID] then
-                local data = ItemUtility:GetItemData(item.Id)
-                local rarity = (data and data.Data and data.Data.Rarity) or "Common"
-                local itemTier = RarityTiers[rarity] or 1
-
-                if itemTier >= targetTier then
-                    net:FavoriteItem(item.UUID)
-                    self.FavoritedCache[item.UUID] = true
-                    print("[Bodoamat | Favorite] 🌟 Mengamankan Ikan Langka: " .. tostring(data.Name or "Fish") .. " [" .. rarity .. "]")
-                    task.wait(0.04)
+                local character = LocalPlayer.Character
+                if character then
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        humanoid:Move(Vector3.new(0.005, 0, 0), false)
+                        task.wait(0.08)
+                        humanoid:Move(Vector3.zero, false)
+                    end
                 end
             end
-        end
-    end)
-end
-
-function AutoSell:Start(interval: number, net: any, st: any)
-    if self.Running then return end
-    self.Running = true
-    local sleepTime = math.max(10, interval or 45)
-
-    self.Thread = task.spawn(function()
-        while self.Running do
-            task.wait(sleepTime)
-            if not self.Running then break end
-
-            if net and net.HasRemotes then
-                self:ProtectRareFish(net)
-                task.wait(0.2)
-                local ok = net:SellAll()
-                if ok and st then
-                    st.LastStatusMessage = "💰 Ikan otomatis terjual! (Ikan langka diamankan)"
-                end
-            end
-        end
-    end)
-end
-
-function AutoSell:Stop()
-    self.Running = false
-    if self.Thread then
-        task.cancel(self.Thread)
-        self.Thread = nil
+        end)
     end
+
+    print("[Bodoamat] Sistem Anti-AFK & Auto-Rejoin Aktif.")
+end
+
+function AntiAfk:Stop()
+    self.Enabled = false
+
+    for _, conn in ipairs(self.Connections) do
+        conn:Disconnect()
+    end
+    table.clear(self.Connections)
+
+    if self.MicroMoveThread then
+        task.cancel(self.MicroMoveThread)
+        self.MicroMoveThread = nil
+    end
+
+    print("[Bodoamat] Sistem Anti-AFK Dinonaktifkan.")
 end
 
 -- ============================================================
--- 6. MODULE: TELEPORT 14 LOKASI PULAU
+-- 5. MODULE: FPS BOOSTER
 -- ============================================================
-local Teleport = {
-    Locations = {
-        { Name = "Spawn Island",        CFrame = CFrame.new(45.28, 252.56, 2987.11) },
-        { Name = "Sisyphus Statue",     CFrame = CFrame.new(-3728.22, -135.07, -1012.13) },
-        { Name = "Coral Reefs",         CFrame = CFrame.new(-3114.78, 1.32, 2237.52) },
-        { Name = "Esoteric Depths",     CFrame = CFrame.new(3248.37, -1301.53, 1403.83) },
-        { Name = "Crater Island",       CFrame = CFrame.new(1016.49, 20.09, 5069.27) },
-        { Name = "Lost Isle",           CFrame = CFrame.new(-3618.16, 240.84, -1317.46) },
-        { Name = "Weather Machine",     CFrame = CFrame.new(-1488.51, 83.17, 1876.30) },
-        { Name = "Tropical Grove",      CFrame = CFrame.new(-2095.34, 197.20, 3718.08) },
-        { Name = "Mount Hallow",        CFrame = CFrame.new(2136.62, 78.92, 3272.50) },
-        { Name = "Treasure Room",       CFrame = CFrame.new(-3606.35, -266.57, -1580.97) },
-        { Name = "Kohana",              CFrame = CFrame.new(-663.90, 3.05, 718.80) },
-        { Name = "Underground Cellar",  CFrame = CFrame.new(2109.52, -94.19, -708.61) },
-        { Name = "Ancient Jungle",      CFrame = CFrame.new(1831.71, 6.62, -299.28) },
-        { Name = "Sacred Temple",       CFrame = CFrame.new(1466.92, -21.88, -622.84) },
+local FpsBooster = {
+    IsFpsBoosted = false,
+    IsGpuSaverActive = false,
+    GpuSaverGui = nil :: ScreenGui?,
+    StatsUpdateThread = nil :: thread?,
+    OriginalSettings = {
+        GlobalShadows = true,
+        FogEnd = 100000,
     }
 }
 
-function Teleport:To(targetCFrame: CFrame): boolean
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not humanoid or humanoid.Health <= 0 then return false end
+-- [[ 1. FPS BOOST AMAN (Zero Workspace-Part Tamper) ]]
+function FpsBooster:SetFpsBoost(enabled: boolean)
+    if self.IsFpsBoosted == enabled then return end
+    self.IsFpsBoosted = enabled
 
-    pcall(function()
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-        hrp.CFrame = targetCFrame + Vector3.new(0, 3.5, 0)
-        task.wait(0.05)
-        hrp.AssemblyLinearVelocity = Vector3.zero
-    end)
-    return true
+    if enabled then
+        pcall(function()
+            self.OriginalSettings.GlobalShadows = Lighting.GlobalShadows
+            self.OriginalSettings.FogEnd = Lighting.FogEnd
+            
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+
+            -- Matikan efek post-processing Lighting yang membebani GPU
+            for _, effect in ipairs(Lighting:GetChildren()) do
+                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") then
+                    effect.Enabled = false
+                end
+            end
+        end)
+
+        -- Matikan efek partikel visual berat tanpa menyentuh BasePart/Material (Mencegah tripwire BAC-6228)
+        pcall(function()
+            for _, desc in ipairs(workspace:GetDescendants()) do
+                if desc:IsA("ParticleEmitter") or desc:IsA("Trail") or desc:IsA("Beam") or desc:IsA("Fire") or desc:IsA("Smoke") then
+                    desc.Enabled = false
+                end
+            end
+        end)
+
+        -- Turunkan level kualitas render Roblox ke minimum (resmi dari API engine)
+        pcall(function()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        end)
+
+        print("[Bodoamat | FPS] Mode Grafis Ringan (Safe Anti-BAC) aktif.")
+    else
+        pcall(function()
+            Lighting.GlobalShadows = self.OriginalSettings.GlobalShadows
+            Lighting.FogEnd = self.OriginalSettings.FogEnd
+            for _, effect in ipairs(Lighting:GetChildren()) do
+                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") then
+                    effect.Enabled = true
+                end
+            end
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+        end)
+
+        print("[Bodoamat | FPS] Mode Grafis Standar dipulihkan.")
+    end
+end
+
+-- [[ 2. ULTRA GPU SAVER (Set3dRenderingEnabled - Bebas Desync Tick) ]]
+function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
+    if self.IsGpuSaverActive == enabled then return end
+    self.IsGpuSaverActive = enabled
+
+    if enabled then
+        -- Kunci Rahasia Anti-BAC: Matikan render 3D engine tanpa mengubah tick rate physics / fps cap
+        pcall(function()
+            RunService:Set3dRenderingEnabled(false)
+        end)
+
+        -- Buat Layar Minimalis Stat Overlay
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "Bodoamat_GpuSaver"
+        gui.ResetOnSpawn = false
+        gui.DisplayOrder = 999999
+        gui.IgnoreGuiInset = true
+
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(1, 0, 1, 0)
+        bg.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
+        bg.BorderSizePixel = 0
+        bg.Parent = gui
+
+        -- Card Informasi di tengah
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(0, 440, 0, 250)
+        card.Position = UDim2.new(0.5, -220, 0.5, -125)
+        card.BackgroundColor3 = Color3.fromRGB(18, 22, 30)
+        card.BorderSizePixel = 0
+        card.Parent = bg
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 14)
+        corner.Parent = card
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 170, 255)
+        stroke.Thickness = 1.5
+        stroke.Transparency = 0.3
+        stroke.Parent = card
+
+        -- Title
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, 0, 0, 45)
+        title.BackgroundTransparency = 1
+        title.Text = "🛡️ GPU SAVER ACTIVE (SAFE AFK)"
+        title.TextColor3 = Color3.fromRGB(0, 210, 255)
+        title.TextSize = 18
+        title.Font = Enum.Font.GothamBold
+        title.Parent = card
+
+        -- Info status
+        local infoLabel = Instance.new("TextLabel")
+        infoLabel.Size = UDim2.new(1, -30, 0, 125)
+        infoLabel.Position = UDim2.new(0, 15, 0, 50)
+        infoLabel.BackgroundTransparency = 1
+        infoLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
+        infoLabel.TextSize = 14
+        infoLabel.Font = Enum.Font.Gotham
+        infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+        infoLabel.TextYAlignment = Enum.TextYAlignment.Top
+        infoLabel.RichText = true
+        infoLabel.Parent = card
+
+        -- Tombol Exit
+        local exitBtn = Instance.new("TextButton")
+        exitBtn.Size = UDim2.new(1, -30, 0, 42)
+        exitBtn.Position = UDim2.new(0, 15, 1, -52)
+        exitBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 210)
+        exitBtn.Text = "Matikan GPU Saver (Kembali ke Tampilan Game)"
+        exitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        exitBtn.TextSize = 13
+        exitBtn.Font = Enum.Font.GothamMedium
+        exitBtn.Parent = card
+
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 8)
+        btnCorner.Parent = exitBtn
+
+        exitBtn.MouseButton1Click:Connect(function()
+            self:SetGpuSaver(false, stateRef)
+            if stateRef then stateRef:Set("IsGpuSaver", false) end
+        end)
+
+        pcall(function()
+            gui.Parent = CoreGui
+        end)
+        if not gui.Parent then
+            gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        end
+        self.GpuSaverGui = gui
+
+        -- Loop update statistik
+        self.StatsUpdateThread = task.spawn(function()
+            while self.IsGpuSaverActive do
+                local elapsed = (stateRef and stateRef:GetElapsedTime()) or "--:--:--"
+                local fish = (stateRef and stateRef.FishCaught) or 0
+                local status = (stateRef and stateRef.IsFishing) and "<font color='#2ecc71'>Sedang Memancing</font>" or "<font color='#e74c3c'>Standby / Tidak Memancing</font>"
+
+                infoLabel.Text = string.format(
+                    "<b>Status Farm:</b> %s\n<b>Durasi AFK:</b> %s\n<b>Ikan Ditangkap:</b> %d Ekor\n<b>Teknologi:</b> 3D Rasterization Disabled (Zero GPU Heat)\n<b>Anti-Cheat:</b> Physics tick normal (Aman dari BAC-6228)",
+                    status, elapsed, fish
+                )
+                task.wait(1)
+            end
+        end)
+
+        print("[Bodoamat | GPU] GPU Saver Aktif (3D Engine Sleep). Suhu perangkat dijamin dingin.")
+    else
+        -- Pulihkan 3D rendering
+        pcall(function()
+            RunService:Set3dRenderingEnabled(true)
+        end)
+
+        if self.StatsUpdateThread then
+            task.cancel(self.StatsUpdateThread)
+            self.StatsUpdateThread = nil
+        end
+
+        if self.GpuSaverGui then
+            self.GpuSaverGui:Destroy()
+            self.GpuSaverGui = nil
+        end
+
+        print("[Bodoamat | GPU] GPU Saver Dinonaktifkan. Tampilan 3D pulih.")
+    end
 end
 
 -- ============================================================
--- 7. MODULE: MOBILITAS (WALK ON WATER, INF JUMP, SPEED)
+-- 6. MODULE: MOVEMENT
 -- ============================================================
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-
 local Movement = {
     IsWaterWalk = false,
     IsInfJump = false,
     WalkSpeed = 16,
     JumpPower = 50,
+    
     WaterPlatform = nil :: Part?,
     HeartbeatConn = nil :: RBXScriptConnection?,
     JumpConn = nil :: RBXScriptConnection?,
 }
 
+-- [[ 1. WALK ON WATER (JESUS WALK) ]]
 function Movement:SetWaterWalk(enabled: boolean)
     if self.IsWaterWalk == enabled then return end
     self.IsWaterWalk = enabled
@@ -613,9 +715,11 @@ function Movement:SetWaterWalk(enabled: boolean)
                 if not char then return end
                 local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
                 if hrp and self.WaterPlatform then
+                    -- Posisi platform dinamis tepat di bawah kaki pemain sejajar permukaan air laut (-0.6)
                     self.WaterPlatform.CFrame = CFrame.new(hrp.Position.X, -0.6, hrp.Position.Z)
                 end
 
+                -- Terapkan WalkSpeed / JumpPower secara konsisten
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health > 0 then
                     if self.WalkSpeed ~= 16 and hum.WalkSpeed ~= self.WalkSpeed then
@@ -627,6 +731,7 @@ function Movement:SetWaterWalk(enabled: boolean)
                 end
             end)
         end
+        print("[Bodoamat | Movement] Walk on Water diaktifkan.")
     else
         if not self.IsWaterWalk and self.WalkSpeed == 16 and self.JumpPower == 50 then
             if self.HeartbeatConn then
@@ -634,13 +739,16 @@ function Movement:SetWaterWalk(enabled: boolean)
                 self.HeartbeatConn = nil
             end
         end
+
         if self.WaterPlatform then
             self.WaterPlatform:Destroy()
             self.WaterPlatform = nil
         end
+        print("[Bodoamat | Movement] Walk on Water dinonaktifkan.")
     end
 end
 
+-- [[ 2. INFINITE JUMP ]]
 function Movement:SetInfiniteJump(enabled: boolean)
     if self.IsInfJump == enabled then return end
     self.IsInfJump = enabled
@@ -660,14 +768,17 @@ function Movement:SetInfiniteJump(enabled: boolean)
                 end)
             end)
         end
+        print("[Bodoamat | Movement] Infinite Jump diaktifkan.")
     else
         if self.JumpConn then
             self.JumpConn:Disconnect()
             self.JumpConn = nil
         end
+        print("[Bodoamat | Movement] Infinite Jump dinonaktifkan.")
     end
 end
 
+-- [[ 3. SPEED & JUMP MODIFIERS ]]
 function Movement:SetWalkSpeed(speed: number)
     self.WalkSpeed = math.clamp(speed, 16, 200)
     local char = LocalPlayer.Character
@@ -677,257 +788,799 @@ function Movement:SetWalkSpeed(speed: number)
     end
 end
 
--- ============================================================
--- 8. MODULE: OPTIMASI GRAFIS AMAN (ANTI-BAC) & GPU SAVER
--- ============================================================
-local Lighting = game:GetService("Lighting")
-local CoreGui = game:GetService("CoreGui")
-
-local FpsBooster = {
-    IsFpsBoosted = false,
-    IsGpuSaverActive = false,
-    GpuSaverGui = nil :: ScreenGui?,
-    StatsUpdateThread = nil :: thread?,
-    OriginalSettings = {
-        GlobalShadows = true,
-        FogEnd = 100000,
-    }
-}
-
-function FpsBooster:SetFpsBoost(enabled: boolean)
-    if self.IsFpsBoosted == enabled then return end
-    self.IsFpsBoosted = enabled
-
-    if enabled then
-        pcall(function()
-            self.OriginalSettings.GlobalShadows = Lighting.GlobalShadows
-            self.OriginalSettings.FogEnd = Lighting.FogEnd
-            Lighting.GlobalShadows = false
-            Lighting.FogEnd = 9e9
-
-            for _, effect in ipairs(Lighting:GetChildren()) do
-                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") then
-                    effect.Enabled = false
-                end
-            end
-        end)
-
-        pcall(function()
-            for _, desc in ipairs(workspace:GetDescendants()) do
-                if desc:IsA("ParticleEmitter") or desc:IsA("Trail") or desc:IsA("Beam") or desc:IsA("Fire") or desc:IsA("Smoke") then
-                    desc.Enabled = false
-                end
-            end
-        end)
-
-        pcall(function()
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        end)
-        print("[Bodoamat | FPS] Mode Grafis Ringan (Safe Anti-BAC) aktif.")
-    else
-        pcall(function()
-            Lighting.GlobalShadows = self.OriginalSettings.GlobalShadows
-            Lighting.FogEnd = self.OriginalSettings.FogEnd
-            for _, effect in ipairs(Lighting:GetChildren()) do
-                if effect:IsA("PostEffect") or effect:IsA("BloomEffect") or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("BlurEffect") then
-                    effect.Enabled = true
-                end
-            end
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-        end)
-        print("[Bodoamat | FPS] Mode Grafis Standar dipulihkan.")
+function Movement:SetJumpPower(power: number)
+    self.JumpPower = math.clamp(power, 50, 250)
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.JumpPower = self.JumpPower end
     end
 end
 
-function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
-    if self.IsGpuSaverActive == enabled then return end
-    self.IsGpuSaverActive = enabled
+-- ============================================================
+-- 7. MODULE: AUTO FISHING
+-- ============================================================
+local AutoFish = {
+    Running = false,
+    Thread = nil :: thread?,
+    IsFishing = false,
+}
 
-    if enabled then
-        -- Matikan raster 3D engine (Bebas panas, nol beban GPU, physics tick tetap normal)
-        pcall(function()
-            RunService:Set3dRenderingEnabled(false)
-        end)
+-- Pastikan joran terpasang di tangan karakter (Universal bahasa: Rod, Batang, dll.)
+function AutoFish:EnsureRodEquipped(net: any): boolean
+    local char = LocalPlayer.Character
+    if not char then return false end
 
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "Bodoamat_GpuSaver"
-        gui.ResetOnSpawn = false
-        gui.DisplayOrder = 999999
-        gui.IgnoreGuiInset = true
+    -- 1. Jika karakter sudah memegang tool di tangan, langsung gunakan!
+    local heldTool = char:FindFirstChildOfClass("Tool")
+    if heldTool then
+        return true
+    end
 
-        local bg = Instance.new("Frame")
-        bg.Size = UDim2.new(1, 0, 1, 0)
-        bg.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
-        bg.BorderSizePixel = 0
-        bg.Parent = gui
+    -- 2. Panggil Remote Hotbar Slot 1 (Joran utama)
+    if net and net.HasRemotes then
+        net:EquipHotbar(1)
+        task.wait(0.1)
+    end
 
-        local card = Instance.new("Frame")
-        card.Size = UDim2.new(0, 440, 0, 250)
-        card.Position = UDim2.new(0.5, -220, 0.5, -125)
-        card.BackgroundColor3 = Color3.fromRGB(18, 22, 30)
-        card.BorderSizePixel = 0
-        card.Parent = bg
+    -- 3. Fallback: Ambil tool pertama dari Backpack
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        local bpTool = backpack:FindFirstChildOfClass("Tool")
+        if bpTool then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:EquipTool(bpTool)
+                task.wait(0.1)
+            end
+        end
+    end
 
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 14)
-        corner.Parent = card
+    return (char:FindFirstChildOfClass("Tool") ~= nil)
+end
 
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 170, 255)
-        stroke.Thickness = 1.5
-        stroke.Transparency = 0.3
-        stroke.Parent = card
+-- Mulai Loop Auto Fishing
+function AutoFish:Start(config: any, state: any, network: any)
+    if self.Running then return end
+    self.Running = true
 
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, 0, 0, 45)
-        title.BackgroundTransparency = 1
-        title.Text = "🛡️ GPU SAVER ACTIVE (SAFE AFK)"
-        title.TextColor3 = Color3.fromRGB(0, 210, 255)
-        title.TextSize = 18
-        title.Font = Enum.Font.GothamBold
-        title.Parent = card
+    self.Thread = task.spawn(function()
+        local mode = (config and config.Mode) or "Fast"
+        print("[Bodoamat | Fishing] Memulai siklus memancing dalam mode: " .. tostring(mode))
 
-        local infoLabel = Instance.new("TextLabel")
-        infoLabel.Size = UDim2.new(1, -30, 0, 125)
-        infoLabel.Position = UDim2.new(0, 15, 0, 50)
-        infoLabel.BackgroundTransparency = 1
-        infoLabel.TextColor3 = Color3.fromRGB(220, 225, 235)
-        infoLabel.TextSize = 14
-        infoLabel.Font = Enum.Font.Gotham
-        infoLabel.TextXAlignment = Enum.TextXAlignment.Left
-        infoLabel.TextYAlignment = Enum.TextYAlignment.Top
-        infoLabel.RichText = true
-        infoLabel.Parent = card
+        while self.Running do
+            local ok, err = pcall(function()
+                -- Jeda jika proses penjualan sedang berlangsung agar tidak memicu konflik state BAC-8228
+                if state and state.IsSelling then
+                    task.wait(0.5)
+                    return
+                end
 
-        local exitBtn = Instance.new("TextButton")
-        exitBtn.Size = UDim2.new(1, -30, 0, 42)
-        exitBtn.Position = UDim2.new(0, 15, 1, -52)
-        exitBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 210)
-        exitBtn.Text = "Matikan GPU Saver (Kembali ke Tampilan Game)"
-        exitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        exitBtn.TextSize = 13
-        exitBtn.Font = Enum.Font.GothamMedium
-        exitBtn.Parent = card
+                -- Pastikan joran siap di tangan
+                self:EnsureRodEquipped(network)
 
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 8)
-        btnCorner.Parent = exitBtn
+                local char = LocalPlayer.Character
+                local currentTool = char and char:FindFirstChildOfClass("Tool")
 
-        exitBtn.MouseButton1Click:Connect(function()
-            self:SetGpuSaver(false, stateRef)
-            if stateRef then stateRef:Set("IsGpuSaver", false) end
-        end)
+                if mode == "Blatant" then
+                    -- ==========================================
+                    -- MODE 1: BLATANT INSTANT (PARALLEL CAST + 5X REEL)
+                    -- ==========================================
+                    state.LastStatusMessage = "🚀 Blatant Cast..."
+                    if network and network.HasRemotes then
+                        network:EquipHotbar(1)
+                        task.wait(0.01)
 
-        pcall(function() gui.Parent = CoreGui end)
-        if not gui.Parent then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
-        self.GpuSaverGui = gui
+                        task.spawn(function()
+                            network:ChargeRod(1755848498.4834)
+                            task.wait(0.01)
+                            network:RequestMinigame(1.2854545116425, 1)
+                        end)
 
-        self.StatsUpdateThread = task.spawn(function()
-            while self.IsGpuSaverActive do
-                local elapsed = (stateRef and stateRef:GetElapsedTime()) or "--:--:--"
-                local fish = (stateRef and stateRef.FishCaught) or 0
-                local status = (stateRef and stateRef.IsFishing) and "<font color='#2ecc71'>Sedang Memancing</font>" or "<font color='#e74c3c'>Standby / Tidak Memancing</font>"
+                        task.wait(0.04)
 
-                infoLabel.Text = string.format(
-                    "<b>Status Farm:</b> %s\n<b>Durasi AFK:</b> %s\n<b>Ikan Ditangkap:</b> %d Ekor\n<b>Teknologi:</b> 3D Rasterization Standby (Suhu Dingin)\n<b>Anti-Cheat:</b> Physics tick normal (Aman dari BAC-6228)",
-                    status, elapsed, fish
-                )
+                        task.spawn(function()
+                            network:ChargeRod(1755848498.4834)
+                            task.wait(0.01)
+                            network:RequestMinigame(1.2854545116425, 1)
+                        end)
+
+                        task.wait(0.85)
+
+                        -- Pengaman BAC-8228: Batalkan tarikan kail jika operasi penjualan sedang berjalan
+                        if state and state.IsSelling then return end
+
+                        state.LastStatusMessage = "⚡ Instant Reel..."
+                        for _ = 1, 5 do
+                            if state and state.IsSelling then return end
+                            network:CompleteFishing()
+                            task.wait(0.01)
+                        end
+
+                        state.FishCaught = state.FishCaught + 1
+                        state.LastStatusMessage = "✅ Tertangkap! Total: " .. tostring(state.FishCaught)
+                        task.wait(0.1)
+                    end
+
+                elseif mode == "Fast" then
+                    -- ==========================================
+                    -- MODE 2: FAST SAFE (NORMAL PROVEN CYCLE)
+                    -- ==========================================
+                    state.LastStatusMessage = "🎣 Melempar Kail (Fast)..."
+                    if network and network.HasRemotes then
+                        network:EquipHotbar(1)
+                        task.wait(0.05)
+                        network:ChargeRod(1755848498.4834)
+                        task.wait(0.02)
+                        network:RequestMinigame(1.2854545116425, 1)
+
+                        task.wait(0.85)
+
+                        -- Pengaman BAC-8228: Batalkan tarikan kail jika operasi penjualan sedang berjalan
+                        if state and state.IsSelling then return end
+
+                        state.LastStatusMessage = "🐟 Menarik Ikan..."
+                        network:CompleteFishing()
+
+                        state.FishCaught = state.FishCaught + 1
+                        state.LastStatusMessage = "✅ Ikan Tertangkap! Total: " .. tostring(state.FishCaught)
+                        task.wait(0.2)
+                    end
+
+                else
+                    -- ==========================================
+                    -- MODE 3: LEGIT (HUMAN INPUT SIMULATION)
+                    -- ==========================================
+                    state.LastStatusMessage = "🎣 Melempar Kail (Legit)..."
+                    network:EquipHotbar(1)
+                    task.wait(0.05)
+
+                    if currentTool then currentTool:Activate() end
+                    if network and network.HasRemotes then
+                        network:ChargeRod(1755848498.4834)
+                        task.wait(0.02)
+                        network:RequestMinigame(1.2854545116425, 1)
+                    end
+
+                    task.wait(1.5 + (math.random(1, 4) / 10))
+
+                    -- Pengaman BAC-8228: Batalkan tarikan kail jika operasi penjualan sedang berjalan
+                    if state and state.IsSelling then return end
+
+                    state.LastStatusMessage = "🐟 Menarik Kail (Legit)..."
+                    if currentTool then currentTool:Activate() end
+                    if network and network.HasRemotes then
+                        network:CompleteFishing()
+                    end
+
+                    state.FishCaught = state.FishCaught + 1
+                    state.LastStatusMessage = "✅ Selesai Menarik. Total: " .. tostring(state.FishCaught)
+                    task.wait(0.8 + (math.random(1, 3) / 10))
+                end
+            end)
+
+            if not ok then
+                warn("[Bodoamat | Fishing Error] " .. tostring(err))
                 task.wait(1)
             end
-        end)
-        print("[Bodoamat | GPU] GPU Saver Aktif (3D Standby). Suhu perangkat dijamin dingin.")
-    else
-        pcall(function()
-            RunService:Set3dRenderingEnabled(true)
-        end)
-        if self.StatsUpdateThread then
-            task.cancel(self.StatsUpdateThread)
-            self.StatsUpdateThread = nil
         end
-        if self.GpuSaverGui then
-            self.GpuSaverGui:Destroy()
-            self.GpuSaverGui = nil
-        end
-        print("[Bodoamat | GPU] GPU Saver Dinonaktifkan. Tampilan 3D pulih.")
+
+        state.LastStatusMessage = "Memancing Dimatikan"
+        print("[Bodoamat | Fishing] Mesin memancing berhenti.")
+    end)
+end
+
+function AutoFish:Stop()
+    self.Running = false
+    if self.Thread then
+        task.cancel(self.Thread)
+        self.Thread = nil
     end
 end
 
 -- ============================================================
--- 9. MODULE: ANTI-AFK & AUTO-REJOIN ON KICK
+-- 8. MODULE: AUTO SELL & SAFE FAVORITE
 -- ============================================================
-local VirtualUser = game:GetService("VirtualUser")
-local GuiService = game:GetService("GuiService")
-local TeleportService = game:GetService("TeleportService")
-
-local AntiAfk = {
-    Enabled = false,
-    AutoRejoin = true,
-    Connections = {} :: { RBXScriptConnection },
-    MicroMoveThread = nil :: thread?,
+local AutoSell = {
+    Running = false,
+    IsExecuting = false,
+    Thread = nil :: thread?,
+    FavoriteThread = nil :: thread?,
+    AutoFavoriteEnabled = true,
+    MinFavoriteRarity = "Legendary", -- "Rare", "Epic", "Legendary", "Mythic", "Secret"
+    FavoritedCache = {} :: { [string]: boolean },
 }
 
-function AntiAfk:Start(cfg: { MicroMovement: boolean, MoveInterval: number, AutoRejoin: boolean? }?)
-    if self.Enabled then return end
-    self.Enabled = true
+local RarityTiers: { [string]: number } = {
+    Common = 1,
+    Uncommon = 2,
+    Rare = 3,
+    Epic = 4,
+    Legendary = 5,
+    Mythic = 6,
+    Secret = 7,
+    Exotic = 8,
+}
 
-    local interval = (cfg and cfg.MoveInterval) or 240
-    local enableMicroMove = true
-    if cfg and cfg.MicroMovement ~= nil then enableMicroMove = cfg.MicroMovement end
-    if cfg and cfg.AutoRejoin ~= nil then self.AutoRejoin = cfg.AutoRejoin end
+local ItemUtility = nil :: any
+local PlayerData = nil :: any
 
-    local idleConn = LocalPlayer.Idled:Connect(function()
-        if not self.Enabled then return end
-        pcall(function()
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.zero)
-        end)
-    end)
-    table.insert(self.Connections, idleConn)
+pcall(function()
+    local shared = ReplicatedStorage:FindFirstChild("Shared")
+    if shared and shared:FindFirstChild("ItemUtility") then
+        ItemUtility = require(shared.ItemUtility)
+    end
 
-    local errConn = GuiService.ErrorMessageChanged:Connect(function(msg)
-        if self.AutoRejoin and self.Enabled and msg and #msg > 0 then
-            warn("[Bodoamat | Rejoin] Pesan disconnect terdeteksi: " .. tostring(msg))
-            task.wait(2.5)
-            pcall(function()
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-            end)
+    local packages = ReplicatedStorage:FindFirstChild("Packages")
+    if packages and packages:FindFirstChild("Replion") then
+        local Replion = require(packages.Replion)
+        PlayerData = Replion.Client:WaitReplion("Data")
+    end
+end)
+
+-- Eksekusi penjualan tunggal yang aman dari konflik state memancing (Pencegah BAC-8228)
+function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boolean
+    if self.IsExecuting then return false end
+    self.IsExecuting = true
+
+    -- 1. Beri sinyal ke AutoFish agar jeda sementara
+    if state then state.IsSelling = true end
+
+    local success = false
+    pcall(function()
+        local char = Players.LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        local savedPos = nil
+
+        -- Jika opsi Merchant-Safe TP diaktifkan, simpan posisi dan geser sekejap ke dekat NPC Merchant
+        if state and state.MerchantSafeTp and hrp and teleportMod then
+            savedPos = hrp.CFrame
+            teleportMod:To(CFrame.new(-135, 3, 2764))
+            task.wait(0.2)
+        end
+
+        -- 2. Batalkan input memancing dan lepaskan joran dari tangan karakter
+        if network then
+            if network.Remotes["CancelInput"] then
+                network:CancelInput()
+            end
+            if network.Remotes["UnequipHotbar"] then
+                network:UnequipHotbar(1)
+            end
+        end
+        task.wait(0.4) -- Beri waktu server mencatat karakter dalam status idle bebas pancing
+
+        -- 3. Panggil remote penjualan bersih tanpa spam paket lain
+        if network and network.Remotes["SellAll"] then
+            success = network:SellAll()
+        end
+        task.wait(0.4)
+
+        -- Kembalikan ke spot memancing semula jika tadi bergeser ke merchant
+        if savedPos and teleportMod then
+            teleportMod:To(savedPos)
+            task.wait(0.2)
+        end
+
+        -- 4. Pasang kembali joran jika fitur Auto Fishing sedang aktif
+        if network and state and state.IsFishing and network.Remotes["EquipHotbar"] then
+            network:EquipHotbar(1)
+            task.wait(0.2)
         end
     end)
-    table.insert(self.Connections, errConn)
 
-    if enableMicroMove then
-        self.MicroMoveThread = task.spawn(function()
-            while self.Enabled do
-                task.wait(interval)
-                if not self.Enabled then break end
+    -- 5. Kembalikan status memancing normal
+    if state then
+        state.IsSelling = false
+        if success then
+            state.LastStatusMessage = "💰 Berhasil menjual semua ikan!"
+        end
+    end
 
-                local character = LocalPlayer.Character
-                if character then
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid and humanoid.Health > 0 then
-                        humanoid:Move(Vector3.new(0.005, 0, 0), false)
-                        task.wait(0.08)
-                        humanoid:Move(Vector3.zero, false)
+    self.IsExecuting = false
+    return success
+end
+
+-- Mulai loop auto-sell berkala & loop auto-favorite terpisah
+function AutoSell:Start(interval: number, network: any, state: any, teleportMod: any)
+    if self.Running then return end
+    self.Running = true
+
+    local sleepTime = math.max(15, interval or 45)
+
+    -- Loop 1: Penjualan Ikan Berkala
+    self.Thread = task.spawn(function()
+        print("[Bodoamat | AutoSell] Penjualan otomatis aktif setiap " .. tostring(sleepTime) .. "s.")
+
+        while self.Running do
+            task.wait(sleepTime)
+            if not self.Running then break end
+            self:ExecuteSell(network, state, teleportMod)
+        end
+    end)
+
+    -- Loop 2: Auto-Favorite Terpisah Secara Tenang & Bertahap (Zero Packet Flood)
+    self.FavoriteThread = task.spawn(function()
+        while self.Running do
+            task.wait(12)
+            if not self.Running then break end
+
+            if self.AutoFavoriteEnabled and network and network.Remotes["Favorite"] then
+                pcall(function()
+                    if not PlayerData or not ItemUtility then return end
+                    local inv = (PlayerData.GetExpect and PlayerData:GetExpect("Inventory")) or (PlayerData.Get and PlayerData:Get("Inventory"))
+                    if not inv or not inv.Items then return end
+
+                    local targetTier = RarityTiers[self.MinFavoriteRarity] or 5
+
+                    for _, item in ipairs(inv.Items) do
+                        -- KUNCI PENTING: Jika sudah difavoritkan, JANGAN panggil lagi (remote ini adalah toggle!)
+                        if item.Favorited == true or self.FavoritedCache[item.UUID] then
+                            continue
+                        end
+
+                        local data = ItemUtility:GetItemData(item.Id)
+                        local rarity = (data and data.Data and data.Data.Rarity) or "Common"
+                        local itemTier = RarityTiers[rarity] or 1
+
+                        if itemTier >= targetTier then
+                            network:FavoriteItem(item.UUID)
+                            self.FavoritedCache[item.UUID] = true
+                            print("[Bodoamat | Favorite] ⭐ Mengamankan Ikan Langka: " .. tostring(data.Name or "Fish") .. " [" .. rarity .. "]")
+                            task.wait(0.5) -- Jeda aman manusiawi (mencegah BAC-8228)
+                            break -- Cukup 1 per siklus agar tidak membanjiri antrean paket
+                        end
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+function AutoSell:Stop()
+    self.Running = false
+    if self.Thread then
+        task.cancel(self.Thread)
+        self.Thread = nil
+    end
+    if self.FavoriteThread then
+        task.cancel(self.FavoriteThread)
+        self.FavoriteThread = nil
+    end
+    print("[Bodoamat | AutoSell] Penjualan otomatis dimatikan.")
+end
+
+-- ============================================================
+-- 9. MODULE: TELEPORT & NAVIGATION
+-- ============================================================
+local Teleport = {
+    -- Peta Lokasi Lengkap & Update Terbaru (30+ Lokasi Terverifikasi)
+    Locations = {
+        -- [[ KOTA, SPAWN & MERCHANT ]]
+        { Name = "Spawn (Fisherman Island)",         CFrame = CFrame.new(45.28, 252.56, 2987.11), Category = "Main" },
+        { Name = "Traveling Merchant / Alien",       CFrame = CFrame.new(-135.0, 3.0, 2764.0),    Category = "Shop" },
+        { Name = "Underground Cellar (Pasar Gelap)", CFrame = CFrame.new(2109.52, -94.19, -708.61), Category = "Shop" },
+        { Name = "Weather Machine Island",           CFrame = CFrame.new(-1488.51, 83.17, 1876.30), Category = "Main" },
+
+        -- [[ ZONA UPDATE TERBARU (BENCHMARK MODERN) ]]
+        { Name = "Copper Canyon (Withering Core)",   CFrame = CFrame.new(-1800.0, 35.0, -4200.0), Category = "New" },
+        { Name = "Copper Canyon Mines (Gua Tambang)", CFrame = CFrame.new(-1850.0, -45.0, -4250.0), Category = "New" },
+        { Name = "Sewers (Saluran Bawah Tanah)",      CFrame = CFrame.new(120.0, -35.0, 2600.0),    Category = "New" },
+        { Name = "Mariana Trench (Abyssal Gate)",     CFrame = CFrame.new(5746.0, -1800.0, 15376.0), Category = "New" },
+        { Name = "Mariana Trench Deep (Dasar Palung)", CFrame = CFrame.new(5750.0, -2600.0, 15400.0), Category = "New" },
+
+        -- [[ PULAU-PULAU UTAMA ]]
+        { Name = "Kohana",                           CFrame = CFrame.new(-663.90, 3.05, 718.80),   Category = "Island" },
+        { Name = "Kohana Volcano / Lava",            CFrame = CFrame.new(-592.0, 59.0, 127.0),     Category = "Island" },
+        { Name = "Coral Reefs",                      CFrame = CFrame.new(-3114.78, 1.32, 2237.52), Category = "Island" },
+        { Name = "Tropical Grove",                   CFrame = CFrame.new(-2095.34, 197.20, 3718.08), Category = "Island" },
+        { Name = "Crater Island",                    CFrame = CFrame.new(1016.49, 20.09, 5069.27), Category = "Island" },
+        { Name = "Mount Hallow",                     CFrame = CFrame.new(2136.62, 78.92, 3272.50), Category = "Island" },
+        { Name = "Classic Island",                   CFrame = CFrame.new(1433.0, 44.0, 2755.0),    Category = "Island" },
+        { Name = "Esoteric Island",                  CFrame = CFrame.new(1991.0, 6.0, 1390.0),     Category = "Island" },
+
+        -- [[ ENDGAME, QUEST & GUA RAHASIA ]]
+        { Name = "Esoteric Depths (Enchant Stone)",  CFrame = CFrame.new(3248.37, -1301.53, 1403.83), Category = "Secret" },
+        { Name = "Lost Isle (Underwater)",           CFrame = CFrame.new(-3618.16, 240.84, -1317.46), Category = "Secret" },
+        { Name = "Sisyphus Statue",                  CFrame = CFrame.new(-3728.22, -135.07, -1012.13), Category = "Secret" },
+        { Name = "Treasure Room",                    CFrame = CFrame.new(-3606.35, -266.57, -1580.97), Category = "Secret" },
+        { Name = "Ancient Jungle",                   CFrame = CFrame.new(1831.71, 6.62, -299.28), Category = "Secret" },
+        { Name = "Ancient Ruin",                     CFrame = CFrame.new(6067.0, -586.0, 4714.0),  Category = "Secret" },
+        { Name = "Sacred Temple",                    CFrame = CFrame.new(1466.92, -21.88, -622.84), Category = "Secret" },
+        { Name = "Crystal Depths",                   CFrame = CFrame.new(5746.0, -877.0, 15376.0), Category = "Secret" },
+        { Name = "Pirate Cove",                      CFrame = CFrame.new(3471.0, 4.0, 3442.0),     Category = "Secret" },
+        { Name = "Pirate Treasure Room",             CFrame = CFrame.new(3305.0, -306.0, 3080.0),   Category = "Secret" },
+        { Name = "Leviathan's Den",                  CFrame = CFrame.new(3473.0, -288.0, 3473.0),  Category = "Secret" },
+        { Name = "Iron Cavern",                      CFrame = CFrame.new(-8798.0, -585.0, 241.0),  Category = "Secret" },
+        { Name = "Iron Cafe",                        CFrame = CFrame.new(-8647.0, -548.0, 160.0),  Category = "Secret" },
+    },
+
+    -- Titik Kustom Buatan Pemain (Save & Load Waypoint)
+    CustomWaypoints = {} :: { [string]: CFrame },
+}
+
+-- Eksekusi Teleportasi Aman (Bebas Flung & Anti-Tripwire Velocity)
+function Teleport:To(targetCFrame: CFrame): boolean
+    local char = LocalPlayer.Character
+    if not char then return false end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid or humanoid.Health <= 0 then return false end
+
+    pcall(function()
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        hrp.CFrame = targetCFrame + Vector3.new(0, 3.5, 0)
+        task.wait(0.05)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end)
+
+    return true
+end
+
+-- Teleport Berdasarkan Nama Lokasi
+function Teleport:ToNamed(name: string): boolean
+    -- 1. Cek dari daftar lokasi kustom pemain
+    if self.CustomWaypoints[name] then
+        return self:To(self.CustomWaypoints[name])
+    end
+
+    -- 2. Cek apakah ada di database lokasi statis
+    for _, loc in ipairs(self.Locations) do
+        if loc.Name:lower() == name:lower() then
+            -- Coba scan objek fisik map di workspace terlebih dahulu (jika ada update posisi oleh developer game)
+            local dynamicCF = self:ScanWorkspace(loc.Name)
+            if dynamicCF then
+                return self:To(dynamicCF)
+            end
+            return self:To(loc.CFrame)
+        end
+    end
+
+    -- 3. Fallback: Scan bebas di Workspace
+    local foundCF = self:ScanWorkspace(name)
+    if foundCF then
+        return self:To(foundCF)
+    end
+
+    return false
+end
+
+-- Smart Workspace Auto-Discovery Scanner
+function Teleport:ScanWorkspace(query: string): CFrame?
+    local cleanQuery = query:lower():gsub("%s+", "")
+    local containers = {
+        Workspace:FindFirstChild("Areas"),
+        Workspace:FindFirstChild("Islands"),
+        Workspace:FindFirstChild("Locations"),
+        Workspace:FindFirstChild("Map"),
+        Workspace:FindFirstChild("Props"),
+        Workspace,
+    }
+
+    for _, container in ipairs(containers) do
+        if not container then continue end
+        for _, child in ipairs(container:GetChildren()) do
+            local childName = child.Name:lower():gsub("%s+", "")
+            if string.find(childName, cleanQuery) or string.find(cleanQuery, childName) then
+                if child:IsA("Model") and child.PrimaryPart then
+                    return child.PrimaryPart.CFrame
+                elseif child:IsA("BasePart") then
+                    return child.CFrame
+                elseif child:IsA("Model") then
+                    local p = child:FindFirstChildOfClass("BasePart")
+                    if p then return p.CFrame end
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+-- Teleport ke Pemain Lain di Server (Berguna jika teman sudah berada di zona baru)
+function Teleport:ToPlayer(targetName: string): boolean
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and (player.Name:lower() == targetName:lower() or player.DisplayName:lower() == targetName:lower()) then
+            local targetChar = player.Character
+            local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart") :: BasePart?
+            if targetHrp then
+                return self:To(targetHrp.CFrame + Vector3.new(2, 0, 2))
+            end
+        end
+    end
+    return false
+end
+
+-- Simpan Posisi Saat Ini sebagai Titik Kustom
+function Teleport:SaveCurrentPosition(name: string): boolean
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not hrp then return false end
+
+    local cleanName = (name and #name > 0) and name or ("Spot #" .. tostring(os.date("%H:%M:%S")))
+    self.CustomWaypoints[cleanName] = hrp.CFrame
+    print("[Bodoamat | Teleport] 📌 Berhasil menyimpan waypoint kustom: " .. cleanName)
+    return true
+end
+
+-- Hapus Titik Kustom
+function Teleport:DeleteCustomWaypoint(name: string): boolean
+    if self.CustomWaypoints[name] then
+        self.CustomWaypoints[name] = nil
+        return true
+    end
+    return false
+end
+
+-- ============================================================
+-- 10. MODULE: TOTEM AUTOMATION
+-- ============================================================
+local Totem = {
+    Running = false,
+    Thread = nil :: thread?,
+    SelectedType = "Luck Totem", -- "Luck Totem", "Shiny Totem", "Mutation Totem", atau "Any"
+}
+
+-- Cari Tool Totem di Character atau Backpack
+function Totem:FindTotemTool(specificType: string?): Tool?
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local targetName = (specificType or self.SelectedType or "Totem"):lower()
+
+    -- 1. Cek di Character
+    if char then
+        for _, item in ipairs(char:GetChildren()) do
+            if item:IsA("Tool") and (item.Name:lower():find(targetName) or item.Name:lower():find("totem")) then
+                return item
+            end
+        end
+    end
+
+    -- 2. Cek di Backpack
+    if backpack then
+        for _, item in ipairs(backpack:GetChildren()) do
+            if item:IsA("Tool") and (item.Name:lower():find(targetName) or item.Name:lower():find("totem")) then
+                return item
+            end
+        end
+    end
+
+    return nil
+end
+
+-- Pasang 1 Totem di Posisi Saat Ini
+function Totem:DeploySingle(specificType: string?): boolean
+    local char = LocalPlayer.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+
+    local totemTool = self:FindTotemTool(specificType)
+    if not totemTool then
+        print("[Bodoamat | Totem] ⚠️ Totem tidak ditemukan di inventory atau tas!")
+        return false
+    end
+
+    local success = false
+    pcall(function()
+        -- 1. Pasang Totem di Tangan
+        humanoid:EquipTool(totemTool)
+        task.wait(0.15)
+
+        -- 2. Picu Aktivasi
+        totemTool:Activate()
+
+        -- 3. Cek apakah ada remote Place di dalam Tool atau ReplicatedStorage
+        local placeEvent = totemTool:FindFirstChild("Place") or totemTool:FindFirstChild("Activate")
+        if placeEvent and placeEvent:IsA("RemoteEvent") then
+            placeEvent:FireServer()
+        elseif placeEvent and placeEvent:IsA("RemoteFunction") then
+            placeEvent:InvokeServer()
+        end
+
+        task.wait(0.2)
+        success = true
+        print("[Bodoamat | Totem] 🍀 Berhasil menempatkan totem: " .. totemTool.Name)
+    end)
+
+    return success
+end
+
+-- Pasang 5 Totem dalam Formasi Salib (+) untuk Cakupan Radius Maksimal
+function Totem:DeployFormation5(specificType: string?): boolean
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return false end
+
+    local originalPos = hrp.CFrame
+    local distance = 50 -- Jarak optimal antar totem (radius pengaruh 50-70 studs)
+    local offsets = {
+        Vector3.new(0, 0, 0),             -- Pusat
+        Vector3.new(distance, 0, 0),      -- Kanan
+        Vector3.new(-distance, 0, 0),     -- Kiri
+        Vector3.new(0, 0, distance),      -- Depan
+        Vector3.new(0, 0, -distance),     -- Belakang
+    }
+
+    local deployedCount = 0
+    pcall(function()
+        for i, offset in ipairs(offsets) do
+            local totem = self:FindTotemTool(specificType)
+            if not totem then break end
+
+            -- Geser karakter sejenak ke posisi formasi
+            hrp.CFrame = originalPos + offset + Vector3.new(0, 2, 0)
+            task.wait(0.1)
+
+            humanoid:EquipTool(totem)
+            task.wait(0.15)
+            totem:Activate()
+
+            local placeEv = totem:FindFirstChild("Place")
+            if placeEv and placeEv:IsA("RemoteEvent") then
+                placeEv:FireServer()
+            end
+
+            task.wait(0.2)
+            deployedCount = deployedCount + 1
+        end
+
+        -- Kembalikan ke posisi awal
+        hrp.CFrame = originalPos
+    end)
+
+    print("[Bodoamat | Totem] 🌟 Selesai formasi 5 Totem. Total terpasang: " .. tostring(deployedCount))
+    return deployedCount > 0
+end
+
+-- Mulai Loop Auto-Totem Berkala
+function Totem:Start(intervalMinutes: number?, totemType: string?)
+    if self.Running then return end
+    self.Running = true
+    if totemType then self.SelectedType = totemType end
+
+    local intervalSeconds = math.max(60, (intervalMinutes or 28) * 60)
+
+    self.Thread = task.spawn(function()
+        print("[Bodoamat | Totem] Auto Totem aktif (Pembaruan setiap " .. tostring(math.floor(intervalSeconds / 60)) .. " menit).")
+
+        -- Pasang langsung saat pertama kali diaktifkan
+        self:DeploySingle(self.SelectedType)
+
+        while self.Running do
+            task.wait(intervalSeconds)
+            if not self.Running then break end
+            self:DeploySingle(self.SelectedType)
+        end
+    end)
+end
+
+function Totem:Stop()
+    self.Running = false
+    if self.Thread then
+        task.cancel(self.Thread)
+        self.Thread = nil
+    end
+    print("[Bodoamat | Totem] Auto Totem dimatikan.")
+end
+
+-- ============================================================
+-- 11. MODULE: MERCHANT & DEEP SEA TOOLS
+-- ============================================================
+local Merchant = {}
+
+-- Daftar Item Populer Toko & Merchant
+Merchant.Items = {
+    Bait = { "Singularity Bait", "Royal Bait", "Enchanted Bait", "Golden Bait", "Topwater Bait" },
+    Totem = { "Luck Totem", "Shiny Totem", "Mutation Totem" },
+    Crates = { "Luxury Crate", "Azure Crate", "Enchanted Crate", "Elderwood Crate" },
+    Weather = { "Storm", "Thunderstorm", "Blizzard", "Sandstorm", "Cloudy", "Wind" }
+}
+
+-- Buka Menu Toko / Black Market Jarak Jauh via ProximityPrompt
+function Merchant:OpenRemoteShop(keyword: string?): boolean
+    local searchKey = (keyword or "merchant"):lower()
+    local found = false
+
+    pcall(function()
+        for _, desc in ipairs(Workspace:GetDescendants()) do
+            if desc:IsA("ProximityPrompt") then
+                local objText = (desc.ObjectText or ""):lower()
+                local actText = (desc.ActionText or ""):lower()
+                local parentName = (desc.Parent and desc.Parent.Name or ""):lower()
+
+                if objText:find(searchKey) or actText:find(searchKey) or parentName:find(searchKey)
+                   or objText:find("shop") or objText:find("market") or objText:find("bazaar")
+                   or parentName:find("cellar") or parentName:find("alien") then
+
+                    -- Gunakan fungsi native executor fireproximityprompt
+                    local firePrompt = (rawget and rawget(getgenv and getgenv() or {}, "fireproximityprompt"))
+                                       or (getfenv and getfenv().fireproximityprompt)
+
+                    if firePrompt then
+                        firePrompt(desc, 0)
+                        found = true
+                        print("[Bodoamat | Merchant] 🛒 Membuka prompt toko: " .. tostring(desc.ObjectText))
+                        break
+                    else
+                        -- Fallback simulasi posisi jika fireproximityprompt tidak tersedia
+                        local promptPart = desc.Parent
+                        if promptPart and promptPart:IsA("BasePart") and LocalPlayer.Character then
+                            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+                            if hrp then
+                                local oldPos = hrp.CFrame
+                                hrp.CFrame = promptPart.CFrame + Vector3.new(0, 2, 0)
+                                task.wait(0.2)
+                                desc:InputHoldBegin()
+                                task.wait(desc.HoldDuration + 0.1)
+                                desc:InputHoldEnd()
+                                task.wait(0.2)
+                                hrp.CFrame = oldPos
+                                found = true
+                                break
+                            end
+                        end
                     end
                 end
             end
-        end)
-    end
-    print("[Bodoamat] Sistem Anti-AFK & Auto-Rejoin Aktif.")
+        end
+    end)
+
+    return found
 end
 
-function AntiAfk:Stop()
-    self.Enabled = false
-    for _, conn in ipairs(self.Connections) do conn:Disconnect() end
-    table.clear(self.Connections)
-    if self.MicroMoveThread then
-        task.cancel(self.MicroMoveThread)
-        self.MicroMoveThread = nil
+-- Beli Item Spesifik via Network Remote
+function Merchant:BuyItem(itemName: string, network: any): boolean
+    if not network then return false end
+    local success = network:BuyItem(itemName)
+    if success then
+        print("[Bodoamat | Merchant] ✅ Berhasil membeli item: " .. itemName)
+    else
+        print("[Bodoamat | Merchant] ⚠️ Pembelian gagal atau koin tidak mencukupi: " .. itemName)
     end
+    return success
+end
+
+-- Refresh Stok Merchant
+function Merchant:RefreshStock(network: any): boolean
+    if not network then return false end
+    return network:RefreshMerchant()
+end
+
+-- Pasang Tabung Oksigen Laut Dalam (Mariana Trench & Lost Isle)
+function Merchant:EquipOxygen(network: any): boolean
+    if not network then return false end
+    local success = network:EquipOxygenTank()
+    if success then
+        print("[Bodoamat | Laut Dalam] 🤿 Tabung Oksigen aktif! Karakter aman dari kehabisan nafas.")
+    end
+    return success
+end
+
+-- Aktifkan/Matikan Radar Ikan
+function Merchant:ToggleRadar(enabled: boolean, network: any): boolean
+    if not network then return false end
+    local success = network:UpdateFishingRadar(enabled)
+    if success then
+        print("[Bodoamat | Radar] 📡 Radar Ikan: " .. (enabled and "Aktif" or "Nonaktif"))
+    end
+    return success
+end
+
+-- Beli Cuaca Server
+function Merchant:SetWeather(weatherName: string, network: any): boolean
+    if not network then return false end
+    local success = network:PurchaseWeather(weatherName)
+    if success then
+        print("[Bodoamat | Cuaca] ⛈️ Berhasil memicu event cuaca: " .. weatherName)
+    end
+    return success
 end
 
 -- ============================================================
--- 10. MODULE: STANDALONE GUI v2.0
+-- 12. UI: BODOAMAT GUI
 -- ============================================================
 local BodoamatGui = {
     ScreenGui = nil :: ScreenGui?,
@@ -937,32 +1590,44 @@ local BodoamatGui = {
     TabButtons = {} :: { [string]: TextButton },
 }
 
-function BodoamatGui:Create(cfg: any, st: any, mods: any)
+function BodoamatGui:Create(config: any, state: any, modules: any)
+    -- 1. Bersihkan UI lama jika sudah ada
     pcall(function()
         for _, gui in ipairs(CoreGui:GetChildren()) do
-            if gui.Name == "BodoamatUI" or gui.Name == "Bodoamat_MobileBtn" then gui:Destroy() end
+            if gui.Name == "BodoamatUI" or gui.Name == "Bodoamat_MobileBtn" then
+                gui:Destroy()
+            end
         end
         local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
         if playerGui then
             for _, gui in ipairs(playerGui:GetChildren()) do
-                if gui.Name == "BodoamatUI" or gui.Name == "Bodoamat_MobileBtn" then gui:Destroy() end
+                if gui.Name == "BodoamatUI" or gui.Name == "Bodoamat_MobileBtn" then
+                    gui:Destroy()
+                end
             end
         end
     end)
 
+    -- 2. Buat ScreenGui Utama
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "BodoamatUI"
     screenGui.ResetOnSpawn = false
     screenGui.DisplayOrder = 10000
-    pcall(function() screenGui.Parent = CoreGui end)
-    if not screenGui.Parent then screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+    pcall(function()
+        screenGui.Parent = CoreGui
+    end)
+    if not screenGui.Parent then
+        screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
     self.ScreenGui = screenGui
 
+    -- 3. Frame Jendela Utama
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
-    mainFrame.Size = UDim2.new(0, 540, 0, 390)
-    mainFrame.Position = UDim2.new(0.5, -270, 0.5, -195)
-    mainFrame.BackgroundColor3 = cfg.UI.Theme.Background
+    mainFrame.Size = UDim2.new(0, 560, 0, 420)
+    mainFrame.Position = UDim2.new(0.5, -280, 0.5, -210)
+    mainFrame.BackgroundColor3 = config.UI.Theme.Background
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.ClipsDescendants = true
@@ -974,10 +1639,11 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     mainCorner.Parent = mainFrame
 
     local mainStroke = Instance.new("UIStroke")
-    mainStroke.Color = cfg.UI.Theme.Border
+    mainStroke.Color = config.UI.Theme.Border
     mainStroke.Thickness = 1.2
     mainStroke.Parent = mainFrame
 
+    -- Logika Dragging Universal (Mouse & Mobile Touch)
     local dragging, dragInput, dragStart, startPos
     mainFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -985,26 +1651,36 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
             dragStart = input.Position
             startPos = mainFrame.Position
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
             end)
         end
     end)
+
     mainFrame.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
         end
     end)
+
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
         end
     end)
 
+    -- 4. Header Bar
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.Size = UDim2.new(1, 0, 0, 48)
-    header.BackgroundColor3 = cfg.UI.Theme.CardBg
+    header.BackgroundColor3 = config.UI.Theme.CardBg
     header.BorderSizePixel = 0
     header.Parent = mainFrame
 
@@ -1015,27 +1691,27 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     local headerPatch = Instance.new("Frame")
     headerPatch.Size = UDim2.new(1, 0, 0, 10)
     headerPatch.Position = UDim2.new(0, 0, 1, -10)
-    headerPatch.BackgroundColor3 = cfg.UI.Theme.CardBg
+    headerPatch.BackgroundColor3 = config.UI.Theme.CardBg
     headerPatch.BorderSizePixel = 0
     headerPatch.Parent = header
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0, 220, 0, 24)
+    titleLabel.Size = UDim2.new(0, 240, 0, 24)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "🐟 " .. cfg.UI.Title
-    titleLabel.TextColor3 = cfg.UI.Theme.Accent
-    titleLabel.TextSize = 17
+    titleLabel.Text = "🐟 " .. config.UI.Title .. " v3.0"
+    titleLabel.TextColor3 = config.UI.Theme.Accent
+    titleLabel.TextSize = 16
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = header
 
     local subtitleLabel = Instance.new("TextLabel")
-    subtitleLabel.Size = UDim2.new(0, 260, 0, 16)
+    subtitleLabel.Size = UDim2.new(0, 280, 0, 16)
     subtitleLabel.Position = UDim2.new(0, 16, 0, 28)
     subtitleLabel.BackgroundTransparency = 1
-    subtitleLabel.Text = cfg.UI.Subtitle
-    subtitleLabel.TextColor3 = cfg.UI.Theme.TextSubtle
+    subtitleLabel.Text = config.UI.Subtitle
+    subtitleLabel.TextColor3 = config.UI.Theme.TextSubtle
     subtitleLabel.TextSize = 11
     subtitleLabel.Font = Enum.Font.Gotham
     subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1054,11 +1730,15 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     local closeCorner = Instance.new("UICorner")
     closeCorner.CornerRadius = UDim.new(0, 6)
     closeCorner.Parent = closeBtn
-    closeBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
 
+    closeBtn.MouseButton1Click:Connect(function()
+        mainFrame.Visible = false
+    end)
+
+    -- 5. Sidebar Navigasi Tab (Kiri)
     local sidebar = Instance.new("Frame")
     sidebar.Name = "Sidebar"
-    sidebar.Size = UDim2.new(0, 135, 1, -48)
+    sidebar.Size = UDim2.new(0, 138, 1, -48)
     sidebar.Position = UDim2.new(0, 0, 0, 48)
     sidebar.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
     sidebar.BorderSizePixel = 0
@@ -1066,8 +1746,8 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
 
     local contentArea = Instance.new("Frame")
     contentArea.Name = "ContentArea"
-    contentArea.Size = UDim2.new(1, -145, 1, -58)
-    contentArea.Position = UDim2.new(0, 140, 0, 53)
+    contentArea.Size = UDim2.new(1, -148, 1, -58)
+    contentArea.Position = UDim2.new(0, 143, 0, 53)
     contentArea.BackgroundTransparency = 1
     contentArea.Parent = mainFrame
 
@@ -1078,7 +1758,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         page.BackgroundTransparency = 1
         page.BorderSizePixel = 0
         page.ScrollBarThickness = 4
-        page.ScrollBarImageColor3 = cfg.UI.Theme.Accent
+        page.ScrollBarImageColor3 = config.UI.Theme.Accent
         page.Visible = false
         page.CanvasSize = UDim2.new(0, 0, 0, 0)
         page.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -1091,7 +1771,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
 
         local pagePadding = Instance.new("UIPadding")
         pagePadding.PaddingRight = UDim.new(0, 6)
-        pagePadding.PaddingBottom = UDim.new(0, 10)
+        pagePadding.PaddingBottom = UDim.new(0, 12)
         pagePadding.Parent = page
 
         self.Tabs[tabName] = page
@@ -1100,33 +1780,35 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
 
     local tabList = {
         { Id = "Fishing",  Label = "🎣 Memancing" },
-        { Id = "Selling",  Label = "💰 Toko & Fav" },
-        { Id = "Teleport", Label = "🗺️ Teleport" },
+        { Id = "Selling",  Label = "💰 Toko & Jual" },
+        { Id = "Totem",    Label = "🗿 Totem & Laut" },
+        { Id = "Teleport", Label = "🗺️ Teleportasi" },
         { Id = "Movement", Label = "🏃 Mobilitas" },
         { Id = "Optimasi", Label = "⚡ Performa" },
         { Id = "Status",   Label = "📊 Statistik" },
     }
 
     local tabLayout = Instance.new("UIListLayout")
-    tabLayout.Padding = UDim.new(0, 5)
+    tabLayout.Padding = UDim.new(0, 4)
     tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
     tabLayout.Parent = sidebar
 
     local sidebarPadding = Instance.new("UIPadding")
-    sidebarPadding.PaddingTop = UDim.new(0, 8)
+    sidebarPadding.PaddingTop = UDim.new(0, 6)
     sidebarPadding.PaddingLeft = UDim.new(0, 6)
     sidebarPadding.PaddingRight = UDim.new(0, 6)
     sidebarPadding.Parent = sidebar
 
     for _, t in ipairs(tabList) do
         createTab(t.Id)
+
         local btn = Instance.new("TextButton")
         btn.Name = t.Id .. "TabBtn"
-        btn.Size = UDim2.new(1, 0, 0, 34)
-        btn.BackgroundColor3 = (t.Id == self.CurrentTab) and cfg.UI.Theme.CardBg or Color3.fromRGB(20, 22, 30)
+        btn.Size = UDim2.new(1, 0, 0, 32)
+        btn.BackgroundColor3 = (t.Id == self.CurrentTab) and config.UI.Theme.CardBg or Color3.fromRGB(20, 22, 30)
         btn.Text = t.Label
-        btn.TextColor3 = (t.Id == self.CurrentTab) and cfg.UI.Theme.Accent or cfg.UI.Theme.TextSubtle
-        btn.TextSize = 12
+        btn.TextColor3 = (t.Id == self.CurrentTab) and config.UI.Theme.Accent or config.UI.Theme.TextSubtle
+        btn.TextSize = 11
         btn.Font = Enum.Font.GothamMedium
         btn.TextXAlignment = Enum.TextXAlignment.Left
         btn.Parent = sidebar
@@ -1136,17 +1818,35 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         pad.Parent = btn
 
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 7)
+        corner.CornerRadius = UDim.new(0, 6)
         corner.Parent = btn
 
         self.TabButtons[t.Id] = btn
-        btn.MouseButton1Click:Connect(function() self:SwitchTab(t.Id, cfg) end)
+
+        btn.MouseButton1Click:Connect(function()
+            self:SwitchTab(t.Id, config)
+        end)
+    end
+
+    -- ==========================================
+    -- KOMPONEN UI BUILDER HELPER
+    -- ==========================================
+    local function createSectionHeader(parent: Instance, text: string)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -4, 0, 22)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = text
+        lbl.TextColor3 = config.UI.Theme.Accent
+        lbl.TextSize = 11
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = parent
     end
 
     local function createToggle(parent: Instance, title: string, desc: string, default: boolean, onToggle: (boolean) -> ())
         local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -4, 0, 52)
-        card.BackgroundColor3 = cfg.UI.Theme.CardBg
+        card.Size = UDim2.new(1, -4, 0, 50)
+        card.BackgroundColor3 = config.UI.Theme.CardBg
         card.BorderSizePixel = 0
         card.Parent = parent
 
@@ -1156,10 +1856,10 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
 
         local tLabel = Instance.new("TextLabel")
         tLabel.Size = UDim2.new(1, -70, 0, 20)
-        tLabel.Position = UDim2.new(0, 12, 0, 7)
+        tLabel.Position = UDim2.new(0, 12, 0, 6)
         tLabel.BackgroundTransparency = 1
         tLabel.Text = title
-        tLabel.TextColor3 = cfg.UI.Theme.Text
+        tLabel.TextColor3 = config.UI.Theme.Text
         tLabel.TextSize = 12
         tLabel.Font = Enum.Font.GothamBold
         tLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1170,7 +1870,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         dLabel.Position = UDim2.new(0, 12, 0, 26)
         dLabel.BackgroundTransparency = 1
         dLabel.Text = desc
-        dLabel.TextColor3 = cfg.UI.Theme.TextSubtle
+        dLabel.TextColor3 = config.UI.Theme.TextSubtle
         dLabel.TextSize = 10
         dLabel.Font = Enum.Font.Gotham
         dLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1179,7 +1879,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         local toggleBtn = Instance.new("TextButton")
         toggleBtn.Size = UDim2.new(0, 48, 0, 26)
         toggleBtn.Position = UDim2.new(1, -58, 0.5, -13)
-        toggleBtn.BackgroundColor3 = default and cfg.UI.Theme.Success or Color3.fromRGB(48, 52, 68)
+        toggleBtn.BackgroundColor3 = default and config.UI.Theme.Success or Color3.fromRGB(48, 52, 68)
         toggleBtn.Text = default and "ON" or "OFF"
         toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         toggleBtn.TextSize = 11
@@ -1194,7 +1894,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         toggleBtn.MouseButton1Click:Connect(function()
             isToggled = not isToggled
             toggleBtn.Text = isToggled and "ON" or "OFF"
-            toggleBtn.BackgroundColor3 = isToggled and cfg.UI.Theme.Success or Color3.fromRGB(48, 52, 68)
+            toggleBtn.BackgroundColor3 = isToggled and config.UI.Theme.Success or Color3.fromRGB(48, 52, 68)
             onToggle(isToggled)
         end)
     end
@@ -1202,7 +1902,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     local function createActionButton(parent: Instance, label: string, desc: string, onClick: () -> ())
         local card = Instance.new("Frame")
         card.Size = UDim2.new(1, -4, 0, 46)
-        card.BackgroundColor3 = cfg.UI.Theme.CardBg
+        card.BackgroundColor3 = config.UI.Theme.CardBg
         card.BorderSizePixel = 0
         card.Parent = parent
 
@@ -1215,7 +1915,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         tLabel.Position = UDim2.new(0, 12, 0, 5)
         tLabel.BackgroundTransparency = 1
         tLabel.Text = label
-        tLabel.TextColor3 = cfg.UI.Theme.Text
+        tLabel.TextColor3 = config.UI.Theme.Text
         tLabel.TextSize = 12
         tLabel.Font = Enum.Font.GothamBold
         tLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1226,16 +1926,16 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         dLabel.Position = UDim2.new(0, 12, 0, 24)
         dLabel.BackgroundTransparency = 1
         dLabel.Text = desc
-        dLabel.TextColor3 = cfg.UI.Theme.TextSubtle
+        dLabel.TextColor3 = config.UI.Theme.TextSubtle
         dLabel.TextSize = 10
         dLabel.Font = Enum.Font.Gotham
         dLabel.TextXAlignment = Enum.TextXAlignment.Left
         dLabel.Parent = card
 
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 90, 0, 28)
-        btn.Position = UDim2.new(1, -98, 0.5, -14)
-        btn.BackgroundColor3 = cfg.UI.Theme.Accent
+        btn.Size = UDim2.new(0, 92, 0, 28)
+        btn.Position = UDim2.new(1, -100, 0.5, -14)
+        btn.BackgroundColor3 = config.UI.Theme.Accent
         btn.Text = "Jalankan"
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.TextSize = 11
@@ -1245,23 +1945,79 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         local bCorner = Instance.new("UICorner")
         bCorner.CornerRadius = UDim.new(0, 6)
         bCorner.Parent = btn
-        btn.MouseButton1Click:Connect(onClick)
+
+        btn.MouseButton1Click:Connect(function()
+            onClick()
+        end)
     end
 
-    -- TAB 1: MEMANCING
+    local function createTextInput(parent: Instance, placeholder: string, btnLabel: string, onSubmit: (string) -> ())
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, -4, 0, 44)
+        card.BackgroundColor3 = config.UI.Theme.CardBg
+        card.BorderSizePixel = 0
+        card.Parent = parent
+
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 8)
+        cCorner.Parent = card
+
+        local box = Instance.new("TextBox")
+        box.Size = UDim2.new(1, -105, 0, 28)
+        box.Position = UDim2.new(0, 10, 0.5, -14)
+        box.BackgroundColor3 = Color3.fromRGB(24, 27, 36)
+        box.PlaceholderText = placeholder
+        box.PlaceholderColor3 = config.UI.Theme.TextSubtle
+        box.Text = ""
+        box.TextColor3 = Color3.fromRGB(255, 255, 255)
+        box.TextSize = 11
+        box.Font = Enum.Font.Gotham
+        box.ClearTextOnFocus = false
+        box.Parent = card
+
+        local bCorner = Instance.new("UICorner")
+        bCorner.CornerRadius = UDim.new(0, 6)
+        bCorner.Parent = box
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 80, 0, 28)
+        btn.Position = UDim2.new(1, -88, 0.5, -14)
+        btn.BackgroundColor3 = config.UI.Theme.Accent
+        btn.Text = btnLabel
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 11
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = card
+
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 6)
+        btnCorner.Parent = btn
+
+        btn.MouseButton1Click:Connect(function()
+            if #box.Text > 0 then
+                onSubmit(box.Text)
+            end
+        end)
+    end
+
+    -- ==========================================
+    -- ISI KONTEN TAB 1: MEMANCING
+    -- ==========================================
     local fishPage = self.Tabs["Fishing"]
-    createToggle(fishPage, "Auto Fishing Aktif", "Otomatis melempar kail dan menarik tangkapan", st.IsFishing, function(val)
-        st:Set("IsFishing", val)
+
+    createToggle(fishPage, "Auto Fishing Aktif", "Otomatis melempar dan menarik tangkapan", state.IsFishing, function(val)
+        state:Set("IsFishing", val)
         if val then
-            mods.AutoFish:Start(cfg.AutoFish, st, mods.Network)
+            modules.AutoFish:Start(config.AutoFish, state, modules.Network)
         else
-            mods.AutoFish:Stop()
+            modules.AutoFish:Stop()
         end
     end)
 
+    -- Selector Mode Memancing (Legit / Fast / Blatant)
     local modeCard = Instance.new("Frame")
     modeCard.Size = UDim2.new(1, -4, 0, 68)
-    modeCard.BackgroundColor3 = cfg.UI.Theme.CardBg
+    modeCard.BackgroundColor3 = config.UI.Theme.CardBg
     modeCard.BorderSizePixel = 0
     modeCard.Parent = fishPage
 
@@ -1274,7 +2030,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     mTitle.Position = UDim2.new(0, 12, 0, 6)
     mTitle.BackgroundTransparency = 1
     mTitle.Text = "Mode Kecepatan Memancing"
-    mTitle.TextColor3 = cfg.UI.Theme.Text
+    mTitle.TextColor3 = config.UI.Theme.Text
     mTitle.TextSize = 12
     mTitle.Font = Enum.Font.GothamBold
     mTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -1301,7 +2057,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     for _, m in ipairs(modes) do
         local mBtn = Instance.new("TextButton")
         mBtn.Size = UDim2.new(0.32, -4, 1, 0)
-        mBtn.BackgroundColor3 = (cfg.AutoFish.Mode == m.Id) and cfg.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
+        mBtn.BackgroundColor3 = (config.AutoFish.Mode == m.Id) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
         mBtn.Text = m.Label
         mBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         mBtn.TextSize = 10
@@ -1313,42 +2069,55 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         c.Parent = mBtn
 
         modeButtons[m.Id] = mBtn
+
         mBtn.MouseButton1Click:Connect(function()
-            cfg.AutoFish.Mode = m.Id
-            st:Set("FishingMode", m.Id)
+            config.AutoFish.Mode = m.Id
+            state:Set("FishingMode", m.Id)
             for id, btn in pairs(modeButtons) do
-                btn.BackgroundColor3 = (id == m.Id) and cfg.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
+                btn.BackgroundColor3 = (id == m.Id) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
             end
-            if st.IsFishing then
-                mods.AutoFish:Stop()
-                mods.AutoFish:Start(cfg.AutoFish, st, mods.Network)
+            if state.IsFishing then
+                modules.AutoFish:Stop()
+                modules.AutoFish:Start(config.AutoFish, state, modules.Network)
             end
+            print("[Bodoamat] Mode memancing berganti ke: " .. m.Id)
         end)
     end
 
     createActionButton(fishPage, "Equip Joran Manual", "Mencari dan memasang joran dari tas ke tangan", function()
-        mods.AutoFish:EnsureRodEquipped(mods.Network)
+        modules.AutoFish:EnsureRodEquipped(modules.Network)
     end)
 
-    -- TAB 2: TOKO & FAVORITE
+    -- ==========================================
+    -- ISI KONTEN TAB 2: TOKO & JUAL
+    -- ==========================================
     local sellPage = self.Tabs["Selling"]
-    createToggle(sellPage, "Auto Sell Ikan", "Menjual hasil tangkapan otomatis setiap 45 detik", st.IsAutoSell, function(val)
-        st:Set("IsAutoSell", val)
+
+    createToggle(sellPage, "Auto Sell Ikan", "Menjual hasil tangkapan otomatis secara berkala", state.IsAutoSell, function(val)
+        state:Set("IsAutoSell", val)
         if val then
-            mods.AutoSell:Start(cfg.AutoSell.Interval, mods.Network, st)
+            modules.AutoSell:Start(config.AutoSell.Interval, modules.Network, state)
         else
-            mods.AutoSell:Stop()
+            modules.AutoSell:Stop()
         end
     end)
 
-    createToggle(sellPage, "Auto Favorite Ikan Langka", "Mengunci otomatis ikan bernilai tinggi sebelum dijual", mods.AutoSell.AutoFavoriteEnabled, function(val)
-        mods.AutoSell.AutoFavoriteEnabled = val
-        st:Set("IsAutoFavorite", val)
+    createToggle(sellPage, "Mode Aman Dekat Pedagang TP", "TP singkat ke pedagang saat jual jika di luar jangkauan (Anti BAC-8228)", state.MerchantSafeTp, function(val)
+        state:Set("MerchantSafeTp", val)
+        modules.AutoSell.MerchantSafeTp = val
+        print("[Bodoamat | AutoSell] Merchant Safe TP: " .. (val and "Aktif" or "Nonaktif"))
     end)
 
+    createToggle(sellPage, "Auto Favorite Ikan Langka", "Mengunci otomatis ikan bernilai tinggi sebelum dijual", modules.AutoSell.AutoFavoriteEnabled, function(val)
+        modules.AutoSell.AutoFavoriteEnabled = val
+        state:Set("IsAutoFavorite", val)
+        print("[Bodoamat] Auto Favorite: " .. (val and "Aktif" or "Nonaktif"))
+    end)
+
+    -- Pilihan Min Rarity
     local rarityCard = Instance.new("Frame")
     rarityCard.Size = UDim2.new(1, -4, 0, 64)
-    rarityCard.BackgroundColor3 = cfg.UI.Theme.CardBg
+    rarityCard.BackgroundColor3 = config.UI.Theme.CardBg
     rarityCard.BorderSizePixel = 0
     rarityCard.Parent = sellPage
 
@@ -1361,7 +2130,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     rTitle.Position = UDim2.new(0, 12, 0, 6)
     rTitle.BackgroundTransparency = 1
     rTitle.Text = "Minimal Rarity yang Diamankan (Tidak Dijual)"
-    rTitle.TextColor3 = cfg.UI.Theme.Text
+    rTitle.TextColor3 = config.UI.Theme.Text
     rTitle.TextSize = 11
     rTitle.Font = Enum.Font.GothamBold
     rTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -1383,7 +2152,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     for _, rName in ipairs(rList) do
         local rBtn = Instance.new("TextButton")
         rBtn.Size = UDim2.new(0.19, 0, 1, 0)
-        rBtn.BackgroundColor3 = (mods.AutoSell.MinFavoriteRarity == rName) and cfg.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
+        rBtn.BackgroundColor3 = (modules.AutoSell.MinFavoriteRarity == rName) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
         rBtn.Text = rName
         rBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         rBtn.TextSize = 9
@@ -1393,92 +2162,406 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         local c = Instance.new("UICorner")
         c.CornerRadius = UDim.new(0, 5)
         c.Parent = rBtn
+
         rButtons[rName] = rBtn
 
         rBtn.MouseButton1Click:Connect(function()
-            mods.AutoSell.MinFavoriteRarity = rName
+            modules.AutoSell.MinFavoriteRarity = rName
             for id, b in pairs(rButtons) do
-                b.BackgroundColor3 = (id == rName) and cfg.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
+                b.BackgroundColor3 = (id == rName) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
             end
+            print("[Bodoamat] Min Favorite Rarity diset ke: " .. rName)
         end)
     end
 
-    createActionButton(sellPage, "Jual Semua Ikan Sekarang", "Kirim remote jual langsung ke merchant", function()
-        mods.AutoSell:ProtectRareFish(mods.Network)
-        task.wait(0.1)
-        local ok = mods.Network:SellAll()
-        if ok then st.LastStatusMessage = "💰 Berhasil menjual semua ikan!" end
+    local sellDebounce = false
+    createActionButton(sellPage, "Jual Semua Ikan Sekarang", "Kirim remote jual langsung ke merchant (Anti-BAC Safe)", function()
+        if sellDebounce then return end
+        sellDebounce = true
+        modules.AutoSell:ExecuteSell(modules.Network, state)
+        task.wait(2.5)
+        sellDebounce = false
     end)
 
-    -- TAB 3: TELEPORT
+    createSectionHeader(sellPage, "🛒 TOKO & BLACK MARKET REMOTE")
+
+    createActionButton(sellPage, "Buka Black Market Jarak Jauh", "Picu prompt Pasar Gelap / Cellar dari mana saja", function()
+        local opened = modules.Merchant:OpenRemoteShop("cellar")
+        if not opened then
+            modules.Merchant:OpenRemoteShop("merchant")
+        end
+    end)
+
+    createActionButton(sellPage, "Buka Pedagang Keliling (Alien)", "Picu prompt Traveling Merchant dari mana saja", function()
+        modules.Merchant:OpenRemoteShop("traveling")
+    end)
+
+    createActionButton(sellPage, "Refresh Stok Merchant", "Kirim remote untuk memperbarui stok barang pedagang", function()
+        modules.Merchant:RefreshStock(modules.Network)
+    end)
+
+    -- Quick Buy Bait
+    local buyCard = Instance.new("Frame")
+    buyCard.Size = UDim2.new(1, -4, 0, 68)
+    buyCard.BackgroundColor3 = config.UI.Theme.CardBg
+    buyCard.BorderSizePixel = 0
+    buyCard.Parent = sellPage
+
+    local bCorner = Instance.new("UICorner")
+    bCorner.CornerRadius = UDim.new(0, 8)
+    bCorner.Parent = buyCard
+
+    local bTitle = Instance.new("TextLabel")
+    bTitle.Size = UDim2.new(1, -20, 0, 18)
+    bTitle.Position = UDim2.new(0, 12, 0, 6)
+    bTitle.BackgroundTransparency = 1
+    bTitle.Text = "Beli Umpan Instan (Top Bait)"
+    bTitle.TextColor3 = config.UI.Theme.Text
+    bTitle.TextSize = 11
+    bTitle.Font = Enum.Font.GothamBold
+    bTitle.TextXAlignment = Enum.TextXAlignment.Left
+    bTitle.Parent = buyCard
+
+    local baitBtns = { "Singularity Bait", "Royal Bait", "Enchanted Bait", "Golden Bait" }
+    local baitContainer = Instance.new("Frame")
+    baitContainer.Size = UDim2.new(1, -24, 0, 28)
+    baitContainer.Position = UDim2.new(0, 12, 0, 30)
+    baitContainer.BackgroundTransparency = 1
+    baitContainer.Parent = buyCard
+
+    local baitLayout = Instance.new("UIListLayout")
+    baitLayout.FillDirection = Enum.FillDirection.Horizontal
+    baitLayout.Padding = UDim.new(0, 4)
+    baitLayout.Parent = baitContainer
+
+    for _, baitName in ipairs(baitBtns) do
+        local bb = Instance.new("TextButton")
+        bb.Size = UDim2.new(0.24, -2, 1, 0)
+        bb.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
+        bb.Text = baitName:gsub(" Bait", "")
+        bb.TextColor3 = Color3.fromRGB(255, 255, 255)
+        bb.TextSize = 9
+        bb.Font = Enum.Font.GothamMedium
+        bb.Parent = baitContainer
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 5)
+        c.Parent = bb
+
+        bb.MouseButton1Click:Connect(function()
+            modules.Merchant:BuyItem(baitName, modules.Network)
+        end)
+    end
+
+    -- ==========================================
+    -- ISI KONTEN TAB 3: TOTEM & LAUT DALAM
+    -- ==========================================
+    local totemPage = self.Tabs["Totem"]
+
+    createSectionHeader(totemPage, "🗿 KELOLA & PASANG TOTEM")
+
+    -- Selector Tipe Totem
+    local tTypeCard = Instance.new("Frame")
+    tTypeCard.Size = UDim2.new(1, -4, 0, 64)
+    tTypeCard.BackgroundColor3 = config.UI.Theme.CardBg
+    tTypeCard.BorderSizePixel = 0
+    tTypeCard.Parent = totemPage
+
+    local ttCorner = Instance.new("UICorner")
+    ttCorner.CornerRadius = UDim.new(0, 8)
+    ttCorner.Parent = tTypeCard
+
+    local ttTitle = Instance.new("TextLabel")
+    ttTitle.Size = UDim2.new(1, -20, 0, 18)
+    ttTitle.Position = UDim2.new(0, 12, 0, 6)
+    ttTitle.BackgroundTransparency = 1
+    ttTitle.Text = "Tipe Totem yang Dipasang"
+    ttTitle.TextColor3 = config.UI.Theme.Text
+    ttTitle.TextSize = 11
+    ttTitle.Font = Enum.Font.GothamBold
+    ttTitle.TextXAlignment = Enum.TextXAlignment.Left
+    ttTitle.Parent = tTypeCard
+
+    local tTypeList = { "Luck Totem", "Shiny Totem", "Mutation Totem" }
+    local tTypeBtns = {}
+    local ttContainer = Instance.new("Frame")
+    ttContainer.Size = UDim2.new(1, -24, 0, 28)
+    ttContainer.Position = UDim2.new(0, 12, 0, 28)
+    ttContainer.BackgroundTransparency = 1
+    ttContainer.Parent = tTypeCard
+
+    local ttLayout = Instance.new("UIListLayout")
+    ttLayout.FillDirection = Enum.FillDirection.Horizontal
+    ttLayout.Padding = UDim.new(0, 6)
+    ttLayout.Parent = ttContainer
+
+    for _, tName in ipairs(tTypeList) do
+        local tb = Instance.new("TextButton")
+        tb.Size = UDim2.new(0.32, -4, 1, 0)
+        tb.BackgroundColor3 = (modules.Totem.SelectedType == tName) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
+        tb.Text = tName
+        tb.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tb.TextSize = 10
+        tb.Font = Enum.Font.GothamMedium
+        tb.Parent = ttContainer
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 6)
+        c.Parent = tb
+
+        tTypeBtns[tName] = tb
+
+        tb.MouseButton1Click:Connect(function()
+            modules.Totem.SelectedType = tName
+            state:Set("TotemType", tName)
+            for id, b in pairs(tTypeBtns) do
+                b.BackgroundColor3 = (id == tName) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
+            end
+            print("[Bodoamat | Totem] Tipe aktif: " .. tName)
+        end)
+    end
+
+    createActionButton(totemPage, "Pasang 1 Totem", "Menempatkan 1 totem di posisi karakter sekarang", function()
+        modules.Totem:DeploySingle(modules.Totem.SelectedType)
+    end)
+
+    createActionButton(totemPage, "Pasang Formasi 5 Totem (+)", "Pasang 5 totem formasi salib jangkauan maksimal 60 stud", function()
+        modules.Totem:DeployFormation5(modules.Totem.SelectedType)
+    end)
+
+    createToggle(totemPage, "Auto Pasang Totem Berkala", "Mengecek & memasang ulang totem otomatis setiap 60 detik", state.IsAutoTotem, function(val)
+        state:Set("IsAutoTotem", val)
+        if val then
+            modules.Totem:StartAuto(60, modules.Totem.SelectedType)
+        else
+            modules.Totem:StopAuto()
+        end
+    end)
+
+    createSectionHeader(totemPage, "🤿 EKSPLORASI LAUT DALAM & RADAR")
+
+    createToggle(totemPage, "Tabung Oksigen Laut Dalam", "Aktifkan O2 tank agar tidak tenggelam di Mariana Trench & Lost Isle", state.IsOxygenEquipped, function(val)
+        state:Set("IsOxygenEquipped", val)
+        if val then
+            modules.Merchant:EquipOxygen(modules.Network)
+        end
+    end)
+
+    createToggle(totemPage, "Fishing Radar (Deteksi Ikan)", "Menampilkan posisi dan rarity ikan di sekitar air", state.IsRadar, function(val)
+        state:Set("IsRadar", val)
+        modules.Merchant:ToggleRadar(val, modules.Network)
+    end)
+
+    createSectionHeader(totemPage, "⛈️ KONTROL CUACA SERVER")
+
+    local weatherCard = Instance.new("Frame")
+    weatherCard.Size = UDim2.new(1, -4, 0, 64)
+    weatherCard.BackgroundColor3 = config.UI.Theme.CardBg
+    weatherCard.BorderSizePixel = 0
+    weatherCard.Parent = totemPage
+
+    local wCorner = Instance.new("UICorner")
+    wCorner.CornerRadius = UDim.new(0, 8)
+    wCorner.Parent = weatherCard
+
+    local wTitle = Instance.new("TextLabel")
+    wTitle.Size = UDim2.new(1, -20, 0, 18)
+    wTitle.Position = UDim2.new(0, 12, 0, 6)
+    wTitle.BackgroundTransparency = 1
+    wTitle.Text = "Beli Event Cuaca Server (Weather Machine)"
+    wTitle.TextColor3 = config.UI.Theme.Text
+    wTitle.TextSize = 11
+    wTitle.Font = Enum.Font.GothamBold
+    wTitle.TextXAlignment = Enum.TextXAlignment.Left
+    wTitle.Parent = weatherCard
+
+    local wList = { "Storm", "Thunderstorm", "Cloudy", "Wind" }
+    local wContainer = Instance.new("Frame")
+    wContainer.Size = UDim2.new(1, -24, 0, 28)
+    wContainer.Position = UDim2.new(0, 12, 0, 28)
+    wContainer.BackgroundTransparency = 1
+    wContainer.Parent = weatherCard
+
+    local wLayout = Instance.new("UIListLayout")
+    wLayout.FillDirection = Enum.FillDirection.Horizontal
+    wLayout.Padding = UDim.new(0, 4)
+    wLayout.Parent = wContainer
+
+    for _, wName in ipairs(wList) do
+        local wb = Instance.new("TextButton")
+        wb.Size = UDim2.new(0.24, -2, 1, 0)
+        wb.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
+        wb.Text = wName
+        wb.TextColor3 = Color3.fromRGB(255, 255, 255)
+        wb.TextSize = 9
+        wb.Font = Enum.Font.GothamMedium
+        wb.Parent = wContainer
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 5)
+        c.Parent = wb
+
+        wb.MouseButton1Click:Connect(function()
+            modules.Merchant:SetWeather(wName, modules.Network)
+        end)
+    end
+
+    -- ==========================================
+    -- ISI KONTEN TAB 4: TELEPORTASI (30+ LOKASI)
+    -- ==========================================
     local tpPage = self.Tabs["Teleport"]
-    local tpHeader = Instance.new("TextLabel")
-    tpHeader.Size = UDim2.new(1, -10, 0, 20)
-    tpHeader.BackgroundTransparency = 1
-    tpHeader.Text = "📍 Teleport Cepat 14 Lokasi Pulau & Secret Spots"
-    tpHeader.TextColor3 = cfg.UI.Theme.Accent
-    tpHeader.TextSize = 12
-    tpHeader.Font = Enum.Font.GothamBold
-    tpHeader.TextXAlignment = Enum.TextXAlignment.Left
-    tpHeader.Parent = tpPage
 
-    for _, loc in ipairs(mods.Teleport.Locations) do
-        local tpCard = Instance.new("Frame")
-        tpCard.Size = UDim2.new(1, -4, 0, 38)
-        tpCard.BackgroundColor3 = cfg.UI.Theme.CardBg
-        tpCard.BorderSizePixel = 0
-        tpCard.Parent = tpPage
+    createSectionHeader(tpPage, "👥 TELEPORT KE PEMAIN LAIN")
+    createTextInput(tpPage, "Ketik Username / Display Name...", "TP Player", function(name)
+        local ok = modules.Teleport:ToPlayer(name)
+        if ok then
+            state.LastStatusMessage = "📍 TP ke pemain: " .. name
+        else
+            warn("[Bodoamat | Teleport] Pemain '" .. name .. "' tidak ditemukan di server!")
+        end
+    end)
 
-        local cCorner = Instance.new("UICorner")
-        cCorner.CornerRadius = UDim.new(0, 7)
-        cCorner.Parent = tpCard
+    createSectionHeader(tpPage, "📌 SIMPAN TITIK KUSTOM (WAYPOINT)")
+    createTextInput(tpPage, "Beri nama titik kustom...", "Simpan Posisi", function(wpName)
+        modules.Teleport:SaveCurrentPosition(wpName)
+        state.LastStatusMessage = "📌 Waypoint tersimpan: " .. wpName
+    end)
 
-        local locLabel = Instance.new("TextLabel")
-        locLabel.Size = UDim2.new(1, -90, 1, 0)
-        locLabel.Position = UDim2.new(0, 12, 0, 0)
-        locLabel.BackgroundTransparency = 1
-        locLabel.Text = "🏝️ " .. loc.Name
-        locLabel.TextColor3 = cfg.UI.Theme.Text
-        locLabel.TextSize = 12
-        locLabel.Font = Enum.Font.GothamMedium
-        locLabel.TextXAlignment = Enum.TextXAlignment.Left
-        locLabel.Parent = tpCard
+    createSectionHeader(tpPage, "📍 DAFTAR LOKASI RESMI (30+ ZONA)")
 
-        local goBtn = Instance.new("TextButton")
-        goBtn.Size = UDim2.new(0, 70, 0, 26)
-        goBtn.Position = UDim2.new(1, -78, 0.5, -13)
-        goBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 230)
-        goBtn.Text = "Teleport"
-        goBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        goBtn.TextSize = 11
-        goBtn.Font = Enum.Font.GothamBold
-        goBtn.Parent = tpCard
+    -- Filter Kategori Lokasi
+    local currentFilter = "Semua"
+    local catFilterCard = Instance.new("Frame")
+    catFilterCard.Size = UDim2.new(1, -4, 0, 32)
+    catFilterCard.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
+    catFilterCard.BorderSizePixel = 0
+    catFilterCard.Parent = tpPage
 
-        local bCorner = Instance.new("UICorner")
-        bCorner.CornerRadius = UDim.new(0, 5)
-        bCorner.Parent = goBtn
+    local cfLayout = Instance.new("UIListLayout")
+    cfLayout.FillDirection = Enum.FillDirection.Horizontal
+    cfLayout.Padding = UDim.new(0, 4)
+    cfLayout.Parent = catFilterCard
 
-        goBtn.MouseButton1Click:Connect(function()
-            local success = mods.Teleport:To(loc.CFrame)
-            if success then st.LastStatusMessage = "📍 Teleport ke " .. loc.Name end
+    local filterButtons = {}
+    local catFilters = {
+        { Id = "Semua",  Label = "Semua" },
+        { Id = "New",    Label = "🌟 Zona Baru" },
+        { Id = "Shop",   Label = "🛒 Toko/Cellar" },
+        { Id = "Island", Label = "🏝️ Pulau" },
+        { Id = "Secret", Label = "🔮 Secret" },
+    }
+
+    local locContainer = Instance.new("Frame")
+    locContainer.Size = UDim2.new(1, 0, 0, 0)
+    locContainer.AutomaticSize = Enum.AutomaticSize.Y
+    locContainer.BackgroundTransparency = 1
+    locContainer.Parent = tpPage
+
+    local lcLayout = Instance.new("UIListLayout")
+    lcLayout.Padding = UDim.new(0, 6)
+    lcLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    lcLayout.Parent = locContainer
+
+    local function refreshLocList()
+        for _, child in ipairs(locContainer:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+
+        for _, loc in ipairs(modules.Teleport.Locations) do
+            if currentFilter == "Semua" or loc.Category == currentFilter then
+                local tpCard = Instance.new("Frame")
+                tpCard.Size = UDim2.new(1, -4, 0, 36)
+                tpCard.BackgroundColor3 = config.UI.Theme.CardBg
+                tpCard.BorderSizePixel = 0
+                tpCard.Parent = locContainer
+
+                local cCorner = Instance.new("UICorner")
+                cCorner.CornerRadius = UDim.new(0, 7)
+                cCorner.Parent = tpCard
+
+                local locLabel = Instance.new("TextLabel")
+                locLabel.Size = UDim2.new(1, -85, 1, 0)
+                locLabel.Position = UDim2.new(0, 10, 0, 0)
+                locLabel.BackgroundTransparency = 1
+                locLabel.Text = (loc.Category == "New" and "⭐ " or "📍 ") .. loc.Name
+                locLabel.TextColor3 = (loc.Category == "New") and Color3.fromRGB(255, 215, 0) or config.UI.Theme.Text
+                locLabel.TextSize = 11
+                locLabel.Font = Enum.Font.GothamMedium
+                locLabel.TextXAlignment = Enum.TextXAlignment.Left
+                locLabel.Parent = tpCard
+
+                local goBtn = Instance.new("TextButton")
+                goBtn.Size = UDim2.new(0, 68, 0, 24)
+                goBtn.Position = UDim2.new(1, -74, 0.5, -12)
+                goBtn.BackgroundColor3 = (loc.Category == "New") and Color3.fromRGB(230, 126, 34) or Color3.fromRGB(0, 150, 230)
+                goBtn.Text = "Teleport"
+                goBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                goBtn.TextSize = 10
+                goBtn.Font = Enum.Font.GothamBold
+                goBtn.Parent = tpCard
+
+                local bCorner = Instance.new("UICorner")
+                bCorner.CornerRadius = UDim.new(0, 5)
+                bCorner.Parent = goBtn
+
+                goBtn.MouseButton1Click:Connect(function()
+                    local success = modules.Teleport:To(loc.CFrame)
+                    if success then
+                        state.LastStatusMessage = "📍 Teleport ke " .. loc.Name
+                    end
+                end)
+            end
+        end
+    end
+
+    for _, cf in ipairs(catFilters) do
+        local fb = Instance.new("TextButton")
+        fb.Size = UDim2.new(0.19, -2, 1, 0)
+        fb.BackgroundColor3 = (currentFilter == cf.Id) and config.UI.Theme.Accent or Color3.fromRGB(32, 35, 48)
+        fb.Text = cf.Label
+        fb.TextColor3 = Color3.fromRGB(255, 255, 255)
+        fb.TextSize = 9
+        fb.Font = Enum.Font.GothamMedium
+        fb.Parent = catFilterCard
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 5)
+        c.Parent = fb
+
+        filterButtons[cf.Id] = fb
+
+        fb.MouseButton1Click:Connect(function()
+            currentFilter = cf.Id
+            for id, b in pairs(filterButtons) do
+                b.BackgroundColor3 = (id == cf.Id) and config.UI.Theme.Accent or Color3.fromRGB(32, 35, 48)
+            end
+            refreshLocList()
         end)
     end
 
-    -- TAB 4: MOBILITAS
+    refreshLocList()
+
+    -- ==========================================
+    -- ISI KONTEN TAB 5: MOBILITAS (MOVEMENT)
+    -- ==========================================
     local movePage = self.Tabs["Movement"]
-    createToggle(movePage, "Walk On Water (Jesus Walk)", "Berjalan di atas permukaan air laut tanpa jatuh", st.IsWaterWalk, function(val)
-        st:Set("IsWaterWalk", val)
-        mods.Movement:SetWaterWalk(val)
+
+    createToggle(movePage, "Walk On Water (Jesus Walk)", "Berjalan di atas permukaan air laut tanpa jatuh", state.IsWaterWalk, function(val)
+        state:Set("IsWaterWalk", val)
+        modules.Movement:SetWaterWalk(val)
     end)
 
-    createToggle(movePage, "Infinite Jump", "Lompat bebas di udara tanpa batas", st.IsInfJump, function(val)
-        st:Set("IsInfJump", val)
-        mods.Movement:SetInfiniteJump(val)
+    createToggle(movePage, "Infinite Jump", "Lompat bebas di udara tanpa batas", state.IsInfJump, function(val)
+        state:Set("IsInfJump", val)
+        modules.Movement:SetInfiniteJump(val)
     end)
 
+    -- Kecepatan Lari (WalkSpeed)
     local spdCard = Instance.new("Frame")
     spdCard.Size = UDim2.new(1, -4, 0, 62)
-    spdCard.BackgroundColor3 = cfg.UI.Theme.CardBg
+    spdCard.BackgroundColor3 = config.UI.Theme.CardBg
     spdCard.BorderSizePixel = 0
     spdCard.Parent = movePage
 
@@ -1490,8 +2573,8 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     sTitle.Size = UDim2.new(1, -20, 0, 18)
     sTitle.Position = UDim2.new(0, 12, 0, 6)
     sTitle.BackgroundTransparency = 1
-    sTitle.Text = "Kecepatan Karakter (WalkSpeed: " .. tostring(mods.Movement.WalkSpeed) .. ")"
-    sTitle.TextColor3 = cfg.UI.Theme.Text
+    sTitle.Text = "Kecepatan Karakter (WalkSpeed: " .. tostring(modules.Movement.WalkSpeed) .. ")"
+    sTitle.TextColor3 = config.UI.Theme.Text
     sTitle.TextSize = 12
     sTitle.Font = Enum.Font.GothamBold
     sTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -1518,7 +2601,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     for _, s in ipairs(speeds) do
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0.24, -4, 1, 0)
-        b.BackgroundColor3 = (mods.Movement.WalkSpeed == s.Val) and cfg.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
+        b.BackgroundColor3 = (modules.Movement.WalkSpeed == s.Val) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
         b.Text = s.Label
         b.TextColor3 = Color3.fromRGB(255, 255, 255)
         b.TextSize = 10
@@ -1528,38 +2611,45 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         local c = Instance.new("UICorner")
         c.CornerRadius = UDim.new(0, 5)
         c.Parent = b
+
         b.MouseButton1Click:Connect(function()
-            mods.Movement:SetWalkSpeed(s.Val)
+            modules.Movement:SetWalkSpeed(s.Val)
             sTitle.Text = "Kecepatan Karakter (WalkSpeed: " .. tostring(s.Val) .. ")"
         end)
     end
 
-    -- TAB 5: OPTIMASI & PERFORMA
+    -- ==========================================
+    -- ISI KONTEN TAB 6: OPTIMASI & PERFORMA
+    -- ==========================================
     local optPage = self.Tabs["Optimasi"]
-    createToggle(optPage, "FPS Booster (Safe Anti-BAC)", "Menonaktifkan partikel berat & bloom (Tanpa tamper parts)", st.IsFpsBoost, function(val)
-        st:Set("IsFpsBoost", val)
-        mods.FpsBooster:SetFpsBoost(val)
+
+    createToggle(optPage, "FPS Booster (Safe Anti-BAC)", "Menonaktifkan partikel berat & bloom (Tanpa tamper parts)", state.IsFpsBoost, function(val)
+        state:Set("IsFpsBoost", val)
+        modules.FpsBooster:SetFpsBoost(val)
     end)
 
-    createToggle(optPage, "Ultra GPU Saver (AFK Safe)", "Matikan 3D rasterization agar suhu PC/HP dingin", st.IsGpuSaver, function(val)
-        st:Set("IsGpuSaver", val)
-        mods.FpsBooster:SetGpuSaver(val, st)
+    createToggle(optPage, "Ultra GPU Saver (AFK Safe)", "Matikan 3D rasterization agar suhu PC/HP dingin", state.IsGpuSaver, function(val)
+        state:Set("IsGpuSaver", val)
+        modules.FpsBooster:SetGpuSaver(val, state)
     end)
 
-    createToggle(optPage, "Anti-AFK 20 Menit & Auto-Rejoin", "Mencegah kick idle dan otomatis masuk kembali jika terputus", st.IsAntiAfk, function(val)
-        st:Set("IsAntiAfk", val)
+    createToggle(optPage, "Anti-AFK 20 Menit & Auto-Rejoin", "Mencegah kick idle dan otomatis masuk kembali jika terputus", state.IsAntiAfk, function(val)
+        state:Set("IsAntiAfk", val)
         if val then
-            mods.AntiAfk:Start(cfg.AntiAfk)
+            modules.AntiAfk:Start(config.AntiAfk)
         else
-            mods.AntiAfk:Stop()
+            modules.AntiAfk:Stop()
         end
     end)
 
-    -- TAB 6: STATUS & STATISTIK
+    -- ==========================================
+    -- ISI KONTEN TAB 7: STATUS & STATISTIK
+    -- ==========================================
     local statPage = self.Tabs["Status"]
+
     local statBox = Instance.new("Frame")
-    statBox.Size = UDim2.new(1, -4, 0, 210)
-    statBox.BackgroundColor3 = cfg.UI.Theme.CardBg
+    statBox.Size = UDim2.new(1, -4, 0, 230)
+    statBox.BackgroundColor3 = config.UI.Theme.CardBg
     statBox.BorderSizePixel = 0
     statBox.Parent = statPage
 
@@ -1571,8 +2661,8 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     statText.Size = UDim2.new(1, -24, 1, -20)
     statText.Position = UDim2.new(0, 12, 0, 10)
     statText.BackgroundTransparency = 1
-    statText.TextColor3 = cfg.UI.Theme.Text
-    statText.TextSize = 13
+    statText.TextColor3 = config.UI.Theme.Text
+    statText.TextSize = 12
     statText.Font = Enum.Font.Gotham
     statText.TextXAlignment = Enum.TextXAlignment.Left
     statText.TextYAlignment = Enum.TextYAlignment.Top
@@ -1581,32 +2671,40 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
 
     task.spawn(function()
         while screenGui.Parent do
-            local elapsed = st:GetElapsedTime()
-            local caught = st.FishCaught
-            local status = st.LastStatusMessage
-            local fMode = cfg.AutoFish.Mode
+            local elapsed = state:GetElapsedTime()
+            local caught = state.FishCaught
+            local status = state.LastStatusMessage
+            local fMode = config.AutoFish.Mode
+            local o2Status = state.IsOxygenEquipped and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
+            local radarStatus = state.IsRadar and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
+
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+            local posStr = hrp and string.format("%.1f, %.1f, %.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z) or "N/A"
 
             statText.Text = string.format(
                 "<b>📊 INFORMASI LIVE SESSION:</b>\n\n" ..
                 "• <b>Durasi Menjalankan:</b> <font color='#00d2ff'>%s</font>\n" ..
                 "• <b>Total Ikan Tertangkap:</b> <font color='#2ecc71'>%d Ekor</font>\n" ..
                 "• <b>Mode Memancing:</b> <font color='#f39c12'>%s</font>\n" ..
+                "• <b>Tabung Oksigen:</b> %s | <b>Radar:</b> %s\n" ..
+                "• <b>Posisi Karakter:</b> <font color='#9b59b6'>%s</font>\n" ..
                 "• <b>Status Sistem:</b> %s\n\n" ..
                 "<b>🛡️ STATUS KEAMANAN (ANTI-BAC):</b>\n" ..
-                "• <b>Namecall Blocker:</b> <font color='#2ecc71'>Aktif</font>\n" ..
-                "• <b>Workspace Part Tamper:</b> <font color='#2ecc71'>Dihapus (Safe)</font>\n" ..
+                "• <b>IsSelling Guard:</b> <font color='#2ecc71'>Aktif (BAC-8228 Guard)</font>\n" ..
+                "• <b>Workspace Part Tamper:</b> <font color='#2ecc71'>Dihapus (BAC-6228 Guard)</font>\n" ..
                 "• <b>GPU Saver Mode:</b> <font color='#2ecc71'>Engine Raster Standby</font>",
-                elapsed, caught, fMode, status
+                elapsed, caught, fMode, o2Status, radarStatus, posStr, status
             )
             task.wait(1)
         end
     end)
 
+    -- 6. Tombol Floating Buka/Tutup GUI untuk Mobile
     local mobileBtn = Instance.new("TextButton")
     mobileBtn.Name = "Bodoamat_MobileBtn"
     mobileBtn.Size = UDim2.new(0, 48, 0, 48)
     mobileBtn.Position = UDim2.new(0, 20, 0.5, -24)
-    mobileBtn.BackgroundColor3 = cfg.UI.Theme.CardBg
+    mobileBtn.BackgroundColor3 = config.UI.Theme.CardBg
     mobileBtn.Text = "🐟"
     mobileBtn.TextSize = 22
     mobileBtn.Active = true
@@ -1617,7 +2715,7 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
     mbCorner.Parent = mobileBtn
 
     local mbStroke = Instance.new("UIStroke")
-    mbStroke.Color = cfg.UI.Theme.Accent
+    mbStroke.Color = config.UI.Theme.Accent
     mbStroke.Thickness = 1.5
     mbStroke.Parent = mobileBtn
 
@@ -1625,35 +2723,40 @@ function BodoamatGui:Create(cfg: any, st: any, mods: any)
         mainFrame.Visible = not mainFrame.Visible
     end)
 
+    -- Shortcut Keyboard Toggle (Default: RightShift)
     UserInputService.InputBegan:Connect(function(input, processed)
-        if not processed and input.KeyCode == cfg.UI.ToggleKey then
+        if not processed and input.KeyCode == config.UI.ToggleKey then
             mainFrame.Visible = not mainFrame.Visible
         end
     end)
 
-    self:SwitchTab("Fishing", cfg)
-    print("[Bodoamat | UI] Standalone GUI v2.0 berhasil dimuat.")
+    -- Aktifkan tab pertama secara default
+    self:SwitchTab("Fishing", config)
+
+    print("[Bodoamat | UI] Standalone GUI v3.0 berhasil dibuat.")
 end
 
-function BodoamatGui:SwitchTab(tabId: string, cfg: any)
+function BodoamatGui:SwitchTab(tabId: string, config: any)
     self.CurrentTab = tabId
     for id, page in pairs(self.Tabs) do
         page.Visible = (id == tabId)
     end
     for id, btn in pairs(self.TabButtons) do
-        btn.BackgroundColor3 = (id == tabId) and cfg.UI.Theme.CardBg or Color3.fromRGB(20, 22, 30)
-        btn.TextColor3 = (id == tabId) and cfg.UI.Theme.Accent or cfg.UI.Theme.TextSubtle
+        btn.BackgroundColor3 = (id == tabId) and config.UI.Theme.CardBg or Color3.fromRGB(20, 22, 30)
+        btn.TextColor3 = (id == tabId) and config.UI.Theme.Accent or config.UI.Theme.TextSubtle
     end
 end
 
 -- ============================================================
--- 11. BOOTSTRAP INITIALIZATION
+-- 13. BOOTSTRAP INITIALIZATION
 -- ============================================================
 local Modules = {
     Network = Network,
     AutoFish = AutoFish,
     AutoSell = AutoSell,
     Teleport = Teleport,
+    Totem = Totem,
+    Merchant = Merchant,
     Movement = Movement,
     FpsBooster = FpsBooster,
     AntiAfk = AntiAfk,
@@ -1662,7 +2765,7 @@ local Modules = {
 
 local function Init()
     print("================================================")
-    print("🚀 BODOAMAT v2.0 - Memulai inisialisasi...")
+    print("🚀 BODOAMAT v3.0 - Memulai inisialisasi...")
     print("================================================")
 
     Network:Init()
@@ -1673,7 +2776,7 @@ local function Init()
 
     BodoamatGui:Create(Config, State, Modules)
 
-    print("[Bodoamat v2.0] Berhasil dimuat! Tekan RightShift atau tombol 🐟 untuk membuka menu.")
+    print("[Bodoamat v3.0] Berhasil dimuat! Tekan RightShift atau tombol 🐟 untuk membuka menu.")
 end
 
 Init()
