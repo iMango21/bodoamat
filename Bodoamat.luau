@@ -259,7 +259,7 @@ function Network:Init(): boolean
 
             self.Remotes["ChargeRod"]       = resolveRF("ChargeFishingRod")
             self.Remotes["RequestGame"]     = resolveRF("RequestFishingMinigameStarted")
-            self.Remotes["CompleteGame"]    = resolveRE("FishingCompleted") or resolveRE("CatchFishCompleted")
+            self.Remotes["CompleteGame"]    = resolveRF("CatchFishCompleted") or resolveRE("FishingCompleted") or resolveRE("CatchFishCompleted") or resolveRF("FishingCompleted")
             self.Remotes["CancelInput"]     = resolveRF("CancelFishingInputs")
             self.Remotes["SellAll"]         = resolveRF("SellAllItems")
             self.Remotes["EquipHotbar"]     = resolveRE("EquipToolFromHotbar")
@@ -295,7 +295,7 @@ function Network:Init(): boolean
 
         self.Remotes["ChargeRod"]       = netFolder:FindFirstChild("RF/ChargeFishingRod")
         self.Remotes["RequestGame"]     = netFolder:FindFirstChild("RF/RequestFishingMinigameStarted")
-        self.Remotes["CompleteGame"]    = netFolder:FindFirstChild("RE/FishingCompleted")
+        self.Remotes["CompleteGame"]    = netFolder:FindFirstChild("RF/CatchFishCompleted") or netFolder:FindFirstChild("RE/FishingCompleted") or netFolder:FindFirstChild("RF/FishingCompleted") or netFolder:FindFirstChild("RE/CatchFishCompleted")
         self.Remotes["CancelInput"]     = netFolder:FindFirstChild("RF/CancelFishingInputs")
         self.Remotes["SellAll"]         = netFolder:FindFirstChild("RF/SellAllItems")
         self.Remotes["EquipHotbar"]     = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
@@ -320,36 +320,54 @@ function Network:Init(): boolean
     return self.HasRemotes
 end
 
--- Wrapper: Lempar Kail (Charge)
+-- Wrapper: Lempar Kail (Charge) - Dynamic Live Timestamp (Anti BAC-4218)
 function Network:ChargeRod(power: number?): boolean
     local remote = self.Remotes["ChargeRod"]
     if remote and remote:IsA("RemoteFunction") then
+        local now = workspace:GetServerTimeNow()
         local ok, _ = pcall(function()
-            remote:InvokeServer(power or 1755848498.4834)
+            remote:InvokeServer(nil, nil, now, nil)
         end)
-        return ok
+        if not ok then
+            pcall(function()
+                remote:InvokeServer(power or now)
+            end)
+        end
+        return true
     end
     return false
 end
 
--- Wrapper: Permintaan Minigame
-function Network:RequestMinigame(arg1: number?, arg2: number?): boolean
+-- Wrapper: Permintaan Minigame - Dynamic Live Timestamp (Anti BAC-4218)
+function Network:RequestMinigame(diff: number?, luck: number?): boolean
     local remote = self.Remotes["RequestGame"]
     if remote and remote:IsA("RemoteFunction") then
+        local now = workspace:GetServerTimeNow()
+        local safeLuck = luck or (0.3 + (math.random(10, 30) / 100))
+        local safeDiff = diff or 0
         local ok, _ = pcall(function()
-            remote:InvokeServer(arg1 or 1.2854545116425, arg2 or 1)
+            remote:InvokeServer(safeDiff, safeLuck, now)
         end)
-        return ok
+        if not ok then
+            pcall(function()
+                remote:InvokeServer(-1.233, 1, now)
+            end)
+        end
+        return true
     end
     return false
 end
 
--- Wrapper: Selesaikan Tangkapan (Reel)
+-- Wrapper: Selesaikan Tangkapan (Reel) - Mendukung RemoteFunction & RemoteEvent
 function Network:CompleteFishing(): boolean
     local remote = self.Remotes["CompleteGame"]
-    if remote and remote:IsA("RemoteEvent") then
+    if remote then
         local ok, _ = pcall(function()
-            remote:FireServer()
+            if remote:IsA("RemoteFunction") then
+                remote:InvokeServer()
+            elseif remote:IsA("RemoteEvent") then
+                remote:FireServer()
+            end
         end)
         return ok
     end
@@ -956,9 +974,9 @@ function AutoFish:Start(config: any, state: any, network: any)
                     network:EquipHotbar(1)
                     task.wait(0.25)
 
-                    -- Aktivasi lemparan kail normal
+                    -- Aktivasi lemparan kail normal (Dynamic server timestamp)
                     if currentTool then pcall(function() currentTool:Activate() end) end
-                    network:ChargeRod(1755848498.4834)
+                    network:ChargeRod()
 
                     -- Fase 1: Menunggu ikan memakan umpan (Waktu natural 2.8 - 4.2 detik acak)
                     local biteWait = 2.8 + (math.random(10, 140) / 100)
@@ -971,9 +989,9 @@ function AutoFish:Start(config: any, state: any, network: any)
                         elapsed = elapsed + 0.2
                     end
 
-                    -- Fase 2: Minigame reel dimulai
+                    -- Fase 2: Minigame reel dimulai (Dynamic server timestamp)
                     state.LastStatusMessage = "🐟 Ikan Menggigit! Memulai Tarikan..."
-                    network:RequestMinigame(1.2854545116425, 1)
+                    network:RequestMinigame()
 
                     -- Durasi minigame wajar pemain (2.2 - 3.4 detik acak)
                     local reelWait = 2.2 + (math.random(10, 120) / 100)
