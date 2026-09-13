@@ -53,12 +53,15 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **Fishing Radar**: Mengaktifkan radar visual untuk mendeteksi posisi, jarak, dan tingkat kelangkaan (*rarity*) ikan di dalam air.
 
 ### 5. 🛡️ Keamanan Anti-BAC (Bacon Anti-Cheat Protected)
+- **BAC-5215 Guard (Zero Rogue CancelFishingInputs Trigger)**:
+  - Mengeliminasi pemanggilan `RF/CancelFishingInputs` saat karakter tidak dalam kondisi lempar kail (casting/fishing input state) atau saat proses jual ikan berlangsung.
+  - Menggantikan interupsi joran dengan unequip aman di sisi client (`Humanoid:UnequipTools()`), sehingga server state machine tetap valid 100% dan bebas dari tripwire BAC-5215.
 - **BAC-7214 Guard (Zero WalkSpeed Tampering & Risky Remote Protection)**:
   - Seluruh manipulasi WalkSpeed dihapus secara permanen untuk mencegah flag kecepatan server BAC-7214.
   - Remote pembelian Bait & Crates dihapus dari antarmuka untuk mencegah validasi anomali vendor jarak jauh.
 - **BAC-8228 Guard (Safe Selling & Fishing Isolation)**:
   - Mengunci status `IsSelling` saat proses jual berlangsung.
-  - Menghentikan input pancing (`CancelFishingInputs`), mencopot joran ke tas (*unequip*), memberi jeda buffer 0.4 detik sebelum memanggil `RF/SellAllItems`, lalu memasang kembali joran setelah selesai.
+  - Mencopot joran ke tas secara bersih (*client-side unequip*), memberi jeda buffer 0.4 detik sebelum memanggil `RF/SellAllItems`, lalu memasang kembali joran setelah selesai.
   - Dilengkapi opsi **Mode Aman Dekat Pedagang TP (MerchantSafeTp)** untuk teleportasi singkat ke pedagang saat menjual jika karakter berada di luar jangkauan jual.
 - **BAC-6228 Guard (Zero Part Tampering)**:
   - Modul FPS Booster sama sekali tidak menghapus atau mengubah properti fisik `Part`, `Material`, atau struktur `Workspace`, sehingga client integrity check selalu lulus 100%.

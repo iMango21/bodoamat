@@ -338,9 +338,7 @@ function Network:CompleteFishing(): boolean
                 remote:InvokeServer()
             end
         end)
-        pcall(function()
-            self:CancelInput()
-        end)
+        -- BAC-5215 Guard: Jangan panggil CancelInput setelah CompleteGame
         return ok
     end
     return false
@@ -939,16 +937,23 @@ function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boole
     pcall(function()
         -- LANGKAH 1 (PENTING): Kunci semua ikan Rare/Epic/Legendary sebelum remote jual dipanggil!
         -- Ini menjamin 100% ikan langka tidak akan pernah terhapus/terjual!
-        local locked = self:ProtectAndFavorite(network)
-        if locked > 0 then
-            task.wait(0.4) -- Beri waktu server mencatat status bintang favorit
+        local locked = 0
+        if self.AutoFavoriteEnabled then
+            locked = self:ProtectAndFavorite(network)
+            if locked > 0 then
+                task.wait(0.4) -- Beri waktu server mencatat status bintang favorit
+            end
         end
 
-        -- Batalkan input kail jika ada
-        if network then
-            if network.Remotes["CancelInput"] then
-                network:CancelInput()
-            end
+        -- BAC-5215 Guard: Lepas alat pancing via Humanoid lokal secara aman di sisi client
+        -- JANGAN memanggil RF/CancelFishingInputs saat idle/menjual yang memicu BAC-5215!
+        local char = Players.LocalPlayer and Players.LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum:UnequipTools()
+        end
+        if network and network.Remotes["UnequipHotbar"] then
+            network:UnequipHotbar(1)
         end
         task.wait(0.2)
 
