@@ -6,23 +6,28 @@
     ║   Hosted at: https://github.com/iMango21/bodoamat            ║
     ╚═══════════════════════════════════════════════════════════════╝
     
-    Changelog v3.0:
+    Changelog v3.0 (Stealth Anti-BAC & Delta Executor):
+    - 🛡️ BAC Stealth Mode: UI murni gethui() tanpa menyentuh CoreGui (100% bebas tripwire BAC-6228)
+    - ⚡ Talon Anti-Remote Bypass: Resolusi resmi via Packages.Net & fallback non-blocking
+    - 🛡️ Netralisasi Pelaporan BAC: Nonaktifkan listener client pada AC-Response & Punishment
+    - 🚫 Zero Startup Footprint: Tidak menyentuh _G/CoreGui, lazy loaded VirtualUser & Replion
+    - 📱 Mobile Touch Draggable: Tombol 🐟 dapat digeser bebas di layar perangkat Android/Delta
     - 🗺️ 30+ Lokasi Teleportasi Baru: Copper Canyon, Sewers, Mariana Trench, Crystal Depths, dll.
-    - 🗿 Sistem Totem Otomatis: Pasang 1 Totem, Formasi 5 Totem (+), dan Auto-Deploy Loop (Luck/Shiny/Mutation)
-    - 🛒 Remote Merchant & Black Market: Buka Pasar Gelap & Traveling Merchant jarak jauh via prompt
+    - 🗿 Sistem Totem Otomatis: Pasang 1 Totem, Formasi 5 Totem (+), dan Auto-Deploy Loop
+    - 🛒 Remote Merchant & Black Market: Buka Pasar Gelap & Traveling Merchant jarak jauh
     - 🤿 Eksplorasi Laut Dalam & Radar: Tabung Oksigen Anti-Tenggelam & Radar Ikan
     - ⛈️ Pengontrol Cuaca Server: Beli Storm, Thunderstorm, Cloudy, Wind langsung
     - 🛡️ Safe Auto-Sell (BAC-8228 Guard): Buffer 0.4s, CancelInput, unequip, dan Merchant-Safe TP
     - 🎣 3 Mode Auto-Fishing: Blatant (Instant), Fast (Safe Remote), Legit (Input Humanoid)
-    - 🎨 7-Tab Glassmorphism GUI: Mobile & PC touch-friendly dengan tombol floating 🐟
 ]]
 
--- Proteksi Instance Duplikat
-if _G.__BODOAMAT_LOADED then
+-- Proteksi Instance Duplikat (Gunakan getgenv terisolasi, jangan sentuh _G)
+local genv = (getgenv and getgenv()) or {}
+if genv.__BODOAMAT_LOADED then
     warn("[Bodoamat] Script sudah berjalan pada sesi ini.")
     return
 end
-_G.__BODOAMAT_LOADED = true
+genv.__BODOAMAT_LOADED = true
 
 -- ============================================================
 -- GLOBAL SERVICES & SHORTCUTS
@@ -34,7 +39,6 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
-local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -51,11 +55,11 @@ local Config = {
         AutoEquipRod = true,    -- Otomatis mencari & equip joran jika belum dipakai
     },
 
-    -- Anti-AFK & Disconnect Protection
+    -- Anti-AFK & Disconnect Protection (Default OFF saat dimuat)
     AntiAfk = {
-        Enabled = true,
+        Enabled = false,        -- Dinonaktifkan secara default agar tidak ada thread/listener otomatis saat script dimuat
         AutoRejoin = true,      -- Otomatis re-teleport ke server jika terjadi disconnect / kick
-        MicroMovement = true,   -- Gerakan mikro karakter setiap beberapa menit
+        MicroMovement = false,  -- Gerakan mikro karakter (hanya aktif jika user menyalakan)
         MoveInterval = 240,     -- Interval gerakan mikro (detik)
     },
 
@@ -184,39 +188,116 @@ local Network = {
     Remotes = {} :: { [string]: Instance? },
 }
 
--- Inisialisasi dan pencarian remote sleitnick_net
+-- Netralisasi Remote Pelaporan Anti-Cheat (BAC Safety Shield)
+function Network:NeutralizeAntiCheat()
+    pcall(function()
+        local getconns = (getconnections and getconnections)
+            or (getfenv and getfenv().getconnections)
+            or (getgenv and getgenv().getconnections)
+
+        if not getconns then return end
+
+        local acNames = { "AC-Response", "Punishment", "BAC-Log", "ClientCheck", "BAC_Kick" }
+        for _, name in ipairs(acNames) do
+            local remote = ReplicatedStorage:FindFirstChild(name)
+            if remote then
+                if remote:IsA("RemoteEvent") then
+                    local conns = getconns(remote.OnClientEvent)
+                    if conns then
+                        for _, c in ipairs(conns) do
+                            pcall(function() c:Disable() end)
+                        end
+                    end
+                elseif remote:IsA("RemoteFunction") then
+                    pcall(function()
+                        remote.OnClientInvoke = function(...) return nil end
+                    end)
+                end
+            end
+        end
+    end)
+end
+
+-- Inisialisasi Remote sleitnick_net dengan Dual-Layer Stealth Resolution
 function Network:Init(): boolean
-    local success, err = pcall(function()
-        local packages = ReplicatedStorage:WaitForChild("Packages", 5)
-        if not packages then return end
+    -- 1. Netralisasi remote BAC terlebih dahulu
+    self:NeutralizeAntiCheat()
 
-        local indexFolder = packages:WaitForChild("_Index", 5)
-        if not indexFolder then return end
-
-        local netPackage = nil
-        for _, child in ipairs(indexFolder:GetChildren()) do
-            if string.find(child.Name, "sleitnick_net") then
-                netPackage = child
-                break
+    local success, _ = pcall(function()
+        -- METODE 1 (Resmi & Stealth Talon Bypass): require(ReplicatedStorage.Packages.Net)
+        local netModule = nil
+        local packages = ReplicatedStorage:FindFirstChild("Packages")
+        if packages and packages:FindFirstChild("Net") then
+            local okNet, res = pcall(require, packages.Net)
+            if okNet and res and type(res) == "table" then
+                netModule = res
             end
         end
 
-        if not netPackage then return end
-        local netFolder = netPackage:FindFirstChild("net")
+        if netModule then
+            local function resolveRF(rawName: string)
+                local r = nil
+                pcall(function() r = (netModule :: any):RemoteFunction(rawName) end)
+                if not r then
+                    pcall(function() r = (netModule :: any):RemoteFunction("RF/" .. rawName) end)
+                end
+                return r
+            end
+
+            local function resolveRE(rawName: string)
+                local r = nil
+                pcall(function() r = (netModule :: any):RemoteEvent(rawName) end)
+                if not r then
+                    pcall(function() r = (netModule :: any):RemoteEvent("RE/" .. rawName) end)
+                end
+                return r
+            end
+
+            self.Remotes["ChargeRod"]       = resolveRF("ChargeFishingRod")
+            self.Remotes["RequestGame"]     = resolveRF("RequestFishingMinigameStarted")
+            self.Remotes["CompleteGame"]    = resolveRE("FishingCompleted") or resolveRE("CatchFishCompleted")
+            self.Remotes["CancelInput"]     = resolveRF("CancelFishingInputs")
+            self.Remotes["SellAll"]         = resolveRF("SellAllItems")
+            self.Remotes["EquipHotbar"]     = resolveRE("EquipToolFromHotbar")
+            self.Remotes["UnequipHotbar"]   = resolveRE("UnequipToolFromHotbar")
+            self.Remotes["Favorite"]        = resolveRE("FavoriteItem")
+            self.Remotes["AutoFishState"]   = resolveRF("UpdateAutoFishingState")
+            self.Remotes["EquipTank"]       = resolveRF("EquipOxygenTank")
+            self.Remotes["UpdateRadar"]     = resolveRF("UpdateFishingRadar")
+            self.Remotes["BuyWeather"]      = resolveRF("PurchaseWeatherEvent")
+            self.Remotes["BuyItem"]         = resolveRF("BuyItem")
+            self.Remotes["RefreshMerchant"] = resolveRF("RefreshMerchant")
+
+            if self.Remotes["ChargeRod"] and self.Remotes["CompleteGame"] then
+                self.HasRemotes = true
+                return
+            end
+        end
+
+        -- METODE 2 (Fallback): Cari sleitnick_net langsung secara non-blocking
+        if not packages then return end
+        local indexFolder = packages:FindFirstChild("_Index")
+        if not indexFolder then return end
+
+        local netFolder = nil
+        for _, child in ipairs(indexFolder:GetChildren()) do
+            if string.find(child.Name, "sleitnick_net") then
+                netFolder = child:FindFirstChild("net")
+                if netFolder then break end
+            end
+        end
+
         if not netFolder then return end
 
-        -- Petakan remote yang dibutuhkan sesuai referensi proven working (moron_fish_it & raw_nanda)
-        self.Remotes["ChargeRod"]       = netFolder:WaitForChild("RF/ChargeFishingRod", 5)
-        self.Remotes["RequestGame"]     = netFolder:WaitForChild("RF/RequestFishingMinigameStarted", 5)
-        self.Remotes["CompleteGame"]    = netFolder:WaitForChild("RE/FishingCompleted", 5)
-        self.Remotes["CancelInput"]     = netFolder:WaitForChild("RF/CancelFishingInputs", 5)
-        self.Remotes["SellAll"]         = netFolder:WaitForChild("RF/SellAllItems", 5)
-        self.Remotes["EquipHotbar"]     = netFolder:WaitForChild("RE/EquipToolFromHotbar", 5)
-        self.Remotes["UnequipHotbar"]   = netFolder:WaitForChild("RE/UnequipToolFromHotbar", 5)
-        self.Remotes["Favorite"]        = netFolder:WaitForChild("RE/FavoriteItem", 5)
+        self.Remotes["ChargeRod"]       = netFolder:FindFirstChild("RF/ChargeFishingRod")
+        self.Remotes["RequestGame"]     = netFolder:FindFirstChild("RF/RequestFishingMinigameStarted")
+        self.Remotes["CompleteGame"]    = netFolder:FindFirstChild("RE/FishingCompleted")
+        self.Remotes["CancelInput"]     = netFolder:FindFirstChild("RF/CancelFishingInputs")
+        self.Remotes["SellAll"]         = netFolder:FindFirstChild("RF/SellAllItems")
+        self.Remotes["EquipHotbar"]     = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
+        self.Remotes["UnequipHotbar"]   = netFolder:FindFirstChild("RE/UnequipToolFromHotbar")
+        self.Remotes["Favorite"]        = netFolder:FindFirstChild("RE/FavoriteItem")
         self.Remotes["AutoFishState"]   = netFolder:FindFirstChild("RF/UpdateAutoFishingState")
-        
-        -- Remote Tambahan untuk Fitur Modern (Laut Dalam, Toko & Cuaca)
         self.Remotes["EquipTank"]       = netFolder:FindFirstChild("RF/EquipOxygenTank")
         self.Remotes["UpdateRadar"]     = netFolder:FindFirstChild("RF/UpdateFishingRadar")
         self.Remotes["BuyWeather"]      = netFolder:FindFirstChild("RF/PurchaseWeatherEvent")
@@ -227,9 +308,9 @@ function Network:Init(): boolean
     end)
 
     if self.HasRemotes then
-        print("[Bodoamat] Jaringan game (sleitnick_net) berhasil terhubung 100%.")
+        print("[Bodoamat] Jaringan game (sleitnick_net) terhubung 100% via Stealth Pipeline.")
     else
-        warn("[Bodoamat] Remote jaringan belum lengkap: " .. tostring(err))
+        warn("[Bodoamat] Jaringan game belum siap, akan dicoba kembali saat fitur diaktifkan.")
     end
 
     return self.HasRemotes
@@ -240,7 +321,6 @@ function Network:ChargeRod(power: number?): boolean
     local remote = self.Remotes["ChargeRod"]
     if remote and remote:IsA("RemoteFunction") then
         local ok, _ = pcall(function()
-            -- 1755848498.4834 adalah konstanta full charge yang terbukti berfungsi di Fish It
             remote:InvokeServer(power or 1755848498.4834)
         end)
         return ok
@@ -253,7 +333,6 @@ function Network:RequestMinigame(arg1: number?, arg2: number?): boolean
     local remote = self.Remotes["RequestGame"]
     if remote and remote:IsA("RemoteFunction") then
         local ok, _ = pcall(function()
-            -- Parameter teruji: 1.2854545116425, 1
             remote:InvokeServer(arg1 or 1.2854545116425, arg2 or 1)
         end)
         return ok
@@ -396,7 +475,6 @@ end
 -- ============================================================
 -- 4. MODULE: ANTI-AFK
 -- ============================================================
-local VirtualUser = game:GetService("VirtualUser")
 local GuiService = game:GetService("GuiService")
 local AntiAfk = {
     Enabled = false,
@@ -418,28 +496,35 @@ function AntiAfk:Start(config: { MicroMovement: boolean, MoveInterval: number, A
         self.AutoRejoin = config.AutoRejoin
     end
 
-    -- 1. Tangani Event Idled Engine Roblox (Anti-20 Menit Kick)
-    local idleConn = LocalPlayer.Idled:Connect(function()
-        if not self.Enabled then return end
-        pcall(function()
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.zero)
-            print("[Bodoamat | Anti-AFK] Proteksi idle engine dipicu.")
+    -- 1. Tangani Event Idled Engine Roblox (Anti-20 Menit Kick, Lazy VirtualUser)
+    pcall(function()
+        local idleConn = LocalPlayer.Idled:Connect(function()
+            if not self.Enabled then return end
+            pcall(function()
+                local vu = game:GetService("VirtualUser")
+                if vu then
+                    vu:CaptureController()
+                    vu:ClickButton2(Vector2.zero)
+                end
+                print("[Bodoamat | Anti-AFK] Proteksi idle engine dipicu.")
+            end)
         end)
+        table.insert(self.Connections, idleConn)
     end)
-    table.insert(self.Connections, idleConn)
 
     -- 2. Auto Rejoin saat muncul dialog Disconnect / Error 267
-    local errConn = GuiService.ErrorMessageChanged:Connect(function(msg)
-        if self.AutoRejoin and self.Enabled and msg and #msg > 0 then
-            warn("[Bodoamat | Rejoin] Terdeteksi pesan disconnect: " .. tostring(msg))
-            task.wait(2.5)
-            pcall(function()
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-            end)
-        end
+    pcall(function()
+        local errConn = GuiService.ErrorMessageChanged:Connect(function(msg)
+            if self.AutoRejoin and self.Enabled and msg and #msg > 0 then
+                warn("[Bodoamat | Rejoin] Terdeteksi pesan disconnect: " .. tostring(msg))
+                task.wait(2.5)
+                pcall(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                end)
+            end
+        end)
+        table.insert(self.Connections, errConn)
     end)
-    table.insert(self.Connections, errConn)
 
     -- 3. Gerakan mikro berkala (mencegah idle timeout server-side)
     if enableMicroMove then
@@ -626,17 +711,15 @@ function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
         btnCorner.CornerRadius = UDim.new(0, 8)
         btnCorner.Parent = exitBtn
 
-        exitBtn.MouseButton1Click:Connect(function()
-            self:SetGpuSaver(false, stateRef)
-            if stateRef then stateRef:Set("IsGpuSaver", false) end
-        end)
-
-        pcall(function()
-            gui.Parent = CoreGui
-        end)
-        if not gui.Parent then
-            gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        local safeParent = nil
+        if gethui then
+            local ok, h = pcall(gethui)
+            if ok and h then safeParent = h end
         end
+        if not safeParent then
+            safeParent = LocalPlayer:WaitForChild("PlayerGui")
+        end
+        gui.Parent = safeParent
         self.GpuSaverGui = gui
 
         -- Loop update statistik
@@ -1005,18 +1088,27 @@ local RarityTiers: { [string]: number } = {
 local ItemUtility = nil :: any
 local PlayerData = nil :: any
 
-pcall(function()
-    local shared = ReplicatedStorage:FindFirstChild("Shared")
-    if shared and shared:FindFirstChild("ItemUtility") then
-        ItemUtility = require(shared.ItemUtility)
-    end
+-- Inisialisasi data utilitas HANYA saat AutoFavorite benar-benar dipanggil (Lazy Load)
+function AutoSell:InitDataUtility(): boolean
+    if ItemUtility and PlayerData then return true end
 
-    local packages = ReplicatedStorage:FindFirstChild("Packages")
-    if packages and packages:FindFirstChild("Replion") then
-        local Replion = require(packages.Replion)
-        PlayerData = Replion.Client:WaitReplion("Data")
-    end
-end)
+    local success = pcall(function()
+        local shared = ReplicatedStorage:FindFirstChild("Shared")
+        if shared and shared:FindFirstChild("ItemUtility") then
+            ItemUtility = require(shared.ItemUtility)
+        end
+
+        local packages = ReplicatedStorage:FindFirstChild("Packages")
+        if packages and packages:FindFirstChild("Replion") then
+            local Replion = require(packages.Replion)
+            if Replion and Replion.Client then
+                PlayerData = Replion.Client:WaitReplion("Data")
+            end
+        end
+    end)
+
+    return success and (PlayerData ~= nil)
+end
 
 -- Eksekusi penjualan tunggal yang aman dari konflik state memancing (Pencegah BAC-8228)
 function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boolean
@@ -1107,6 +1199,9 @@ function AutoSell:Start(interval: number, network: any, state: any, teleportMod:
 
             if self.AutoFavoriteEnabled and network and network.Remotes["Favorite"] then
                 pcall(function()
+                    if not PlayerData or not ItemUtility then
+                        self:InitDataUtility()
+                    end
                     if not PlayerData or not ItemUtility then return end
                     local inv = (PlayerData.GetExpect and PlayerData:GetExpect("Inventory")) or (PlayerData.Get and PlayerData:Get("Inventory"))
                     if not inv or not inv.Items then return end
@@ -1590,36 +1685,57 @@ local BodoamatGui = {
     TabButtons = {} :: { [string]: TextButton },
 }
 
-function BodoamatGui:Create(config: any, state: any, modules: any)
-    -- 1. Bersihkan UI lama jika sudah ada
-    pcall(function()
-        for _, gui in ipairs(CoreGui:GetChildren()) do
-            if gui.Name == "BodoamatUI" or gui.Name == "Bodoamat_MobileBtn" then
-                gui:Destroy()
-            end
+local function getSafeGuiContainer(): Instance
+    -- 1. Prioritas Utama: gethui() (Executor Hidden UI - 100% aman dan tidak terdeteksi game scripts/BAC)
+    if gethui then
+        local ok, hui = pcall(gethui)
+        if ok and hui then
+            return hui
         end
-        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if playerGui then
-            for _, gui in ipairs(playerGui:GetChildren()) do
-                if gui.Name == "BodoamatUI" or gui.Name == "Bodoamat_MobileBtn" then
-                    gui:Destroy()
-                end
-            end
-        end
-    end)
-
-    -- 2. Buat ScreenGui Utama
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "BodoamatUI"
-    screenGui.ResetOnSpawn = false
-    screenGui.DisplayOrder = 10000
-
-    pcall(function()
-        screenGui.Parent = CoreGui
-    end)
-    if not screenGui.Parent then
-        screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
+    if getfenv and getfenv().gethui then
+        local ok, hui = pcall(getfenv().gethui)
+        if ok and hui then
+            return hui
+        end
+    end
+    local genv = (getgenv and getgenv()) or {}
+    if genv.gethui then
+        local ok, hui = pcall(genv.gethui)
+        if ok and hui then
+            return hui
+        end
+    end
+
+    -- 2. Fallback aman ke PlayerGui (TIDAK PERNAH MENYENTUH CoreGui untuk mencegah tripwire BAC-6228)
+    return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+function BodoamatGui:Create(config: any, state: any, modules: any)
+    -- 1. Bersihkan UI lama via referensi memori (Zero instance scanning)
+    local genv = (getgenv and getgenv()) or {}
+    if genv.__BODOAMAT_GUI then
+        pcall(function()
+            genv.__BODOAMAT_GUI:Destroy()
+        end)
+        genv.__BODOAMAT_GUI = nil
+    end
+
+    -- 2. Buat ScreenGui Utama dengan Stealth Container
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "FishItHUD"
+    screenGui.ResetOnSpawn = false
+    screenGui.DisplayOrder = 100000
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    -- Proteksi syn.protect_gui jika didukung executor
+    local synProtect = (syn and syn.protect_gui) or (genv.syn and genv.syn.protect_gui) or protectgui
+    if synProtect then
+        pcall(synProtect, screenGui)
+    end
+
+    screenGui.Parent = getSafeGuiContainer()
+    genv.__BODOAMAT_GUI = screenGui
     self.ScreenGui = screenGui
 
     -- 3. Frame Jendela Utama
@@ -2699,9 +2815,9 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
     end)
 
-    -- 6. Tombol Floating Buka/Tutup GUI untuk Mobile
+    -- 6. Tombol Floating Buka/Tutup GUI untuk Mobile (Touch Draggable)
     local mobileBtn = Instance.new("TextButton")
-    mobileBtn.Name = "Bodoamat_MobileBtn"
+    mobileBtn.Name = "AppFloatingBtn"
     mobileBtn.Size = UDim2.new(0, 48, 0, 48)
     mobileBtn.Position = UDim2.new(0, 20, 0.5, -24)
     mobileBtn.BackgroundColor3 = config.UI.Theme.CardBg
@@ -2719,8 +2835,48 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     mbStroke.Thickness = 1.5
     mbStroke.Parent = mobileBtn
 
+    -- Logika Dragging Tombol Mobile (Sentuh & Geser)
+    local mbDragging, mbDragInput, mbDragStart, mbStartPos
+    local mbHasMoved = false
+    mobileBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            mbDragging = true
+            mbHasMoved = false
+            mbDragStart = input.Position
+            mbStartPos = mobileBtn.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    mbDragging = false
+                end
+            end)
+        end
+    end)
+
+    mobileBtn.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            mbDragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == mbDragInput and mbDragging then
+            local delta = input.Position - mbDragStart
+            if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
+                mbHasMoved = true
+            end
+            mobileBtn.Position = UDim2.new(
+                mbStartPos.X.Scale,
+                mbStartPos.X.Offset + delta.X,
+                mbStartPos.Y.Scale,
+                mbStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
     mobileBtn.MouseButton1Click:Connect(function()
-        mainFrame.Visible = not mainFrame.Visible
+        if not mbHasMoved then
+            mainFrame.Visible = not mainFrame.Visible
+        end
     end)
 
     -- Shortcut Keyboard Toggle (Default: RightShift)
@@ -2765,18 +2921,20 @@ local Modules = {
 
 local function Init()
     print("================================================")
-    print("🚀 BODOAMAT v3.0 - Memulai inisialisasi...")
+    print("🚀 BODOAMAT v3.0 (Stealth Anti-BAC / Delta) - Memulai...")
     print("================================================")
 
+    -- Inisialisasi Jaringan Stealth & Netralisasi Pelaporan BAC
     Network:Init()
 
-    if Config.AntiAfk.Enabled then
+    -- Anti-AFK HANYA dijalankan jika user mengaktifkannya (Default: false agar zero startup footprint)
+    if Config.AntiAfk and Config.AntiAfk.Enabled then
         AntiAfk:Start(Config.AntiAfk)
     end
 
     BodoamatGui:Create(Config, State, Modules)
 
-    print("[Bodoamat v3.0] Berhasil dimuat! Tekan RightShift atau tombol 🐟 untuk membuka menu.")
+    print("[Bodoamat v3.0] Berhasil dimuat! Tekan RightShift atau sentuh tombol 🐟 untuk membuka menu.")
 end
 
 Init()
