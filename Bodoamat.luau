@@ -17,9 +17,39 @@
     - 🛒 Remote Merchant & Black Market: Buka Pasar Gelap & Traveling Merchant jarak jauh
     - 🤿 Eksplorasi Laut Dalam & Radar: Tabung Oksigen Anti-Tenggelam & Radar Ikan
     - ⛈️ Pengontrol Cuaca Server: Beli Storm, Thunderstorm, Cloudy, Wind langsung
-    - 🛡️ Safe Auto-Sell (BAC-8228 Guard): Buffer 0.4s, CancelInput, unequip, dan Merchant-Safe TP
-    - 🎣 3 Mode Auto-Fishing: Blatant (Instant), Fast (Safe Remote), Legit (Input Humanoid)
+    - 🎣 Mode Auto-Fishing Alami (Natural Human Play): Siklus realistis 7-9 detik/ekor, bebas anomali BAC-3211
+    - 🛡️ Safe Execution: Semua otomasi default NONAKTIF untuk mencegah kesalahan eksekusi
 ]]
+
+-- ============================================================
+-- 1. IDENTIFIKASI & VALIDASI GAME (FISH IT ONLY)
+-- ============================================================
+local FISH_IT_IDS = {
+    Universes = {
+        [6701277882]      = true, -- Fish It Main Universe ID
+        [79378095465365]  = true, -- Alternative Universe ID
+    },
+    Places = {
+        [121864768012064] = true, -- Fish It Main Place ID
+        [79378095465365]  = true, -- Fallback Direct Place ID
+    }
+}
+
+if not (FISH_IT_IDS.Universes[game.GameId] or FISH_IT_IDS.Places[game.PlaceId]) then
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "⚠️ Akses Dibatalkan",
+            Text = "Script Bodoamat HANYA untuk game Fish It!",
+            Duration = 5
+        })
+    end)
+    return
+end
+
+-- Tunggu game dan map selesai dimuat
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
 
 -- Proteksi Instance Duplikat (Gunakan getgenv terisolasi, jangan sentuh _G)
 local genv = (getgenv and getgenv()) or {}
@@ -40,7 +70,16 @@ local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
 
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+-- Pastikan karakter siap sebelum script dijalankan
+if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    LocalPlayer.CharacterAdded:Wait()
+    local char = LocalPlayer.Character
+    if char then
+        char:WaitForChild("HumanoidRootPart", 10)
+    end
+end
 
 -- ============================================================
 -- 1. CONFIGURATION
@@ -49,18 +88,17 @@ local Config = {
     -- Auto Fishing
     AutoFish = {
         Enabled = false,
-        Mode = "Fast",          -- "Fast" (Safe Remote), "Blatant" (Instant Reel), "Legit" (Human Click)
-        CastDelay = 0.4,        -- Delay sebelum menarik/proses gigitan (detik)
-        CatchDelay = 0.25,      -- Delay jeda antar tangkapan (detik)
-        AutoEquipRod = true,    -- Otomatis mencari & equip joran jika belum dipakai
+        CastDelay = 3.5,          -- Jeda natural menunggu ikan menggigit (detik)
+        CatchDelay = 2.5,         -- Jeda natural menarik kail / reel minigame (detik)
+        AutoEquipRod = true,      -- Otomatis mencari & equip joran jika belum dipakai
     },
 
-    -- Anti-AFK & Disconnect Protection (Default OFF saat dimuat)
+    -- Anti-AFK & Disconnect Protection (Default: NON-AKTIF, Nyalakan via Menu)
     AntiAfk = {
-        Enabled = false,        -- Dinonaktifkan secara default agar tidak ada thread/listener otomatis saat script dimuat
-        AutoRejoin = true,      -- Otomatis re-teleport ke server jika terjadi disconnect / kick
-        MicroMovement = false,  -- Gerakan mikro karakter (hanya aktif jika user menyalakan)
-        MoveInterval = 240,     -- Interval gerakan mikro (detik)
+        Enabled = false,          -- Default NON-AKTIF (Mencegah eksekusi tak sengaja)
+        AutoRejoin = true,        -- Otomatis re-teleport ke server jika diaktifkan
+        MicroMovement = true,     -- Gerakan mikro karakter berkala saat diaktifkan
+        MoveInterval = 120,       -- Interval gerakan mikro setiap 2 menit (detik)
     },
 
     -- Optimasi Grafis & Kinerja (Safe Anti-BAC)
@@ -69,13 +107,13 @@ local Config = {
         GpuSaver = false,       -- Mematikan raster 3D (GPU 0% panas, physics tick normal)
     },
 
-    -- Auto Sell & Auto Favorite
+    -- Auto Sell & Auto Favorite (Default: NON-AKTIF)
     AutoSell = {
-        Enabled = false,
+        Enabled = false,          -- Default NON-AKTIF
         Interval = 45,          -- Menjual otomatis setiap N detik
-        AutoFavorite = true,    -- Mengunci ikan langka sebelum dijual
+        AutoFavorite = false,   -- Default NON-AKTIF
         MinRarity = "Legendary",-- Tingkat kelangkaan minimal yang diamankan
-        MerchantSafeTp = true,  -- TP sementara ke pedagang saat menjual jika di luar jarak
+        MerchantSafeTp = false, -- Default NON-AKTIF
     },
 
     -- Totem Automation
@@ -125,13 +163,12 @@ local State = {
     -- Runtime states
     IsFishing = false,
     IsSelling = false,
-    FishingMode = "Fast",
-    IsAntiAfk = true,
+    IsAntiAfk = false,
     IsFpsBoost = false,
     IsGpuSaver = false,
     IsAutoSell = false,
     MerchantSafeTp = false,
-    IsAutoFavorite = true,
+    IsAutoFavorite = false,
     MinFavoriteRarity = "Legendary",
 
     -- Totem & Laut Dalam (v3.0)
@@ -188,41 +225,8 @@ local Network = {
     Remotes = {} :: { [string]: Instance? },
 }
 
--- Netralisasi Remote Pelaporan Anti-Cheat (BAC Safety Shield)
-function Network:NeutralizeAntiCheat()
-    pcall(function()
-        local getconns = (getconnections and getconnections)
-            or (getfenv and getfenv().getconnections)
-            or (getgenv and getgenv().getconnections)
-
-        if not getconns then return end
-
-        local acNames = { "AC-Response", "Punishment", "BAC-Log", "ClientCheck", "BAC_Kick" }
-        for _, name in ipairs(acNames) do
-            local remote = ReplicatedStorage:FindFirstChild(name)
-            if remote then
-                if remote:IsA("RemoteEvent") then
-                    local conns = getconns(remote.OnClientEvent)
-                    if conns then
-                        for _, c in ipairs(conns) do
-                            pcall(function() c:Disable() end)
-                        end
-                    end
-                elseif remote:IsA("RemoteFunction") then
-                    pcall(function()
-                        remote.OnClientInvoke = function(...) return nil end
-                    end)
-                end
-            end
-        end
-    end)
-end
-
 -- Inisialisasi Remote sleitnick_net dengan Dual-Layer Stealth Resolution
 function Network:Init(): boolean
-    -- 1. Netralisasi remote BAC terlebih dahulu
-    self:NeutralizeAntiCheat()
-
     local success, _ = pcall(function()
         -- METODE 1 (Resmi & Stealth Talon Bypass): require(ReplicatedStorage.Packages.Net)
         local netModule = nil
@@ -928,14 +932,13 @@ function AutoFish:Start(config: any, state: any, network: any)
     self.Running = true
 
     self.Thread = task.spawn(function()
-        local mode = (config and config.Mode) or "Fast"
-        print("[Bodoamat | Fishing] Memulai siklus memancing dalam mode: " .. tostring(mode))
+        print("[Bodoamat | Fishing] Memulai memancing (Siklus Alami Pemain).")
 
         while self.Running do
             local ok, err = pcall(function()
-                -- Jeda jika proses penjualan sedang berlangsung agar tidak memicu konflik state BAC-8228
+                -- Jeda jika proses penjualan sedang berlangsung agar tidak memicu konflik state
                 if state and state.IsSelling then
-                    task.wait(0.5)
+                    task.wait(0.8)
                     return
                 end
 
@@ -945,100 +948,55 @@ function AutoFish:Start(config: any, state: any, network: any)
                 local char = LocalPlayer.Character
                 local currentTool = char and char:FindFirstChildOfClass("Tool")
 
-                if mode == "Blatant" then
-                    -- ==========================================
-                    -- MODE 1: BLATANT INSTANT (PARALLEL CAST + 5X REEL)
-                    -- ==========================================
-                    state.LastStatusMessage = "🚀 Blatant Cast..."
-                    if network and network.HasRemotes then
-                        network:EquipHotbar(1)
-                        task.wait(0.01)
-
-                        task.spawn(function()
-                            network:ChargeRod(1755848498.4834)
-                            task.wait(0.01)
-                            network:RequestMinigame(1.2854545116425, 1)
-                        end)
-
-                        task.wait(0.04)
-
-                        task.spawn(function()
-                            network:ChargeRod(1755848498.4834)
-                            task.wait(0.01)
-                            network:RequestMinigame(1.2854545116425, 1)
-                        end)
-
-                        task.wait(0.85)
-
-                        -- Pengaman BAC-8228: Batalkan tarikan kail jika operasi penjualan sedang berjalan
-                        if state and state.IsSelling then return end
-
-                        state.LastStatusMessage = "⚡ Instant Reel..."
-                        for _ = 1, 5 do
-                            if state and state.IsSelling then return end
-                            network:CompleteFishing()
-                            task.wait(0.01)
-                        end
-
-                        state.FishCaught = state.FishCaught + 1
-                        state.LastStatusMessage = "✅ Tertangkap! Total: " .. tostring(state.FishCaught)
-                        task.wait(0.1)
-                    end
-
-                elseif mode == "Fast" then
-                    -- ==========================================
-                    -- MODE 2: FAST SAFE (NORMAL PROVEN CYCLE)
-                    -- ==========================================
-                    state.LastStatusMessage = "🎣 Melempar Kail (Fast)..."
-                    if network and network.HasRemotes then
-                        network:EquipHotbar(1)
-                        task.wait(0.05)
-                        network:ChargeRod(1755848498.4834)
-                        task.wait(0.02)
-                        network:RequestMinigame(1.2854545116425, 1)
-
-                        task.wait(0.85)
-
-                        -- Pengaman BAC-8228: Batalkan tarikan kail jika operasi penjualan sedang berjalan
-                        if state and state.IsSelling then return end
-
-                        state.LastStatusMessage = "🐟 Menarik Ikan..."
-                        network:CompleteFishing()
-
-                        state.FishCaught = state.FishCaught + 1
-                        state.LastStatusMessage = "✅ Ikan Tertangkap! Total: " .. tostring(state.FishCaught)
-                        task.wait(0.2)
-                    end
-
-                else
-                    -- ==========================================
-                    -- MODE 3: LEGIT (HUMAN INPUT SIMULATION)
-                    -- ==========================================
-                    state.LastStatusMessage = "🎣 Melempar Kail (Legit)..."
+                -- ==========================================
+                -- SIKLUS MEMANCING ALAMI (NATURAL HUMAN PLAY)
+                -- ==========================================
+                state.LastStatusMessage = "🎣 Melempar Kail..."
+                if network and network.HasRemotes then
                     network:EquipHotbar(1)
-                    task.wait(0.05)
+                    task.wait(0.25)
 
-                    if currentTool then currentTool:Activate() end
-                    if network and network.HasRemotes then
-                        network:ChargeRod(1755848498.4834)
-                        task.wait(0.02)
-                        network:RequestMinigame(1.2854545116425, 1)
+                    -- Aktivasi lemparan kail normal
+                    if currentTool then pcall(function() currentTool:Activate() end) end
+                    network:ChargeRod(1755848498.4834)
+
+                    -- Fase 1: Menunggu ikan memakan umpan (Waktu natural 2.8 - 4.2 detik acak)
+                    local biteWait = 2.8 + (math.random(10, 140) / 100)
+                    state.LastStatusMessage = "⏳ Menunggu Ikan Menggigit..."
+
+                    local elapsed = 0
+                    while elapsed < biteWait do
+                        if not self.Running or (state and state.IsSelling) then return end
+                        task.wait(0.2)
+                        elapsed = elapsed + 0.2
                     end
 
-                    task.wait(1.5 + (math.random(1, 4) / 10))
+                    -- Fase 2: Minigame reel dimulai
+                    state.LastStatusMessage = "🐟 Ikan Menggigit! Memulai Tarikan..."
+                    network:RequestMinigame(1.2854545116425, 1)
 
-                    -- Pengaman BAC-8228: Batalkan tarikan kail jika operasi penjualan sedang berjalan
+                    -- Durasi minigame wajar pemain (2.2 - 3.4 detik acak)
+                    local reelWait = 2.2 + (math.random(10, 120) / 100)
+                    elapsed = 0
+                    while elapsed < reelWait do
+                        if not self.Running or (state and state.IsSelling) then return end
+                        task.wait(0.2)
+                        elapsed = elapsed + 0.2
+                    end
+
+                    -- Batalkan tarikan kail jika operasi penjualan sedang berjalan
                     if state and state.IsSelling then return end
 
-                    state.LastStatusMessage = "🐟 Menarik Kail (Legit)..."
-                    if currentTool then currentTool:Activate() end
-                    if network and network.HasRemotes then
-                        network:CompleteFishing()
-                    end
+                    -- Fase 3: Selesaikan tarikan kail
+                    state.LastStatusMessage = "✨ Menarik Ikan..."
+                    if currentTool then pcall(function() currentTool:Activate() end) end
+                    network:CompleteFishing()
 
                     state.FishCaught = state.FishCaught + 1
-                    state.LastStatusMessage = "✅ Selesai Menarik. Total: " .. tostring(state.FishCaught)
-                    task.wait(0.8 + (math.random(1, 3) / 10))
+                    state.LastStatusMessage = "✅ Ikan Tertangkap! Total: " .. tostring(state.FishCaught)
+
+                    -- Jeda istirahat wajar sebelum melempar kembali (1.2 - 2.0 detik)
+                    task.wait(1.2 + (math.random(10, 80) / 100))
                 end
             end)
 
@@ -1069,7 +1027,7 @@ local AutoSell = {
     IsExecuting = false,
     Thread = nil :: thread?,
     FavoriteThread = nil :: thread?,
-    AutoFavoriteEnabled = true,
+    AutoFavoriteEnabled = false,
     MinFavoriteRarity = "Legendary", -- "Rare", "Epic", "Legendary", "Mythic", "Secret"
     FavoritedCache = {} :: { [string]: boolean },
 }
@@ -2158,75 +2116,14 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
     end)
 
-    -- Selector Mode Memancing (Legit / Fast / Blatant)
-    local modeCard = Instance.new("Frame")
-    modeCard.Size = UDim2.new(1, -4, 0, 68)
-    modeCard.BackgroundColor3 = config.UI.Theme.CardBg
-    modeCard.BorderSizePixel = 0
-    modeCard.Parent = fishPage
-
-    local mCorner = Instance.new("UICorner")
-    mCorner.CornerRadius = UDim.new(0, 8)
-    mCorner.Parent = modeCard
-
-    local mTitle = Instance.new("TextLabel")
-    mTitle.Size = UDim2.new(1, -20, 0, 20)
-    mTitle.Position = UDim2.new(0, 12, 0, 6)
-    mTitle.BackgroundTransparency = 1
-    mTitle.Text = "Mode Kecepatan Memancing"
-    mTitle.TextColor3 = config.UI.Theme.Text
-    mTitle.TextSize = 12
-    mTitle.Font = Enum.Font.GothamBold
-    mTitle.TextXAlignment = Enum.TextXAlignment.Left
-    mTitle.Parent = modeCard
-
-    local modeButtons = {}
-    local modes = {
-        { Id = "Legit",   Label = "🛡️ Legit (Input)" },
-        { Id = "Fast",    Label = "⚡ Fast (Safe)" },
-        { Id = "Blatant", Label = "🚀 Blatant (Instant)" },
-    }
-
-    local btnContainer = Instance.new("Frame")
-    btnContainer.Size = UDim2.new(1, -24, 0, 30)
-    btnContainer.Position = UDim2.new(0, 12, 0, 30)
-    btnContainer.BackgroundTransparency = 1
-    btnContainer.Parent = modeCard
-
-    local bLayout = Instance.new("UIListLayout")
-    bLayout.FillDirection = Enum.FillDirection.Horizontal
-    bLayout.Padding = UDim.new(0, 6)
-    bLayout.Parent = btnContainer
-
-    for _, m in ipairs(modes) do
-        local mBtn = Instance.new("TextButton")
-        mBtn.Size = UDim2.new(0.32, -4, 1, 0)
-        mBtn.BackgroundColor3 = (config.AutoFish.Mode == m.Id) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
-        mBtn.Text = m.Label
-        mBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        mBtn.TextSize = 10
-        mBtn.Font = Enum.Font.GothamMedium
-        mBtn.Parent = btnContainer
-
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, 6)
-        c.Parent = mBtn
-
-        modeButtons[m.Id] = mBtn
-
-        mBtn.MouseButton1Click:Connect(function()
-            config.AutoFish.Mode = m.Id
-            state:Set("FishingMode", m.Id)
-            for id, btn in pairs(modeButtons) do
-                btn.BackgroundColor3 = (id == m.Id) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
-            end
-            if state.IsFishing then
-                modules.AutoFish:Stop()
-                modules.AutoFish:Start(config.AutoFish, state, modules.Network)
-            end
-            print("[Bodoamat] Mode memancing berganti ke: " .. m.Id)
-        end)
-    end
+    createToggle(fishPage, "Anti-AFK 24/7 & Auto-Rejoin", "Mencegah kick idle 20 menit & reconnect otomatis saat AFK", state.IsAntiAfk, function(val)
+        state:Set("IsAntiAfk", val)
+        if val then
+            modules.AntiAfk:Start(config.AntiAfk)
+        else
+            modules.AntiAfk:Stop()
+        end
+    end)
 
     createActionButton(fishPage, "Equip Joran Manual", "Mencari dan memasang joran dari tas ke tangan", function()
         modules.AutoFish:EnsureRodEquipped(modules.Network)
@@ -2817,8 +2714,8 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         while screenGui.Parent do
             local elapsed = state:GetElapsedTime()
             local caught = state.FishCaught
-            local status = state.LastStatusMessage
-            local fMode = config.AutoFish.Mode
+            local fishStatus = state.IsFishing and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Nonaktif</font>"
+            local afkStatus = state.IsAntiAfk and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Nonaktif</font>"
             local o2Status = state.IsOxygenEquipped and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
             local radarStatus = state.IsRadar and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
 
@@ -2829,7 +2726,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
                 "<b>📊 INFORMASI LIVE SESSION:</b>\n\n" ..
                 "• <b>Durasi Menjalankan:</b> <font color='#00d2ff'>%s</font>\n" ..
                 "• <b>Total Ikan Tertangkap:</b> <font color='#2ecc71'>%d Ekor</font>\n" ..
-                "• <b>Mode Memancing:</b> <font color='#f39c12'>%s</font>\n" ..
+                "• <b>Auto Fishing:</b> %s | <b>Anti-AFK 24/7:</b> %s\n" ..
                 "• <b>Tabung Oksigen:</b> %s | <b>Radar:</b> %s\n" ..
                 "• <b>Posisi Karakter:</b> <font color='#9b59b6'>%s</font>\n" ..
                 "• <b>Status Sistem:</b> %s\n\n" ..
@@ -2837,7 +2734,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
                 "• <b>IsSelling Guard:</b> <font color='#2ecc71'>Aktif (BAC-8228 Guard)</font>\n" ..
                 "• <b>Workspace Part Tamper:</b> <font color='#2ecc71'>Dihapus (BAC-6228 Guard)</font>\n" ..
                 "• <b>GPU Saver Mode:</b> <font color='#2ecc71'>Engine Raster Standby</font>",
-                elapsed, caught, fMode, o2Status, radarStatus, posStr, status
+                elapsed, caught, fishStatus, afkStatus, o2Status, radarStatus, posStr, status
             )
             task.wait(1)
         end
@@ -2955,7 +2852,7 @@ local function Init()
     -- Inisialisasi Jaringan Stealth & Netralisasi Pelaporan BAC
     Network:Init()
 
-    -- Anti-AFK HANYA dijalankan jika user mengaktifkannya (Default: false agar zero startup footprint)
+    -- Semua otomasi default NONAKTIF untuk keamanan eksekusi (aktifkan via menu UI)
     if Config.AntiAfk and Config.AntiAfk.Enabled then
         AntiAfk:Start(Config.AntiAfk)
     end

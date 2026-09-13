@@ -65,11 +65,15 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **Anti-AFK 20 Menit & Auto-Rejoin**:
   - Mencegah Roblox Idle Kick 20 menit dan otomatis menyambung kembali ke server jika jaringan terputus.
 
-### 6. 🎣 Mesin Memancing Multi-Mode
-- **Mode Fast (Safe Remote)**: Memancing otomatis cepat dengan jitter manusiawi yang aman dari ban.
-- **Mode Blatant (Instant Catch)**: Menarik ikan seketika dalam hitungan milidetik untuk grinding massal.
-- **Mode Legit (Input Simulation)**: Murni menggunakan simulasi aktivasi tool tanpa interaksi langsung ke network remote.
-- **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Rare, Epic, Legendary, Mythic, Secret*) sebelum siklus jual massal.
+### 6. 🎣 Mesin Memancing Alami (Natural Human Play - Bebas BAC-3211)
+- **Mode Normal / Alami**: Memancing dengan siklus waktu realistis seorang manusia (7 - 9 detik per ikan):
+  - Fase 1: Menunggu umpan dimakan (2.8 - 4.2 detik acak).
+  - Fase 2: Minigame reel realistis (2.2 - 3.4 detik acak).
+  - Fase 3: Tarik kail dan jeda istirahat natural (1.2 - 2.0 detik).
+  - Menghilangkan mode tidak wajar (Fast/Blatant) yang dapat memicu rate-limit BAC-3211 pada server.
+- **Aman Ditinggal AFK (24/7)**: Fitur Anti-AFK dapat diaktifkan kapan saja via menu UI (default: nonaktif untuk keamanan saat baru join). Mengintegrasikan `VirtualUser` idle intercept, micro-movement setiap 2 menit, serta `Auto-Rejoin` otomatis jika terjadi disconnect.
+- **Konfigurasi Aman (Default Nonaktif)**: Seluruh fitur otomasi (mancing, jual, totem, mobilitas, anti-afk) bermula dalam status **OFF** saat skrip dieksekusi untuk menghindari kesalahan eksekusi. User memiliki kontrol penuh untuk menyalakan fitur yang diinginkan melalui menu UI.
+- **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Rare, Epic, Legendary, Mythic, Secret*) sebelum siklus jual massal saat fitur ini diaktifkan.
 
 ### 7. 🎨 Antarmuka Modern 7-Tab Standalone UI
 - Tampilan elegan bernuansa *Dark-Glassmorphism* tanpa dependency library eksternal (No Rayfield/WindUI) sehingga **100% stabil, tidak bergantung CDN, dan tidak akan gagal load**.
@@ -98,7 +102,7 @@ d:/PROGRAM/LuaRebel/
 │   │   ├── Network.luau        -- Pengelola remote sleitnick_net, Black Market, & Cuaca
 │   │   └── State.luau          -- Manajemen status runtime, Totem, & counter sesi
 │   ├── Modules/
-│   │   ├── AutoFish.luau       -- Mesin memancing (Legit, Fast, Blatant) dengan BAC-8228 Guard
+│   │   ├── AutoFish.luau       -- Mesin memancing alami (Siklus Alami Pemain) dengan BAC-8228 Guard
 │   │   ├── AutoSell.luau       -- Otomasi penjualan, auto-favorite, & Merchant Safe TP
 │   │   ├── Teleport.luau       -- Navigasi 30+ lokasi pulau, TP player, & custom waypoint
 │   │   ├── Totem.luau          -- Pasang 1 totem, formasi 5 totem (+), & auto loop
@@ -116,10 +120,12 @@ d:/PROGRAM/LuaRebel/
 
 Jalankan skrip langsung di executor Anda (Delta, Hydrogen, Fluxus, Wave, Codex, Arceus X, Solara, dll.):
 
-### Link Raw GitHub:
+### 🌟 Eksekusi 1 File Mandiri (All-In-One Bodoamat.luau)
+Cukup jalankan 1 baris ini di executor Anda:
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/Bodoamat.luau"))()
 ```
+*(File ini sudah mandiri dan lengkap: otomatis memverifikasi game Fish It!, menunggu karakter siap, membuka menu UI stealth, dan semua otomasi default OFF untuk keamanan).*
 
 ---
 
