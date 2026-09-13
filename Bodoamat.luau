@@ -76,27 +76,18 @@ local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 -- 1. CONFIGURATION
 -- ============================================================
 local Config = {
-    -- Auto Fishing
-    AutoFish = {
-        Enabled = false,
-        CastDelay = 3.5,          -- Jeda natural menunggu ikan menggigit (detik)
-        CatchDelay = 2.5,         -- Jeda natural menarik kail / reel minigame (detik)
-        AutoEquipRod = true,      -- Otomatis mencari & equip joran jika belum dipakai
-    },
-
     -- Optimasi Grafis & Kinerja (Safe Anti-BAC)
     Performance = {
         FpsBoost = false,       -- Menghilangkan partikel & post-effects (tanpa merusak model/parts)
         GpuSaver = false,       -- Mematikan raster 3D (GPU 0% panas, physics tick normal)
     },
 
-    -- Auto Sell & Auto Favorite (Default: NON-AKTIF)
+    -- Auto Sell & Auto Favorite (Mengamankan Ikan Langka)
     AutoSell = {
         Enabled = false,          -- Default NON-AKTIF
-        Interval = 45,          -- Menjual otomatis setiap N detik
-        AutoFavorite = false,   -- Default NON-AKTIF
-        MinRarity = "Legendary",-- Tingkat kelangkaan minimal yang diamankan
-        MerchantSafeTp = false, -- Default NON-AKTIF
+        Interval = 45,            -- Menjual otomatis setiap N detik
+        AutoFavorite = true,      -- Default AKTIF agar ikan Rare+ selalu aman
+        MinRarity = "Rare",       -- Tingkat kelangkaan minimal yang diamankan (Rare, Epic, Legendary, Mythic, Secret)
     },
 
     -- Totem Automation
@@ -144,14 +135,12 @@ local Config = {
 -- ============================================================
 local State = {
     -- Runtime states
-    IsFishing = false,
     IsSelling = false,
     IsFpsBoost = false,
     IsGpuSaver = false,
     IsAutoSell = false,
-    MerchantSafeTp = false,
-    IsAutoFavorite = false,
-    MinFavoriteRarity = "Legendary",
+    IsAutoFavorite = true,
+    MinFavoriteRarity = "Rare",
 
     -- Totem & Laut Dalam (v3.0)
     IsAutoTotem = false,
@@ -167,9 +156,8 @@ local State = {
 
     -- Statistika Session
     StartTime = os.time(),
-    FishCaught = 0,
     TotalCoinsEarned = 0,
-    LastStatusMessage = "Sistem Siap",
+    LastStatusMessage = "Sistem Siap (Mode Manual)",
 
     -- Listeners
     Listeners = {} :: { [string]: { (any) -> () } }
@@ -641,12 +629,10 @@ function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
         self.StatsUpdateThread = task.spawn(function()
             while self.IsGpuSaverActive do
                 local elapsed = (stateRef and stateRef:GetElapsedTime()) or "--:--:--"
-                local fish = (stateRef and stateRef.FishCaught) or 0
-                local status = (stateRef and stateRef.IsFishing) and "<font color='#2ecc71'>Sedang Memancing</font>" or "<font color='#e74c3c'>Standby / Tidak Memancing</font>"
 
                 infoLabel.Text = string.format(
-                    "<b>Status Farm:</b> %s\n<b>Durasi AFK:</b> %s\n<b>Ikan Ditangkap:</b> %d Ekor\n<b>Teknologi:</b> 3D Rasterization Disabled (Zero GPU Heat)\n<b>Anti-Cheat:</b> Physics tick normal (Aman dari BAC-6228)",
-                    status, elapsed, fish
+                    "<b>Mode Bermain:</b> <font color='#2ecc71'>Manual Alami (Bebas BAC)</font>\n<b>Durasi Sesi:</b> %s\n<b>Teknologi:</b> 3D Rasterization Disabled (Zero GPU Heat)\n<b>Anti-Cheat:</b> Physics tick normal (Aman dari BAC-6228)",
+                    elapsed
                 )
                 task.wait(1)
             end
@@ -796,148 +782,21 @@ function Movement:SetJumpPower(power: number)
 end
 
 -- ============================================================
--- 7. MODULE: AUTO FISHING
+-- 7. AUTO FISHING: DIHAPUS (MEMANCING 100% MANUAL MURNI)
 -- ============================================================
-local AutoFish = {
-    Running = false,
-    Thread = nil :: thread?,
-    IsFishing = false,
-}
-
--- Pastikan joran terpasang di tangan karakter (Universal bahasa: Rod, Batang, dll.)
-function AutoFish:EnsureRodEquipped(net: any): boolean
-    local char = LocalPlayer.Character
-    if not char then return false end
-
-    -- 1. Jika karakter sudah memegang tool di tangan, langsung gunakan!
-    local heldTool = char:FindFirstChildOfClass("Tool")
-    if heldTool then
-        return true
-    end
-
-    -- 2. Panggil Remote Hotbar Slot 1 (Joran utama)
-    if net and net.HasRemotes then
-        net:EquipHotbar(1)
-        task.wait(0.1)
-    end
-
-    -- 3. Fallback: Ambil tool pertama dari Backpack
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if backpack then
-        local bpTool = backpack:FindFirstChildOfClass("Tool")
-        if bpTool then
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:EquipTool(bpTool)
-                task.wait(0.1)
-            end
-        end
-    end
-
-    return (char:FindFirstChildOfClass("Tool") ~= nil)
-end
-
--- Mulai Loop Auto Fishing
-function AutoFish:Start(config: any, state: any, network: any)
-    if self.Running then return end
-    self.Running = true
-
-    self.Thread = task.spawn(function()
-        print("[Bodoamat | Fishing] Memulai memancing (Siklus Alami Pemain).")
-
-        while self.Running do
-            local ok, err = pcall(function()
-                -- Jeda jika proses penjualan sedang berlangsung agar tidak memicu konflik state
-                if state and state.IsSelling then
-                    task.wait(0.8)
-                    return
-                end
-
-                -- Pastikan joran siap di tangan
-                self:EnsureRodEquipped(network)
-
-                local char = LocalPlayer.Character
-                local currentTool = char and char:FindFirstChildOfClass("Tool")
-
-                -- ==========================================
-                -- SIKLUS MEMANCING ALAMI (NATURAL HUMAN PLAY)
-                -- ==========================================
-                state.LastStatusMessage = "🎣 Melempar Kail..."
-                if network and network.HasRemotes then
-                    network:EquipHotbar(1)
-                    task.wait(0.25)
-
-                    -- Aktivasi lemparan kail normal (Dynamic server timestamp)
-                    network:ChargeRod()
-
-                    -- Fase 1: Menunggu ikan memakan umpan (Waktu natural 2.8 - 4.2 detik acak)
-                    local biteWait = 2.8 + (math.random(10, 140) / 100)
-                    state.LastStatusMessage = "⏳ Menunggu Ikan Menggigit..."
-
-                    local elapsed = 0
-                    while elapsed < biteWait do
-                        if not self.Running or (state and state.IsSelling) then return end
-                        task.wait(0.2)
-                        elapsed = elapsed + 0.2
-                    end
-
-                    -- Fase 2: Minigame reel dimulai (Dynamic server timestamp)
-                    state.LastStatusMessage = "🐟 Ikan Menggigit! Memulai Tarikan..."
-                    network:RequestMinigame()
-
-                    -- Durasi minigame wajar pemain (2.2 - 3.4 detik acak)
-                    local reelWait = 2.2 + (math.random(10, 120) / 100)
-                    elapsed = 0
-                    while elapsed < reelWait do
-                        if not self.Running or (state and state.IsSelling) then return end
-                        task.wait(0.2)
-                        elapsed = elapsed + 0.2
-                    end
-
-                    -- Batalkan tarikan kail jika operasi penjualan sedang berjalan
-                    if state and state.IsSelling then return end
-
-                    -- Fase 3: Selesaikan tarikan kail
-                    state.LastStatusMessage = "✨ Menarik Ikan..."
-                    network:CompleteFishing()
-
-                    state.FishCaught = state.FishCaught + 1
-                    state.LastStatusMessage = "✅ Ikan Tertangkap! Total: " .. tostring(state.FishCaught)
-
-                    -- Jeda istirahat wajar sebelum melempar kembali (1.2 - 2.0 detik)
-                    task.wait(1.2 + (math.random(10, 80) / 100))
-                end
-            end)
-
-            if not ok then
-                warn("[Bodoamat | Fishing Error] " .. tostring(err))
-                task.wait(1)
-            end
-        end
-
-        state.LastStatusMessage = "Memancing Dimatikan"
-        print("[Bodoamat | Fishing] Mesin memancing berhenti.")
-    end)
-end
-
-function AutoFish:Stop()
-    self.Running = false
-    if self.Thread then
-        task.cancel(self.Thread)
-        self.Thread = nil
-    end
-end
+-- Sesuai permintaan pengguna, fitur Auto-Fishing dihapus sepenuhnya.
+-- Pemain memancing secara manual layaknya pemain normal (Bebas total dari BAC-6215/6217/4218/7213).
 
 -- ============================================================
--- 8. MODULE: AUTO SELL & SAFE FAVORITE
+-- 8. MODULE: AUTO SELL & SAFE FAVORITE (ANTI IKAN LANGKA HILANG)
 -- ============================================================
 local AutoSell = {
     Running = false,
     IsExecuting = false,
     Thread = nil :: thread?,
     FavoriteThread = nil :: thread?,
-    AutoFavoriteEnabled = false,
-    MinFavoriteRarity = "Legendary", -- "Rare", "Epic", "Legendary", "Mythic", "Secret"
+    AutoFavoriteEnabled = true, -- Default AKTIF agar ikan Rare ke atas selalu aman!
+    MinFavoriteRarity = "Rare", -- Default "Rare" (Mengamankan Rare, Epic, Legendary, Mythic, Secret, Exotic)
     FavoritedCache = {} :: { [string]: boolean },
 }
 
@@ -955,84 +814,126 @@ local RarityTiers: { [string]: number } = {
 local ItemUtility = nil :: any
 local PlayerData = nil :: any
 
--- Inisialisasi data utilitas HANYA saat AutoFavorite benar-benar dipanggil (Lazy Load)
+-- Inisialisasi data utilitas game secara aman
 function AutoSell:InitDataUtility(): boolean
     if ItemUtility and PlayerData then return true end
 
-    local success = pcall(function()
+    pcall(function()
         local shared = ReplicatedStorage:FindFirstChild("Shared")
         if shared and shared:FindFirstChild("ItemUtility") then
-            ItemUtility = require(shared.ItemUtility)
+            local ok, res = pcall(require, shared.ItemUtility)
+            if ok and res then ItemUtility = res end
         end
 
         local packages = ReplicatedStorage:FindFirstChild("Packages")
         if packages and packages:FindFirstChild("Replion") then
-            local Replion = require(packages.Replion)
-            if Replion and Replion.Client then
+            local ok, Replion = pcall(require, packages.Replion)
+            if ok and Replion and Replion.Client then
                 PlayerData = Replion.Client:WaitReplion("Data")
             end
         end
     end)
 
-    return success and (PlayerData ~= nil)
+    return (ItemUtility ~= nil and PlayerData ~= nil)
 end
 
--- Eksekusi penjualan tunggal yang aman dari konflik state memancing (Pencegah BAC-8228)
+-- Scan Backpack & Beri Bintang Favorit ke Seluruh Ikan Langka (100% Proteksi - Tanpa Terlewat)
+function AutoSell:ProtectAndFavorite(network: any): number
+    local protectedCount = 0
+    pcall(function()
+        if not PlayerData or not ItemUtility then
+            self:InitDataUtility()
+        end
+        if not PlayerData or not ItemUtility then return end
+
+        local inv = (PlayerData.GetExpect and PlayerData:GetExpect("Inventory")) or (PlayerData.Get and PlayerData:Get("Inventory"))
+        if not inv or not inv.Items then return end
+
+        local targetTier = RarityTiers[self.MinFavoriteRarity] or 3 -- Default Tier 3 (Rare)
+
+        for _, item in ipairs(inv.Items) do
+            -- Abaikan jika sudah memiliki bintang favorit
+            if item.Favorited == true or self.FavoritedCache[item.UUID] then
+                continue
+            end
+
+            local data = ItemUtility:GetItemData(item.Id)
+            local rarity = (data and data.Data and data.Data.Rarity) or "Common"
+            local itemTier = RarityTiers[rarity] or 1
+
+            -- Kunci semua ikan yang tingkatannya >= target (Rare, Epic, Legendary, Mythic, Secret, Exotic)
+            if itemTier >= targetTier then
+                if network and network.Remotes["Favorite"] then
+                    network:FavoriteItem(item.UUID)
+                    self.FavoritedCache[item.UUID] = true
+                    protectedCount = protectedCount + 1
+                    print("[Bodoamat | Proteksi] ⭐ Berhasil Mengunci: " .. tostring((data and data.Name) or "Ikan") .. " [" .. rarity .. "]")
+                    task.wait(0.12) -- Jeda aman antar paket ke server
+                end
+            end
+        end
+    end)
+    return protectedCount
+end
+
+-- Aktifkan Loop Pengunci Ikan Langka di Background (Independen)
+function AutoSell:SetAutoFavorite(enabled: boolean, network: any)
+    self.AutoFavoriteEnabled = enabled
+    if enabled then
+        if not self.FavoriteThread then
+            self.FavoriteThread = task.spawn(function()
+                while self.AutoFavoriteEnabled do
+                    self:ProtectAndFavorite(network)
+                    task.wait(5)
+                end
+                self.FavoriteThread = nil
+            end)
+        end
+        print("[Bodoamat | AutoFavorite] Loop proteksi ikan langka aktif (Tier: " .. tostring(self.MinFavoriteRarity) .. "+).")
+    else
+        if self.FavoriteThread then
+            task.cancel(self.FavoriteThread)
+            self.FavoriteThread = nil
+        end
+        print("[Bodoamat | AutoFavorite] Loop proteksi ikan langka dinonaktifkan.")
+    end
+end
+
+-- Eksekusi penjualan tunggal yang aman (WAJIB SWEEP PROTEKSI SEBELUM JUAL)
 function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boolean
     if self.IsExecuting then return false end
     self.IsExecuting = true
 
-    -- 1. Beri sinyal ke AutoFish agar jeda sementara
     if state then state.IsSelling = true end
 
     local success = false
     pcall(function()
-        local char = Players.LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-        local savedPos = nil
-
-        -- Jika opsi Merchant-Safe TP diaktifkan, simpan posisi dan geser sekejap ke dekat NPC Merchant
-        if state and state.MerchantSafeTp and hrp and teleportMod then
-            savedPos = hrp.CFrame
-            teleportMod:To(CFrame.new(-135, 3, 2764))
-            task.wait(0.2)
+        -- LANGKAH 1 (PENTING): Kunci semua ikan Rare/Epic/Legendary sebelum remote jual dipanggil!
+        -- Ini menjamin 100% ikan langka tidak akan pernah terhapus/terjual!
+        local locked = self:ProtectAndFavorite(network)
+        if locked > 0 then
+            task.wait(0.4) -- Beri waktu server mencatat status bintang favorit
         end
 
-        -- 2. Batalkan input memancing dan lepaskan joran dari tangan karakter
+        -- Batalkan input kail jika ada
         if network then
             if network.Remotes["CancelInput"] then
                 network:CancelInput()
             end
-            if network.Remotes["UnequipHotbar"] then
-                network:UnequipHotbar(1)
-            end
         end
-        task.wait(0.4) -- Beri waktu server mencatat karakter dalam status idle bebas pancing
+        task.wait(0.2)
 
-        -- 3. Panggil remote penjualan bersih tanpa spam paket lain
+        -- Panggil remote penjualan bersih (Hanya ikan Common/Uncommon yang tidak berbintang yang terjual)
         if network and network.Remotes["SellAll"] then
             success = network:SellAll()
         end
-        task.wait(0.4)
-
-        -- Kembalikan ke spot memancing semula jika tadi bergeser ke merchant
-        if savedPos and teleportMod then
-            teleportMod:To(savedPos)
-            task.wait(0.2)
-        end
-
-        -- 4. Pasang kembali joran jika fitur Auto Fishing sedang aktif
-        if network and state and state.IsFishing and network.Remotes["EquipHotbar"] then
-            network:EquipHotbar(1)
-            task.wait(0.2)
-        end
+        task.wait(0.3)
     end)
 
-    -- 5. Kembalikan status memancing normal
     if state then
         state.IsSelling = false
         if success then
-            state.LastStatusMessage = "💰 Berhasil menjual semua ikan!"
+            state.LastStatusMessage = "💰 Berhasil menjual ikan biasa (Ikan langka tetap aman!)"
         end
     end
 
@@ -1040,14 +941,13 @@ function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boole
     return success
 end
 
--- Mulai loop auto-sell berkala & loop auto-favorite terpisah
+-- Mulai loop auto-sell berkala
 function AutoSell:Start(interval: number, network: any, state: any, teleportMod: any)
     if self.Running then return end
     self.Running = true
 
     local sleepTime = math.max(15, interval or 45)
 
-    -- Loop 1: Penjualan Ikan Berkala
     self.Thread = task.spawn(function()
         print("[Bodoamat | AutoSell] Penjualan otomatis aktif setiap " .. tostring(sleepTime) .. "s.")
 
@@ -1055,46 +955,6 @@ function AutoSell:Start(interval: number, network: any, state: any, teleportMod:
             task.wait(sleepTime)
             if not self.Running then break end
             self:ExecuteSell(network, state, teleportMod)
-        end
-    end)
-
-    -- Loop 2: Auto-Favorite Terpisah Secara Tenang & Bertahap (Zero Packet Flood)
-    self.FavoriteThread = task.spawn(function()
-        while self.Running do
-            task.wait(12)
-            if not self.Running then break end
-
-            if self.AutoFavoriteEnabled and network and network.Remotes["Favorite"] then
-                pcall(function()
-                    if not PlayerData or not ItemUtility then
-                        self:InitDataUtility()
-                    end
-                    if not PlayerData or not ItemUtility then return end
-                    local inv = (PlayerData.GetExpect and PlayerData:GetExpect("Inventory")) or (PlayerData.Get and PlayerData:Get("Inventory"))
-                    if not inv or not inv.Items then return end
-
-                    local targetTier = RarityTiers[self.MinFavoriteRarity] or 5
-
-                    for _, item in ipairs(inv.Items) do
-                        -- KUNCI PENTING: Jika sudah difavoritkan, JANGAN panggil lagi (remote ini adalah toggle!)
-                        if item.Favorited == true or self.FavoritedCache[item.UUID] then
-                            continue
-                        end
-
-                        local data = ItemUtility:GetItemData(item.Id)
-                        local rarity = (data and data.Data and data.Data.Rarity) or "Common"
-                        local itemTier = RarityTiers[rarity] or 1
-
-                        if itemTier >= targetTier then
-                            network:FavoriteItem(item.UUID)
-                            self.FavoritedCache[item.UUID] = true
-                            print("[Bodoamat | Favorite] ⭐ Mengamankan Ikan Langka: " .. tostring(data.Name or "Fish") .. " [" .. rarity .. "]")
-                            task.wait(0.5) -- Jeda aman manusiawi (mencegah BAC-8228)
-                            break -- Cukup 1 per siklus agar tidak membanjiri antrean paket
-                        end
-                    end
-                end)
-            end
         end
     end)
 end
@@ -1105,11 +965,7 @@ function AutoSell:Stop()
         task.cancel(self.Thread)
         self.Thread = nil
     end
-    if self.FavoriteThread then
-        task.cancel(self.FavoriteThread)
-        self.FavoriteThread = nil
-    end
-    print("[Bodoamat | AutoSell] Penjualan otomatis dimatikan.")
+    print("[Bodoamat | AutoSell] Penjualan otomatis timer dimatikan.")
 end
 
 -- ============================================================
@@ -1575,7 +1431,7 @@ end
 local BodoamatGui = {
     ScreenGui = nil :: ScreenGui?,
     MainFrame = nil :: Frame?,
-    CurrentTab = "Fishing",
+    CurrentTab = "Selling",
     Tabs = {} :: { [string]: ScrollingFrame },
     TabButtons = {} :: { [string]: TextButton },
 }
@@ -1790,7 +1646,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     end
 
     local tabList = {
-        { Id = "Fishing",  Label = "🎣 Memancing" },
         { Id = "Selling",  Label = "💰 Toko & Jual" },
         { Id = "Totem",    Label = "🗿 Totem & Laut" },
         { Id = "Teleport", Label = "🗺️ Teleportasi" },
@@ -2012,25 +1867,11 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     end
 
     -- ==========================================
-    -- ISI KONTEN TAB 1: MEMANCING
-    -- ==========================================
-    local fishPage = self.Tabs["Fishing"]
-
-    createToggle(fishPage, "Auto Fishing Aktif", "Otomatis melempar dan menarik tangkapan", state.IsFishing, function(val)
-        state:Set("IsFishing", val)
-        if val then
-            modules.AutoFish:Start(config.AutoFish, state, modules.Network)
-        else
-            modules.AutoFish:Stop()
-        end
-    end)
-
-    -- ==========================================
-    -- ISI KONTEN TAB 2: TOKO & JUAL
+    -- ISI KONTEN TAB 1: TOKO & JUAL
     -- ==========================================
     local sellPage = self.Tabs["Selling"]
 
-    createToggle(sellPage, "Auto Sell Ikan", "Menjual hasil tangkapan otomatis secara berkala", state.IsAutoSell, function(val)
+    createToggle(sellPage, "Auto Sell Ikan", "Menjual hasil tangkapan biasa secara berkala", state.IsAutoSell, function(val)
         state:Set("IsAutoSell", val)
         if val then
             modules.AutoSell:Start(config.AutoSell.Interval, modules.Network, state)
@@ -2039,16 +1880,10 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
     end)
 
-    createToggle(sellPage, "Mode Aman Dekat Pedagang TP", "TP singkat ke pedagang saat jual jika di luar jangkauan (Anti BAC-8228)", state.MerchantSafeTp, function(val)
-        state:Set("MerchantSafeTp", val)
-        modules.AutoSell.MerchantSafeTp = val
-        print("[Bodoamat | AutoSell] Merchant Safe TP: " .. (val and "Aktif" or "Nonaktif"))
-    end)
 
-    createToggle(sellPage, "Auto Favorite Ikan Langka", "Mengunci otomatis ikan bernilai tinggi sebelum dijual", modules.AutoSell.AutoFavoriteEnabled, function(val)
-        modules.AutoSell.AutoFavoriteEnabled = val
+    createToggle(sellPage, "Auto Favorite Ikan Langka", "Mengunci otomatis ikan bernilai tinggi (Rare ke atas) agar tidak terjual", modules.AutoSell.AutoFavoriteEnabled, function(val)
         state:Set("IsAutoFavorite", val)
-        print("[Bodoamat] Auto Favorite: " .. (val and "Aktif" or "Nonaktif"))
+        modules.AutoSell:SetAutoFavorite(val, modules.Network)
     end)
 
     -- Pilihan Min Rarity
@@ -2066,7 +1901,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     rTitle.Size = UDim2.new(1, -20, 0, 18)
     rTitle.Position = UDim2.new(0, 12, 0, 6)
     rTitle.BackgroundTransparency = 1
-    rTitle.Text = "Minimal Rarity yang Diamankan (Tidak Dijual)"
+    rTitle.Text = "Tingkat Ikan yang Diamankan (Tidak Akan Terjual)"
     rTitle.TextColor3 = config.UI.Theme.Text
     rTitle.TextSize = 11
     rTitle.Font = Enum.Font.GothamBold
@@ -2111,8 +1946,13 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end)
     end
 
+    createActionButton(sellPage, "⭐ Kunci / Amankan Ikan Rare+ Sekarang", "Scan isi tas & kunci semua ikan Rare, Epic, Legendary agar tidak terjual", function()
+        local count = modules.AutoSell:ProtectAndFavorite(modules.Network)
+        print("[Bodoamat | Proteksi] Selesai scan: " .. tostring(count) .. " ikan baru diamankan.")
+    end)
+
     local sellDebounce = false
-    createActionButton(sellPage, "Jual Semua Ikan Sekarang", "Kirim remote jual langsung ke merchant (Anti-BAC Safe)", function()
+    createActionButton(sellPage, "Jual Semua Ikan Sekarang (Aman Ikan Langka)", "Otomatis mengunci ikan Rare ke atas sebelum menjual (Anti Ikan Hilang)", function()
         if sellDebounce then return end
         sellDebounce = true
         modules.AutoSell:ExecuteSell(modules.Network, state)
@@ -2596,8 +2436,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     task.spawn(function()
         while screenGui.Parent do
             local elapsed = state:GetElapsedTime()
-            local caught = state.FishCaught
-            local fishStatus = state.IsFishing and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Nonaktif</font>"
             local o2Status = state.IsOxygenEquipped and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
             local radarStatus = state.IsRadar and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
 
@@ -2606,17 +2444,18 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
             statText.Text = string.format(
                 "<b>📊 INFORMASI LIVE SESSION:</b>\n\n" ..
-                "• <b>Durasi Menjalankan:</b> <font color='#00d2ff'>%s</font>\n" ..
-                "• <b>Total Ikan Tertangkap:</b> <font color='#2ecc71'>%d Ekor</font>\n" ..
-                "• <b>Auto Fishing:</b> %s\n" ..
+                "• <b>Durasi Sesi:</b> <font color='#00d2ff'>%s</font>\n" ..
+                "• <b>Mode Memancing:</b> <font color='#2ecc71'>Manual Alami (Bebas BAC)</font>\n" ..
+                "• <b>Proteksi Ikan Langka:</b> <font color='#2ecc71'>Aktif (Tier %s+)</font>\n" ..
                 "• <b>Tabung Oksigen:</b> %s | <b>Radar:</b> %s\n" ..
                 "• <b>Posisi Karakter:</b> <font color='#9b59b6'>%s</font>\n" ..
                 "• <b>Status Sistem:</b> %s\n\n" ..
                 "<b>🛡️ STATUS KEAMANAN (ANTI-BAC):</b>\n" ..
-                "• <b>IsSelling Guard:</b> <font color='#2ecc71'>Aktif (BAC-8228 Guard)</font>\n" ..
+                "• <b>Fishing BAC Guard:</b> <font color='#2ecc71'>100%% Aman (Manual Murni)</font>\n" ..
+                "• <b>Safe Sell Guard:</b> <font color='#2ecc71'>Aktif (Auto-Favorite Sebelum Jual)</font>\n" ..
                 "• <b>Workspace Part Tamper:</b> <font color='#2ecc71'>Dihapus (BAC-6228 Guard)</font>\n" ..
                 "• <b>GPU Saver Mode:</b> <font color='#2ecc71'>Engine Raster Standby</font>",
-                elapsed, caught, fishStatus, o2Status, radarStatus, posStr, status
+                elapsed, tostring(state.MinFavoriteRarity or "Rare"), o2Status, radarStatus, posStr, tostring(state.LastStatusMessage or "Siap")
             )
             task.wait(1)
         end
@@ -2642,9 +2481,8 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     mbStroke.Thickness = 1.5
     mbStroke.Parent = mobileBtn
 
-    -- Logika Dragging Tombol Mobile (Sentuh & Geser)
-    local mbDragging, mbDragInput, mbDragStart, mbStartPos
-    local mbHasMoved = false
+    -- Logika Dragging Tombol Mobile
+    local mbDragging, mbDragStart, mbStartPos, mbHasMoved
     mobileBtn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             mbDragging = true
@@ -2659,16 +2497,10 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
     end)
 
-    mobileBtn.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            mbDragInput = input
-        end
-    end)
-
     UserInputService.InputChanged:Connect(function(input)
-        if input == mbDragInput and mbDragging then
+        if mbDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - mbDragStart
-            if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
+            if delta.Magnitude > 5 then
                 mbHasMoved = true
             end
             mobileBtn.Position = UDim2.new(
@@ -2694,7 +2526,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     end)
 
     -- Aktifkan tab pertama secara default
-    self:SwitchTab("Fishing", config)
+    self:SwitchTab("Selling", config)
 
     print("[Bodoamat | UI] Standalone GUI v3.0 berhasil dibuat.")
 end
@@ -2715,7 +2547,6 @@ end
 -- ============================================================
 local Modules = {
     Network = Network,
-    AutoFish = AutoFish,
     AutoSell = AutoSell,
     Teleport = Teleport,
     Totem = Totem,
