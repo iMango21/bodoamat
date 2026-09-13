@@ -32,7 +32,7 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **🔮 Endgame & Gua Rahasia**:
   - Esoteric Depths (Enchant Stone), Lost Isle (Underwater), Sisyphus Statue, Treasure Room, Ancient Jungle, Ancient Ruin, Sacred Temple, Pirate Cove, Pirate Treasure Room, Leviathan Den, Iron Cavern, Iron Cafe, Planetary Observatory.
 - **👥 Smart Scanner & Pemain**:
-  - **Smart Player Scanner & Dropdown Teleport**: Memindai seluruh pemain aktif di server dengan 1 klik tombol 'Scan Player', memilih pemain lewat menu dropdown dinamis, dan langsung teleport ke posisinya (lengkap dengan opsi input manual).
+  - **Smart Player Scanner & Dropdown Teleport**: Memindai seluruh pemain aktif di server dengan 1 klik tombol 'Scan Player', memilih pemain lewat menu dropdown dinamis, dan langsung teleport ke posisinya secara aman tanpa tabrakan hitbox (input manual dihilangkan demi mencegah anomali).
   - **Simpan Titik Kustom (Waypoint)**: Simpan koordinat memancing favorit dan teleport kembali kapan saja.
   - **Workspace Dynamic Scanner**: Mendeteksi otomatis pergeseran posisi pulau jika terjadi update map oleh developer game.
 
@@ -53,40 +53,41 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **Fishing Radar**: Mengaktifkan radar visual untuk mendeteksi posisi, jarak, dan tingkat kelangkaan (*rarity*) ikan di dalam air.
 
 ### 5. 🛡️ Keamanan Anti-BAC (Bacon Anti-Cheat Protected)
+- **BAC-10216 Guard (Safe Teleportation & Anti-Flung Velocity Stabilization)**:
+  - Input text box / tombol TP manual dihapus demi menjaga kebersihan data target.
+  - Menonaktifkan part collision sementara (`CanCollide = false`) pada karakter lokal guna mencegah tabrakan/clipping fisik eksplosif saat mendarat dekat pemain lain.
+  - Menerapkan penstabilan kecepatan nol multi-frame (*6-frame velocity clamp*) untuk meredam lonjakan impuls.
+  - Menempatkan posisi mendarat dengan offset 4 studs di samping target pemain dan orientasi menghadap target.
+  - **Zero Tool Interference**: Skrip sama sekali tidak memaksa melepas atau memasang joran pancingan karakter secara otomatis, memberikan kontrol 100% di tangan pemain.
 - **BAC-5215 Guard (Zero Rogue CancelFishingInputs Trigger)**:
   - Mengeliminasi pemanggilan `RF/CancelFishingInputs` saat karakter tidak dalam kondisi lempar kail (casting/fishing input state) atau saat proses jual ikan berlangsung.
-  - Menggantikan interupsi joran dengan unequip aman di sisi client (`Humanoid:UnequipTools()`), sehingga server state machine tetap valid 100% dan bebas dari tripwire BAC-5215.
+  - Proses jual ikan tidak mencopot joran pemain secara paksa, sehingga status pegangan joran tetap utuh.
 - **BAC-7214 Guard (Zero WalkSpeed Tampering & Risky Remote Protection)**:
   - Seluruh manipulasi WalkSpeed dihapus secara permanen untuk mencegah flag kecepatan server BAC-7214.
   - Remote pembelian Bait & Crates dihapus dari antarmuka untuk mencegah validasi anomali vendor jarak jauh.
 - **BAC-8228 Guard (Safe Selling & Fishing Isolation)**:
   - Mengunci status `IsSelling` saat proses jual berlangsung.
-  - Mencopot joran ke tas secara bersih (*client-side unequip*), memberi jeda buffer 0.4 detik sebelum memanggil `RF/SellAllItems`, lalu memasang kembali joran setelah selesai.
+  - Memberi jeda buffer sebelum memanggil `RF/SellAllItems` secara bersih tanpa mengganggu alat yang dipegang karakter.
   - Dilengkapi opsi **Mode Aman Dekat Pedagang TP (MerchantSafeTp)** untuk teleportasi singkat ke pedagang saat menjual jika karakter berada di luar jangkauan jual.
 - **BAC-6228 Guard (Zero Part Tampering)**:
   - Modul FPS Booster sama sekali tidak menghapus atau mengubah properti fisik `Part`, `Material`, atau struktur `Workspace`, sehingga client integrity check selalu lulus 100%.
 - **Ultra GPU Saver (Safe)**:
   - Mematikan render 3D (`Set3dRenderingEnabled(false)`). Penggunaan GPU langsung 0% dingin, namun physics tick tetap berjalan normal pada 60 fps tanpa memicu tick desync.
 
-### 6. 🎣 Mesin Memancing Alami (Natural Human Play - Bebas BAC-3211)
-- **Mode Normal / Alami**: Memancing dengan siklus waktu realistis seorang manusia (7 - 9 detik per ikan):
-  - Fase 1: Menunggu umpan dimakan (2.8 - 4.2 detik acak).
-  - Fase 2: Minigame reel realistis (2.2 - 3.4 detik acak).
-  - Fase 3: Tarik kail dan jeda istirahat natural (1.2 - 2.0 detik).
-  - Menghilangkan mode tidak wajar (Fast/Blatant) yang dapat memicu rate-limit BAC-3211 pada server.
-- **Konfigurasi Aman (Default Nonaktif)**: Seluruh fitur otomasi (mancing, jual, totem, mobilitas) bermula dalam status **OFF** saat skrip dieksekusi untuk menghindari kesalahan eksekusi. User memiliki kontrol penuh untuk menyalakan fitur yang diinginkan melalui menu UI.
+### 6. 🎣 Memancing Manual Murni (Bebas Total dari BAC-3211/6215/7213)
+- **100% Manual Human Play**: Fitur otomatisasi joran/pancingan (Auto Fishing & Auto Equip Rod) dihapus sepenuhnya dari script.
+- Pemain memancing secara mandiri dan wajar layaknya pemain asli, menjamin 0% risiko deteksi timing lemparan kail server.
 - **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Rare, Epic, Legendary, Mythic, Secret*) sebelum siklus jual massal saat fitur ini diaktifkan.
 
-### 7. 🎨 Antarmuka Modern 7-Tab Standalone UI
+### 7. 🎨 Antarmuka Modern 6-Tab Standalone UI
 - Tampilan elegan bernuansa *Dark-Glassmorphism* tanpa dependency library eksternal (No Rayfield/WindUI) sehingga **100% stabil, tidak bergantung CDN, dan tidak akan gagal load**.
-- **7 Tab Kontrol**:
-  1. 🎣 *Memancing*
-  2. 💰 *Toko & Jual*
-  3. 🗿 *Totem & Laut*
-  4. 🗺️ *Teleportasi*
-  5. 🏃 *Mobilitas*
-  6. ⚡ *Performa*
-  7. 📊 *Statistik Live*
+- **6 Tab Kontrol**:
+  1. 💰 *Toko & Jual*
+  2. 🗿 *Totem & Laut*
+  3. 🗺️ *Teleportasi*
+  4. 🏃 *Mobilitas*
+  5. ⚡ *Performa*
+  6. 📊 *Statistik Live*
 - **Tombol Floating Mobile (🐟)**: Mempermudah pemain Android/iOS membuka dan menutup menu di layar sentuh.
 - **Keybind PC**: Tekan tombol `RightShift` pada keyboard.
 

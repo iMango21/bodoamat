@@ -945,16 +945,7 @@ function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boole
             end
         end
 
-        -- BAC-5215 Guard: Lepas alat pancing via Humanoid lokal secara aman di sisi client
-        -- JANGAN memanggil RF/CancelFishingInputs saat idle/menjual yang memicu BAC-5215!
-        local char = Players.LocalPlayer and Players.LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum:UnequipTools()
-        end
-        if network and network.Remotes["UnequipHotbar"] then
-            network:UnequipHotbar(1)
-        end
+        -- Jeda singkat sebelum memanggil penjualan bersih
         task.wait(0.2)
 
         -- Panggil remote penjualan bersih (Hanya ikan Common/Uncommon yang tidak berbintang yang terjual)
@@ -1089,11 +1080,28 @@ function Teleport:To(targetCFrame: CFrame): boolean
     if not hrp or not humanoid or humanoid.Health <= 0 then return false end
 
     pcall(function()
+        -- Matikan CanCollide sementara pada part karakter untuk mencegah lonjakan/flung fisik
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+
+        -- BAC-10216 Guard 3: Reset kecepatan awal
         hrp.AssemblyLinearVelocity = Vector3.zero
         hrp.AssemblyAngularVelocity = Vector3.zero
-        hrp.CFrame = targetCFrame + Vector3.new(0, 3.5, 0)
-        task.wait(0.05)
-        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.CFrame = targetCFrame + Vector3.new(0, 2.5, 0)
+
+        -- BAC-10216 Guard 4: Kunci kecepatan nol selama 6 frame berurutan (Safe Settling)
+        task.spawn(function()
+            for _ = 1, 6 do
+                if hrp and hrp.Parent then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                end
+                task.wait(0.06)
+            end
+        end)
     end)
 
     return true
@@ -1178,14 +1186,16 @@ function Teleport:ScanPlayers(): { { Name: string, DisplayName: string, UserId: 
     return playerList
 end
 
--- Teleport ke Pemain Lain di Server (Berguna jika teman sudah berada di zona baru)
+-- Teleport ke Pemain Lain di Server (Pilihan dari Scanner Dropdown)
 function Teleport:ToPlayer(targetName: string): boolean
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and (player.Name:lower() == targetName:lower() or player.DisplayName:lower() == targetName:lower()) then
             local targetChar = player.Character
             local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart") :: BasePart?
             if targetHrp then
-                return self:To(targetHrp.CFrame + Vector3.new(2, 0, 2))
+                -- Tempatkan 4 studs di samping dengan orientasi menghadap target (mencegah clipping hitbox)
+                local safePos = targetHrp.Position + Vector3.new(4, 1.5, 4)
+                return self:To(CFrame.new(safePos, targetHrp.Position))
             end
         end
     end
@@ -2842,14 +2852,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
     end)
 
-    createTextInput(tpPage, "Atau ketik manual Username / Display Name...", "TP Manual", function(name)
-        local ok = modules.Teleport:ToPlayer(name)
-        if ok then
-            state.LastStatusMessage = "📍 TP ke pemain: " .. name
-        else
-            warn("[Bodoamat | Teleport] Pemain '" .. name .. "' tidak ditemukan di server!")
-        end
-    end)
 
     createSectionHeader(tpPage, "📌 SIMPAN TITIK KUSTOM (WAYPOINT)")
     createTextInput(tpPage, "Beri nama titik kustom...", "Simpan Posisi", function(wpName)
