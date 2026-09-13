@@ -413,7 +413,7 @@ function Network:EquipOxygenTank(): boolean
     local remote = self.Remotes["EquipTank"]
     if remote and remote:IsA("RemoteFunction") then
         local ok, _ = pcall(function()
-            remote:InvokeServer()
+            return remote:InvokeServer(105)
         end)
         return ok
     end
@@ -476,6 +476,7 @@ local FpsBooster = {
     IsGpuSaverActive = false,
     GpuSaverGui = nil :: ScreenGui?,
     StatsUpdateThread = nil :: thread?,
+    GpuSaverInputConn = nil :: RBXScriptConnection?,
     OriginalSettings = {
         GlobalShadows = true,
         FogEnd = 100000,
@@ -608,11 +609,39 @@ function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
         exitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         exitBtn.TextSize = 13
         exitBtn.Font = Enum.Font.GothamMedium
+        exitBtn.Active = true
+        exitBtn.Selectable = true
+        exitBtn.AutoButtonColor = true
+        exitBtn.ZIndex = 10
         exitBtn.Parent = card
 
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(0, 8)
         btnCorner.Parent = exitBtn
+
+        local function exitGpuSaver()
+            self:SetGpuSaver(false, stateRef)
+            if stateRef then
+                stateRef:Set("IsGpuSaver", false)
+            end
+        end
+
+        exitBtn.MouseButton1Click:Connect(exitGpuSaver)
+        exitBtn.Activated:Connect(exitGpuSaver)
+
+        exitBtn.MouseEnter:Connect(function()
+            exitBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 255)
+        end)
+        exitBtn.MouseLeave:Connect(function()
+            exitBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 210)
+        end)
+
+        -- Shortcut keyboard F8 / Escape / RightControl untuk mematikan GPU Saver
+        self.GpuSaverInputConn = UserInputService.InputBegan:Connect(function(input, gpe)
+            if input.KeyCode == Enum.KeyCode.F8 or input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.RightControl then
+                exitGpuSaver()
+            end
+        end)
 
         local safeParent = nil
         if gethui then
@@ -624,6 +653,9 @@ function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
         end
         gui.Parent = safeParent
         self.GpuSaverGui = gui
+
+        local genv = (getgenv and getgenv()) or {}
+        genv.__BODOAMAT_GPU_SAVER = gui
 
         -- Loop update statistik
         self.StatsUpdateThread = task.spawn(function()
@@ -645,6 +677,11 @@ function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
             RunService:Set3dRenderingEnabled(true)
         end)
 
+        if self.GpuSaverInputConn then
+            self.GpuSaverInputConn:Disconnect()
+            self.GpuSaverInputConn = nil
+        end
+
         if self.StatsUpdateThread then
             task.cancel(self.StatsUpdateThread)
             self.StatsUpdateThread = nil
@@ -653,6 +690,12 @@ function FpsBooster:SetGpuSaver(enabled: boolean, stateRef: any)
         if self.GpuSaverGui then
             self.GpuSaverGui:Destroy()
             self.GpuSaverGui = nil
+        end
+
+        local genv = (getgenv and getgenv()) or {}
+        if genv.__BODOAMAT_GPU_SAVER then
+            pcall(function() genv.__BODOAMAT_GPU_SAVER:Destroy() end)
+            genv.__BODOAMAT_GPU_SAVER = nil
         end
 
         print("[Bodoamat | GPU] GPU Saver Dinonaktifkan. Tampilan 3D pulih.")
@@ -1315,7 +1358,14 @@ end
 -- ============================================================
 -- 11. MODULE: MERCHANT & DEEP SEA TOOLS
 -- ============================================================
-local Merchant = {}
+local Merchant = {
+    IsOxygenActive = false,
+    AntiDrownThread = nil :: thread?,
+    IsRadarActive = false,
+    RadarFolder = nil :: Folder?,
+    RadarThread = nil :: thread?,
+    ReturnGui = nil :: ScreenGui?,
+}
 
 -- Daftar Item Populer Toko & Merchant
 Merchant.Items = {
@@ -1325,56 +1375,165 @@ Merchant.Items = {
     Weather = { "Storm", "Thunderstorm", "Blizzard", "Sandstorm", "Cloudy", "Wind" }
 }
 
--- Buka Menu Toko / Black Market Jarak Jauh via ProximityPrompt
+-- Buka Menu Toko / Black Market via Smart Teleport & Auto-Trigger Prompt
 function Merchant:OpenRemoteShop(keyword: string?): boolean
-    local searchKey = (keyword or "merchant"):lower()
-    local found = false
+    local target = (keyword or "merchant"):lower()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not hrp then
+        print("[Bodoamat | Merchant] ⚠️ Karakter tidak ditemukan.")
+        return false
+    end
 
-    pcall(function()
+    local savedSpot = hrp.CFrame
+    local targetCFrame = nil
+    local shopName = "Pedagang"
+
+    if target:find("cellar") or target:find("black") or target:find("gelap") then
+        targetCFrame = CFrame.new(Vector3.new(2109.52, -92.0, -708.61), Vector3.new(2022.33, -92.0, -672.99))
+        shopName = "Pasar Gelap (Underground Cellar)"
+    else
+        targetCFrame = CFrame.new(-135.0, 3.5, 2764.0)
+        shopName = "Traveling Merchant (Pedagang Keliling)"
+    end
+
+    print("[Bodoamat | Merchant] 🚀 Membuka " .. shopName .. "...")
+
+    -- 1. Pindah ke lokasi toko agar NPC dimuat oleh engine game (StreamingEnabled safe)
+    hrp.CFrame = targetCFrame
+
+    -- 2. Tunggu sebentar agar asset & ProximityPrompt dimuat oleh game
+    task.spawn(function()
+        task.wait(0.35)
+
+        -- Cari ProximityPrompt dalam jangkauan 35 stud
         for _, desc in ipairs(Workspace:GetDescendants()) do
-            if desc:IsA("ProximityPrompt") then
-                local objText = (desc.ObjectText or ""):lower()
-                local actText = (desc.ActionText or ""):lower()
-                local parentName = (desc.Parent and desc.Parent.Name or ""):lower()
-
-                if objText:find(searchKey) or actText:find(searchKey) or parentName:find(searchKey)
-                   or objText:find("shop") or objText:find("market") or objText:find("bazaar")
-                   or parentName:find("cellar") or parentName:find("alien") then
-
-                    -- Gunakan fungsi native executor fireproximityprompt
+            if desc:IsA("ProximityPrompt") and desc.Parent and desc.Parent:IsA("BasePart") then
+                local dist = (desc.Parent.Position - hrp.Position).Magnitude
+                if dist <= 35 then
                     local firePrompt = (rawget and rawget(getgenv and getgenv() or {}, "fireproximityprompt"))
                                        or (getfenv and getfenv().fireproximityprompt)
-
                     if firePrompt then
                         firePrompt(desc, 0)
-                        found = true
-                        print("[Bodoamat | Merchant] 🛒 Membuka prompt toko: " .. tostring(desc.ObjectText))
-                        break
                     else
-                        -- Fallback simulasi posisi jika fireproximityprompt tidak tersedia
-                        local promptPart = desc.Parent
-                        if promptPart and promptPart:IsA("BasePart") and LocalPlayer.Character then
-                            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-                            if hrp then
-                                local oldPos = hrp.CFrame
-                                hrp.CFrame = promptPart.CFrame + Vector3.new(0, 2, 0)
-                                task.wait(0.2)
-                                desc:InputHoldBegin()
-                                task.wait(desc.HoldDuration + 0.1)
-                                desc:InputHoldEnd()
-                                task.wait(0.2)
-                                hrp.CFrame = oldPos
-                                found = true
-                                break
-                            end
-                        end
+                        pcall(function()
+                            desc:InputHoldBegin()
+                            task.wait(desc.HoldDuration + 0.05)
+                            desc:InputHoldEnd()
+                        end)
                     end
+                    print("[Bodoamat | Merchant] ✅ Berhasil memicu prompt toko: " .. tostring(desc.ObjectText or desc.ActionText))
+                    break
                 end
             end
         end
+
+        -- Tampilkan widget kembali ke spot memancing semula
+        self:ShowReturnWidget(shopName, savedSpot)
     end)
 
-    return found
+    return true
+end
+
+-- Widget banner kembali ke spot memancing semula setelah selesai belanja
+function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
+    if self.ReturnGui then
+        self.ReturnGui:Destroy()
+        self.ReturnGui = nil
+    end
+
+    local safeParent = nil
+    if gethui then
+        local ok, h = pcall(gethui)
+        if ok and h then safeParent = h end
+    end
+    if not safeParent then
+        safeParent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "Bodoamat_MerchantReturn"
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 100001
+    gui.Parent = safeParent
+    self.ReturnGui = gui
+
+    local banner = Instance.new("Frame")
+    banner.Size = UDim2.new(0, 420, 0, 75)
+    banner.Position = UDim2.new(0.5, -210, 0, 25)
+    banner.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+    banner.BorderSizePixel = 0
+    banner.Active = true
+    banner.Parent = gui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = banner
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 180, 255)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.2
+    stroke.Parent = banner
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, -20, 0, 24)
+    titleLbl.Position = UDim2.new(0, 10, 0, 6)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = "🛒 " .. shopTitle .. " (Sedang Dibuka)"
+    titleLbl.TextColor3 = Color3.fromRGB(0, 215, 255)
+    titleLbl.TextSize = 13
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Center
+    titleLbl.Parent = banner
+
+    -- Tombol Kembali
+    local returnBtn = Instance.new("TextButton")
+    returnBtn.Size = UDim2.new(0.68, -12, 0, 32)
+    returnBtn.Position = UDim2.new(0, 10, 0, 34)
+    returnBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 220)
+    returnBtn.Text = "🔙 Selesai (Kembali ke Spot Mancing)"
+    returnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    returnBtn.TextSize = 11
+    returnBtn.Font = Enum.Font.GothamBold
+    returnBtn.Parent = banner
+
+    local rCorner = Instance.new("UICorner")
+    rCorner.CornerRadius = UDim.new(0, 6)
+    rCorner.Parent = returnBtn
+
+    returnBtn.MouseButton1Click:Connect(function()
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+            if hrp and returnCFrame then
+                hrp.CFrame = returnCFrame
+            end
+        end)
+        gui:Destroy()
+        self.ReturnGui = nil
+        print("[Bodoamat | Merchant] 🔙 Berhasil kembali ke spot memancing semula.")
+    end)
+
+    -- Tombol Tetap Disini (Close Banner)
+    local stayBtn = Instance.new("TextButton")
+    stayBtn.Size = UDim2.new(0.32, -12, 0, 32)
+    stayBtn.Position = UDim2.new(0.68, 4, 0, 34)
+    stayBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 62)
+    stayBtn.Text = "✕ Tetap Disini"
+    stayBtn.TextColor3 = Color3.fromRGB(200, 205, 220)
+    stayBtn.TextSize = 11
+    stayBtn.Font = Enum.Font.GothamMedium
+    stayBtn.Parent = banner
+
+    local sCorner = Instance.new("UICorner")
+    sCorner.CornerRadius = UDim.new(0, 6)
+    sCorner.Parent = stayBtn
+
+    stayBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+        self.ReturnGui = nil
+    end)
 end
 
 -- Beli Item Spesifik via Network Remote
@@ -1397,22 +1556,273 @@ end
 
 -- Pasang Tabung Oksigen Laut Dalam (Mariana Trench & Lost Isle)
 function Merchant:EquipOxygen(network: any): boolean
-    if not network then return false end
-    local success = network:EquipOxygenTank()
-    if success then
-        print("[Bodoamat | Laut Dalam] 🤿 Tabung Oksigen aktif! Karakter aman dari kehabisan nafas.")
+    self.IsOxygenActive = true
+
+    -- 1. Panggil Remote Server dengan ID item 105 (Diving Gear) jika ada
+    if network and network.EquipOxygenTank then
+        pcall(function()
+            network:EquipOxygenTank()
+        end)
     end
-    return success
+
+    -- 2. Pasang Tool Oxygen dari Backpack ke Karakter jika ada
+    pcall(function()
+        local char = LocalPlayer.Character
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        if char and bp then
+            for _, t in ipairs(bp:GetChildren()) do
+                if t:IsA("Tool") and (string.find(t.Name:lower(), "oxygen") or string.find(t.Name:lower(), "tank") or string.find(t.Name:lower(), "diving")) then
+                    t.Parent = char
+                end
+            end
+        end
+    end)
+
+    -- 3. Aktifkan Sistem Proteksi Anti-Tenggelam (Anti-Drown)
+    self:StartAntiDrown()
+    print("[Bodoamat | Laut Dalam] 🤿 Tabung Oksigen & Anti-Tenggelam Aktif! Karakter aman dari kehabisan nafas.")
+    return true
 end
 
--- Aktifkan/Matikan Radar Ikan
-function Merchant:ToggleRadar(enabled: boolean, network: any): boolean
-    if not network then return false end
-    local success = network:UpdateFishingRadar(enabled)
-    if success then
-        print("[Bodoamat | Radar] 📡 Radar Ikan: " .. (enabled and "Aktif" or "Nonaktif"))
+-- Lepas Tabung Oksigen & Nonaktifkan Anti-Tenggelam
+function Merchant:UnequipOxygen(): boolean
+    self.IsOxygenActive = false
+
+    -- Kembalikan Tool Oxygen ke Backpack
+    pcall(function()
+        local char = LocalPlayer.Character
+        local bp = LocalPlayer:FindFirstChild("Backpack")
+        if char and bp then
+            for _, t in ipairs(char:GetChildren()) do
+                if t:IsA("Tool") and (string.find(t.Name:lower(), "oxygen") or string.find(t.Name:lower(), "tank") or string.find(t.Name:lower(), "diving")) then
+                    t.Parent = bp
+                end
+            end
+        end
+    end)
+
+    self:StopAntiDrown()
+    print("[Bodoamat | Laut Dalam] 🤿 Tabung Oksigen & Anti-Tenggelam Dinonaktifkan.")
+    return true
+end
+
+function Merchant:StartAntiDrown()
+    if self.AntiDrownThread then return end
+    self.IsOxygenActive = true
+
+    self.AntiDrownThread = task.spawn(function()
+        while self.IsOxygenActive do
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hum and hrp then
+                        -- Pertahankan state berenang agar tidak tenggelam pasif
+                        if hum:GetState() == Enum.HumanoidStateType.Swimming then
+                            hum.MaxSlopeAngle = 89
+                        end
+                        -- Stabilkan jika tenggelam terlalu cepat di kedalaman laut
+                        local pos = hrp.Position
+                        if pos.Y < -50 then
+                            local vel = hrp.AssemblyLinearVelocity
+                            if vel.Y < -20 then
+                                hrp.AssemblyLinearVelocity = Vector3.new(vel.X, -5, vel.Z)
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(0.3)
+        end
+    end)
+end
+
+function Merchant:StopAntiDrown()
+    self.IsOxygenActive = false
+    if self.AntiDrownThread then
+        task.cancel(self.AntiDrownThread)
+        self.AntiDrownThread = nil
     end
-    return success
+end
+
+-- Aktifkan/Matikan Radar Ikan (Safe Client-Side ESP - Bebas BAC-5212)
+function Merchant:ToggleRadar(arg1: any, arg2: any): boolean
+    local enabled = true
+    if type(arg1) == "boolean" then
+        enabled = arg1
+    elseif type(arg2) == "boolean" then
+        enabled = arg2
+    end
+    self.IsRadarActive = enabled
+
+    if enabled then
+        self:StartRadar()
+        print("[Bodoamat | Radar] 📡 Radar Ikan Visual Klien Aktif (Bebas BAC-5212).")
+    else
+        self:StopRadar()
+        print("[Bodoamat | Radar] 📡 Radar Ikan: Nonaktif.")
+    end
+    return true
+end
+
+-- Radar Visual Klien: Menampilkan penanda lokasi spot mancing & event air terdekat
+function Merchant:StartRadar()
+    if self.RadarThread then return end
+    self.IsRadarActive = true
+
+    -- Buat container penanda radar
+    local safeParent = nil
+    if gethui then
+        local ok, h = pcall(gethui)
+        if ok and h then safeParent = h end
+    end
+    if not safeParent then
+        safeParent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    local radarFolder = Instance.new("Folder")
+    radarFolder.Name = "Bodoamat_RadarMarkers"
+    radarFolder.Parent = safeParent
+    self.RadarFolder = radarFolder
+
+    -- Daftar Spot Mancing Utama untuk Radar
+    local keyFishingSpots = {
+        { Name = "🌊 Coral Reef (Karang Tropis)", Pos = Vector3.new(-1200, 5, 800) },
+        { Name = "🔱 Sunken Ship (Kapal Karam)", Pos = Vector3.new(1800, -80, 2400) },
+        { Name = "🏛️ Atlantis Ruins", Pos = Vector3.new(-3200, -350, -1800) },
+        { Name = "🕳️ Mariana Trench (Palung Dalam)", Pos = Vector3.new(-9255, -255, -1) },
+        { Name = "🌋 Volcanic Island", Pos = Vector3.new(4500, 15, -3100) },
+        { Name = "🏝️ Lost Isle", Pos = Vector3.new(-6500, 10, 5200) },
+    }
+
+    self.RadarThread = task.spawn(function()
+        while self.IsRadarActive do
+            pcall(function()
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                local playerPos = hrp.Position
+
+                -- 1. Deteksi Event Props / Ripple terdekat di Workspace
+                local propsFolder = Workspace:FindFirstChild("Props")
+                if propsFolder then
+                    for _, prop in ipairs(propsFolder:GetChildren()) do
+                        local propPos = nil
+                        if prop:IsA("BasePart") then
+                            propPos = prop.Position
+                        elseif prop:IsA("Model") and prop.PrimaryPart then
+                            propPos = prop.PrimaryPart.Position
+                        elseif prop:IsA("Model") and prop:FindFirstChildWhichIsA("BasePart") then
+                            propPos = prop:FindFirstChildWhichIsA("BasePart").Position
+                        end
+
+                        if propPos then
+                            local dist = math.floor((playerPos - propPos).Magnitude)
+                            if dist < 2000 then
+                                local markerName = "Event_" .. prop.Name
+                                local existing = radarFolder:FindFirstChild(markerName)
+                                if not existing then
+                                    local bb = Instance.new("BillboardGui")
+                                    bb.Name = markerName
+                                    bb.Size = UDim2.new(0, 160, 0, 32)
+                                    bb.AlwaysOnTop = true
+                                    bb.MaxDistance = 2500
+                                    bb.Adornee = (prop:IsA("BasePart") and prop) or (prop:IsA("Model") and prop:FindFirstChildWhichIsA("BasePart"))
+                                    bb.Parent = radarFolder
+
+                                    local lbl = Instance.new("TextLabel")
+                                    lbl.Name = "DistLabel"
+                                    lbl.Size = UDim2.new(1, 0, 1, 0)
+                                    lbl.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
+                                    lbl.BackgroundTransparency = 0.2
+                                    lbl.TextColor3 = Color3.fromRGB(255, 215, 0)
+                                    lbl.TextSize = 11
+                                    lbl.Font = Enum.Font.GothamBold
+                                    lbl.Text = string.format("⭐ %s\n[%dm]", prop.Name, dist)
+                                    lbl.Parent = bb
+
+                                    local c = Instance.new("UICorner")
+                                    c.CornerRadius = UDim.new(0, 6)
+                                    c.Parent = lbl
+                                else
+                                    local lbl = existing:FindFirstChild("DistLabel")
+                                    if lbl and lbl:IsA("TextLabel") then
+                                        lbl.Text = string.format("⭐ %s\n[%dm]", prop.Name, dist)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                -- 2. Update Marker Spot Mancing Utama
+                for _, spot in ipairs(keyFishingSpots) do
+                    local dist = math.floor((playerPos - spot.Pos).Magnitude)
+                    local markerName = "Spot_" .. spot.Name:gsub("%s+", "_")
+                    local existing = radarFolder:FindFirstChild(markerName)
+
+                    if dist < 4000 then
+                        if not existing then
+                            local markerPart = Instance.new("Part")
+                            markerPart.Name = markerName .. "_Anchor"
+                            markerPart.Size = Vector3.new(1, 1, 1)
+                            markerPart.Position = spot.Pos + Vector3.new(0, 15, 0)
+                            markerPart.Anchored = true
+                            markerPart.CanCollide = false
+                            markerPart.Transparency = 1
+                            markerPart.Parent = radarFolder
+
+                            local bb = Instance.new("BillboardGui")
+                            bb.Name = markerName
+                            bb.Size = UDim2.new(0, 180, 0, 30)
+                            bb.AlwaysOnTop = true
+                            bb.MaxDistance = 5000
+                            bb.Adornee = markerPart
+                            bb.Parent = radarFolder
+
+                            local lbl = Instance.new("TextLabel")
+                            lbl.Name = "DistLabel"
+                            lbl.Size = UDim2.new(1, 0, 1, 0)
+                            lbl.BackgroundColor3 = Color3.fromRGB(15, 20, 28)
+                            lbl.BackgroundTransparency = 0.25
+                            lbl.TextColor3 = Color3.fromRGB(0, 210, 255)
+                            lbl.TextSize = 11
+                            lbl.Font = Enum.Font.GothamBold
+                            lbl.Text = string.format("%s\n[%dm]", spot.Name, dist)
+                            lbl.Parent = bb
+
+                            local c = Instance.new("UICorner")
+                            c.CornerRadius = UDim.new(0, 6)
+                            c.Parent = lbl
+                        else
+                            local lbl = existing:FindFirstChild("DistLabel")
+                            if lbl and lbl:IsA("TextLabel") then
+                                lbl.Text = string.format("%s\n[%dm]", spot.Name, dist)
+                            end
+                        end
+                    elseif existing then
+                        existing:Destroy()
+                        local anchor = radarFolder:FindFirstChild(markerName .. "_Anchor")
+                        if anchor then anchor:Destroy() end
+                    end
+                end
+            end)
+            task.wait(1.5)
+        end
+    end)
+end
+
+function Merchant:StopRadar()
+    self.IsRadarActive = false
+    if self.RadarThread then
+        task.cancel(self.RadarThread)
+        self.RadarThread = nil
+    end
+    if self.RadarFolder then
+        self.RadarFolder:Destroy()
+        self.RadarFolder = nil
+    end
 end
 
 -- Beli Cuaca Server
@@ -1471,6 +1881,28 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end)
         genv.__BODOAMAT_GUI = nil
     end
+    if genv.__BODOAMAT_GPU_SAVER then
+        pcall(function()
+            genv.__BODOAMAT_GPU_SAVER:Destroy()
+        end)
+        genv.__BODOAMAT_GPU_SAVER = nil
+    end
+
+    -- Pulihkan rendering 3D otomatis jika sebelumnya tertinggal dalam mode GPU Saver
+    pcall(function()
+        RunService:Set3dRenderingEnabled(true)
+    end)
+
+    -- Bersihkan sisa GUI lama dari container jika ada
+    pcall(function()
+        local container = getSafeGuiContainer()
+        if container then
+            local oldGpu = container:FindFirstChild("Bodoamat_GpuSaver")
+            if oldGpu then oldGpu:Destroy() end
+            local oldHud = container:FindFirstChild("FishItHUD")
+            if oldHud then oldHud:Destroy() end
+        end
+    end)
 
     -- 2. Buat ScreenGui Utama dengan Stealth Container
     local screenGui = Instance.new("ScreenGui")
@@ -1962,14 +2394,11 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     createSectionHeader(sellPage, "🛒 TOKO & BLACK MARKET REMOTE")
 
-    createActionButton(sellPage, "Buka Black Market Jarak Jauh", "Picu prompt Pasar Gelap / Cellar dari mana saja", function()
-        local opened = modules.Merchant:OpenRemoteShop("cellar")
-        if not opened then
-            modules.Merchant:OpenRemoteShop("merchant")
-        end
+    createActionButton(sellPage, "Buka Black Market (Pasar Gelap)", "Kunjungi Pasar Gelap, buka prompt otomatis, ada tombol kembali", function()
+        modules.Merchant:OpenRemoteShop("cellar")
     end)
 
-    createActionButton(sellPage, "Buka Pedagang Keliling (Alien)", "Picu prompt Traveling Merchant dari mana saja", function()
+    createActionButton(sellPage, "Buka Pedagang Keliling (Traveling Merchant)", "Kunjungi Kapal Pedagang Alien, buka prompt otomatis, ada tombol kembali", function()
         modules.Merchant:OpenRemoteShop("traveling")
     end)
 
@@ -2023,6 +2452,59 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
         bb.MouseButton1Click:Connect(function()
             modules.Merchant:BuyItem(baitName, modules.Network)
+        end)
+    end
+
+    -- Quick Buy Totem & Crate
+    local itemBuyCard = Instance.new("Frame")
+    itemBuyCard.Size = UDim2.new(1, -4, 0, 68)
+    itemBuyCard.BackgroundColor3 = config.UI.Theme.CardBg
+    itemBuyCard.BorderSizePixel = 0
+    itemBuyCard.Parent = sellPage
+
+    local ibCorner = Instance.new("UICorner")
+    ibCorner.CornerRadius = UDim.new(0, 8)
+    ibCorner.Parent = itemBuyCard
+
+    local ibTitle = Instance.new("TextLabel")
+    ibTitle.Size = UDim2.new(1, -20, 0, 18)
+    ibTitle.Position = UDim2.new(0, 12, 0, 6)
+    ibTitle.BackgroundTransparency = 1
+    ibTitle.Text = "Beli Totem & Crate Instan (Remote)"
+    ibTitle.TextColor3 = config.UI.Theme.Text
+    ibTitle.TextSize = 11
+    ibTitle.Font = Enum.Font.GothamBold
+    ibTitle.TextXAlignment = Enum.TextXAlignment.Left
+    ibTitle.Parent = itemBuyCard
+
+    local itemBtns = { "Luck Totem", "Shiny Totem", "Mutation Totem", "Luxury Crate", "Azure Crate" }
+    local itemContainer = Instance.new("Frame")
+    itemContainer.Size = UDim2.new(1, -24, 0, 28)
+    itemContainer.Position = UDim2.new(0, 12, 0, 30)
+    itemContainer.BackgroundTransparency = 1
+    itemContainer.Parent = itemBuyCard
+
+    local itemLayout = Instance.new("UIListLayout")
+    itemLayout.FillDirection = Enum.FillDirection.Horizontal
+    itemLayout.Padding = UDim.new(0, 4)
+    itemLayout.Parent = itemContainer
+
+    for _, itName in ipairs(itemBtns) do
+        local ib = Instance.new("TextButton")
+        ib.Size = UDim2.new(0.19, -2, 1, 0)
+        ib.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
+        ib.Text = itName:gsub(" Totem", ""):gsub(" Crate", "")
+        ib.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ib.TextSize = 9
+        ib.Font = Enum.Font.GothamMedium
+        ib.Parent = itemContainer
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 5)
+        c.Parent = ib
+
+        ib.MouseButton1Click:Connect(function()
+            modules.Merchant:BuyItem(itName, modules.Network)
         end)
     end
 
@@ -2117,10 +2599,12 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         state:Set("IsOxygenEquipped", val)
         if val then
             modules.Merchant:EquipOxygen(modules.Network)
+        else
+            modules.Merchant:UnequipOxygen()
         end
     end)
 
-    createToggle(totemPage, "Fishing Radar (Deteksi Ikan)", "Menampilkan posisi dan rarity ikan di sekitar air", state.IsRadar, function(val)
+    createToggle(totemPage, "Fishing Radar (Deteksi Ikan)", "Menampilkan posisi dan rarity ikan di sekitar air (Bebas BAC-5212)", state.IsRadar, function(val)
         state:Set("IsRadar", val)
         modules.Merchant:ToggleRadar(val, modules.Network)
     end)
