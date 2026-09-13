@@ -404,14 +404,37 @@ function Network:FavoriteItem(uuid: string): boolean
     return false
 end
 
--- Wrapper: Pasang Tabung Oksigen (Deep Diving / Mariana Trench)
+-- Wrapper: Pasang Tabung Oksigen (Deep Diving / Mariana Trench - Anti BAC-4214 Protected)
 function Network:EquipOxygenTank(): boolean
     local remote = self.Remotes["EquipTank"]
     if remote and remote:IsA("RemoteFunction") then
-        local ok, _ = pcall(function()
-            return remote:InvokeServer(105)
+        local ok, res = pcall(function()
+            local char = LocalPlayer and LocalPlayer.Character
+            local bp = LocalPlayer and LocalPlayer:FindFirstChild("Backpack")
+            local hasTank = false
+            if bp then
+                for _, t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") and (string.find(t.Name:lower(), "oxygen") or string.find(t.Name:lower(), "tank") or string.find(t.Name:lower(), "diving")) then
+                        hasTank = true
+                        break
+                    end
+                end
+            end
+            if char and not hasTank then
+                for _, t in ipairs(char:GetChildren()) do
+                    if t:IsA("Tool") and (string.find(t.Name:lower(), "oxygen") or string.find(t.Name:lower(), "tank") or string.find(t.Name:lower(), "diving")) then
+                        hasTank = true
+                        break
+                    end
+                end
+            end
+            -- BAC-4214 Guard: Hanya panggil remote jika pemain terverifikasi memiliki tool tabung oksigen
+            if hasTank then
+                return remote:InvokeServer(105)
+            end
+            return false
         end)
-        return ok
+        return ok and (res ~= false)
     end
     return false
 end
@@ -692,18 +715,16 @@ local AutoSell = {
     IsExecuting = false,
     Thread = nil :: thread?,
     FavoriteThread = nil :: thread?,
-    AutoFavoriteEnabled = true, -- Default AKTIF agar ikan Rare ke atas selalu aman!
-    MinFavoriteRarity = "Rare", -- Default "Rare" (Mengamankan Rare, Epic, Legendary, Mythic, Secret, Exotic)
+    AutoFavoriteEnabled = true, -- Default AKTIF untuk memproteksi ikan bernilai tinggi!
+    MinFavoriteRarity = "Legendary", -- Pilihan mulai dari Legendary, Mitos, Secret (Anti BAC-4214)
     FavoritedCache = {} :: { [string]: boolean },
 }
 
+-- Definisi Tingkat Kelangkaan (Fokus Ikan Bernilai Tinggi)
 local RarityTiers: { [string]: number } = {
-    Common = 1,
-    Uncommon = 2,
-    Rare = 3,
-    Epic = 4,
     Legendary = 5,
     Mythic = 6,
+    Mitos = 6,
     Secret = 7,
     Exotic = 8,
 }
@@ -734,7 +755,7 @@ function AutoSell:InitDataUtility(): boolean
     return (ItemUtility ~= nil and PlayerData ~= nil)
 end
 
--- Scan Backpack & Beri Bintang Favorit ke Seluruh Ikan Langka (100% Proteksi - Tanpa Terlewat)
+-- Scan Backpack & Beri Bintang Favorit ke Seluruh Ikan Langka (Anti-BAC 4214 Rate-Limit Protected)
 function AutoSell:ProtectAndFavorite(network: any): number
     local protectedCount = 0
     pcall(function()
@@ -746,7 +767,9 @@ function AutoSell:ProtectAndFavorite(network: any): number
         local inv = (PlayerData.GetExpect and PlayerData:GetExpect("Inventory")) or (PlayerData.Get and PlayerData:Get("Inventory"))
         if not inv or not inv.Items then return end
 
-        local targetTier = RarityTiers[self.MinFavoriteRarity] or 3 -- Default Tier 3 (Rare)
+        -- Anti-BAC 4214 Guard: Target tier minimal 5 (Legendary)
+        local targetTier = RarityTiers[self.MinFavoriteRarity] or 5
+        if targetTier < 5 then targetTier = 5 end
 
         for _, item in ipairs(inv.Items) do
             -- Abaikan jika sudah memiliki bintang favorit
@@ -756,16 +779,19 @@ function AutoSell:ProtectAndFavorite(network: any): number
 
             local data = ItemUtility:GetItemData(item.Id)
             local rarity = (data and data.Data and data.Data.Rarity) or "Common"
-            local itemTier = RarityTiers[rarity] or 1
+            local itemTier = RarityTiers[rarity] or 0
 
-            -- Kunci semua ikan yang tingkatannya >= target (Rare, Epic, Legendary, Mythic, Secret, Exotic)
+            -- Kunci semua ikan yang tingkatannya >= target (Legendary, Mitos/Mythic, Secret, Exotic)
             if itemTier >= targetTier then
                 if network and network.Remotes["Favorite"] then
                     network:FavoriteItem(item.UUID)
                     self.FavoritedCache[item.UUID] = true
                     protectedCount = protectedCount + 1
                     print("[Bodoamat | Proteksi] ⭐ Berhasil Mengunci: " .. tostring((data and data.Name) or "Ikan") .. " [" .. rarity .. "]")
-                    task.wait(0.12) -- Jeda aman antar paket ke server
+                    task.wait(0.35) -- Anti BAC-4214 Guard: Jeda aman antar paket ke server (Mencegah rate limit)
+                    if protectedCount >= 4 then
+                        break -- Batasi maksimal 4 item per siklus agar tidak flooding remote
+                    end
                 end
             end
         end
@@ -1532,16 +1558,13 @@ function Merchant:StartAntiDrown()
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     local hrp = char:FindFirstChild("HumanoidRootPart")
                     if hum and hrp then
-                        -- Pertahankan state berenang agar tidak tenggelam pasif
-                        if hum:GetState() == Enum.HumanoidStateType.Swimming then
-                            hum.MaxSlopeAngle = 89
-                        end
-                        -- Stabilkan jika tenggelam terlalu cepat di kedalaman laut
-                        local pos = hrp.Position
-                        if pos.Y < -50 then
-                            local vel = hrp.AssemblyLinearVelocity
-                            if vel.Y < -20 then
-                                hrp.AssemblyLinearVelocity = Vector3.new(vel.X, -5, vel.Z)
+                        -- Pasang tool oksigen ke karakter jika belum terpasang
+                        local bp = LocalPlayer:FindFirstChild("Backpack")
+                        if bp then
+                            for _, t in ipairs(bp:GetChildren()) do
+                                if t:IsA("Tool") and (string.find(t.Name:lower(), "oxygen") or string.find(t.Name:lower(), "tank") or string.find(t.Name:lower(), "diving")) then
+                                    t.Parent = char
+                                end
                             end
                         end
                     end
@@ -2285,7 +2308,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     end)
 
 
-    createToggle(sellPage, "Auto Favorite Ikan Langka", "Mengunci otomatis ikan bernilai tinggi (Rare ke atas) agar tidak terjual", modules.AutoSell.AutoFavoriteEnabled, function(val)
+    createToggle(sellPage, "Auto Favorite Ikan Langka", "Mengunci otomatis ikan bernilai tinggi (Legendary/Mitos/Secret) agar tidak terjual", modules.AutoSell.AutoFavoriteEnabled, function(val)
         state:Set("IsAutoFavorite", val)
         modules.AutoSell:SetAutoFavorite(val, modules.Network)
     end)
@@ -2304,8 +2327,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     local rTitle = Instance.new("TextLabel")
     rTitle.Size = UDim2.new(1, -20, 0, 18)
     rTitle.Position = UDim2.new(0, 12, 0, 6)
-    rTitle.BackgroundTransparency = 1
-    rTitle.Text = "Tingkat Ikan yang Diamankan (Tidak Akan Terjual)"
+    rTitle.Text = "Tingkat Kelangkaan Minimal yang Diamankan"
     rTitle.TextColor3 = config.UI.Theme.Text
     rTitle.TextSize = 11
     rTitle.Font = Enum.Font.GothamBold
@@ -2313,7 +2335,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     rTitle.Parent = rarityCard
 
     local rButtons = {}
-    local rList = { "Rare", "Epic", "Legendary", "Mythic", "Secret" }
+    local rList = { "Legendary", "Mitos", "Secret" }
     local rContainer = Instance.new("Frame")
     rContainer.Size = UDim2.new(1, -24, 0, 28)
     rContainer.Position = UDim2.new(0, 12, 0, 28)
@@ -2322,16 +2344,16 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     local rLayout = Instance.new("UIListLayout")
     rLayout.FillDirection = Enum.FillDirection.Horizontal
-    rLayout.Padding = UDim.new(0, 4)
+    rLayout.Padding = UDim.new(0, 6)
     rLayout.Parent = rContainer
 
     for _, rName in ipairs(rList) do
         local rBtn = Instance.new("TextButton")
-        rBtn.Size = UDim2.new(0.19, 0, 1, 0)
+        rBtn.Size = UDim2.new(0.32, 0, 1, 0)
         rBtn.BackgroundColor3 = (modules.AutoSell.MinFavoriteRarity == rName) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
         rBtn.Text = rName
         rBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        rBtn.TextSize = 9
+        rBtn.TextSize = 10
         rBtn.Font = Enum.Font.GothamMedium
         rBtn.Parent = rContainer
 
@@ -2346,17 +2368,17 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
             for id, b in pairs(rButtons) do
                 b.BackgroundColor3 = (id == rName) and config.UI.Theme.Accent or Color3.fromRGB(35, 38, 52)
             end
-            print("[Bodoamat] Min Favorite Rarity diset ke: " .. rName)
+            print("[Bodoamat] Min Favorite Rarity diset ke: " .. rName .. "+")
         end)
     end
 
-    createActionButton(sellPage, "⭐ Kunci / Amankan Ikan Rare+ Sekarang", "Scan isi tas & kunci semua ikan Rare, Epic, Legendary agar tidak terjual", function()
+    createActionButton(sellPage, "⭐ Kunci / Amankan Ikan Langka Sekarang", "Scan isi tas & kunci ikan sesuai tier yang dipilih (Legendary/Mitos/Secret)", function()
         local count = modules.AutoSell:ProtectAndFavorite(modules.Network)
         print("[Bodoamat | Proteksi] Selesai scan: " .. tostring(count) .. " ikan baru diamankan.")
     end)
 
     local sellDebounce = false
-    createActionButton(sellPage, "Jual Semua Ikan Sekarang (Aman Ikan Langka)", "Otomatis mengunci ikan Rare ke atas sebelum menjual (Anti Ikan Hilang)", function()
+    createActionButton(sellPage, "Jual Semua Ikan Sekarang (Aman Ikan Langka)", "Otomatis mengunci ikan sesuai tier yang dipilih sebelum menjual", function()
         if sellDebounce then return end
         sellDebounce = true
         modules.AutoSell:ExecuteSell(modules.Network, state)
@@ -2368,10 +2390,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     createActionButton(sellPage, "Buka Black Market (Mariana Trench)", "Kunjungi Black Market di Mariana Trench, auto pakai O2 & buka prompt otomatis", function()
         modules.Merchant:OpenRemoteShop("blackmarket", modules.Network)
-    end)
-
-    createActionButton(sellPage, "Buka Underground Cellar", "Kunjungi Underground Cellar, buka prompt otomatis, ada tombol kembali", function()
-        modules.Merchant:OpenRemoteShop("cellar", modules.Network)
     end)
 
     createActionButton(sellPage, "Buka Pedagang Keliling (Traveling Merchant)", "Kunjungi Kapal Pedagang Alien, buka prompt otomatis, ada tombol kembali", function()
