@@ -45,7 +45,6 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 ### 3. 🛒 Remote Toko, Black Market & Kontrol Cuaca
 - **Buka Black Market Jarak Jauh**: Membuka prompt menu Underground Cellar dari lokasi mana pun di peta tanpa harus berjalan ke gua.
 - **Buka Pedagang Keliling (Alien)**: Membuka prompt Traveling Merchant secara remote via simulasi proximity.
-- **Refresh Stok Merchant**: Memperbarui barang dagangan pedagang langsung via remote network.
 - **Beli Umpan Instan**: Pembelian cepat umpan terbaik (*Singularity Bait, Royal Bait, Enchanted Bait, Golden Bait*).
 - **Pengontrol Cuaca Server**: Membeli event cuaca server (*Storm, Thunderstorm, Cloudy, Wind*) secara instan.
 
@@ -60,10 +59,8 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
   - Dilengkapi opsi **Mode Aman Dekat Pedagang TP (MerchantSafeTp)** untuk teleportasi singkat ke pedagang saat menjual jika karakter berada di luar jangkauan jual.
 - **BAC-6228 Guard (Zero Part Tampering)**:
   - Modul FPS Booster sama sekali tidak menghapus atau mengubah properti fisik `Part`, `Material`, atau struktur `Workspace`, sehingga client integrity check selalu lulus 100%.
-- **Ultra GPU Saver (AFK Safe)**:
-  - Mematikan render 3D (`Set3dRenderingEnabled(false)`) saat ditinggal tidur/AFK. Penggunaan GPU langsung 0% dingin, namun physics tick tetap berjalan normal pada 60 fps tanpa memicu tick desync.
-- **Anti-AFK 20 Menit & Auto-Rejoin**:
-  - Mencegah Roblox Idle Kick 20 menit dan otomatis menyambung kembali ke server jika jaringan terputus.
+- **Ultra GPU Saver (Safe)**:
+  - Mematikan render 3D (`Set3dRenderingEnabled(false)`). Penggunaan GPU langsung 0% dingin, namun physics tick tetap berjalan normal pada 60 fps tanpa memicu tick desync.
 
 ### 6. 🎣 Mesin Memancing Alami (Natural Human Play - Bebas BAC-3211)
 - **Mode Normal / Alami**: Memancing dengan siklus waktu realistis seorang manusia (7 - 9 detik per ikan):
@@ -71,8 +68,7 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
   - Fase 2: Minigame reel realistis (2.2 - 3.4 detik acak).
   - Fase 3: Tarik kail dan jeda istirahat natural (1.2 - 2.0 detik).
   - Menghilangkan mode tidak wajar (Fast/Blatant) yang dapat memicu rate-limit BAC-3211 pada server.
-- **Aman Ditinggal AFK (24/7)**: Fitur Anti-AFK dapat diaktifkan kapan saja via menu UI (default: nonaktif untuk keamanan saat baru join). Mengintegrasikan `VirtualUser` idle intercept, micro-movement setiap 2 menit, serta `Auto-Rejoin` otomatis jika terjadi disconnect.
-- **Konfigurasi Aman (Default Nonaktif)**: Seluruh fitur otomasi (mancing, jual, totem, mobilitas, anti-afk) bermula dalam status **OFF** saat skrip dieksekusi untuk menghindari kesalahan eksekusi. User memiliki kontrol penuh untuk menyalakan fitur yang diinginkan melalui menu UI.
+- **Konfigurasi Aman (Default Nonaktif)**: Seluruh fitur otomasi (mancing, jual, totem, mobilitas) bermula dalam status **OFF** saat skrip dieksekusi untuk menghindari kesalahan eksekusi. User memiliki kontrol penuh untuk menyalakan fitur yang diinginkan melalui menu UI.
 - **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Rare, Epic, Legendary, Mythic, Secret*) sebelum siklus jual massal saat fitur ini diaktifkan.
 
 ### 7. 🎨 Antarmuka Modern 7-Tab Standalone UI

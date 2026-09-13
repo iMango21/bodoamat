@@ -10,7 +10,7 @@
     - 🛡️ BAC Stealth Mode: UI murni gethui() tanpa menyentuh CoreGui (100% bebas tripwire BAC-6228)
     - ⚡ Talon Anti-Remote Bypass: Resolusi resmi via Packages.Net & fallback non-blocking
     - 🛡️ Netralisasi Pelaporan BAC: Nonaktifkan listener client pada AC-Response & Punishment
-    - 🚫 Zero Startup Footprint: Tidak menyentuh _G/CoreGui, lazy loaded VirtualUser & Replion
+    - 🚫 Zero Startup Footprint: Tidak menyentuh _G/CoreGui, 100% aman dan bersih
     - 📱 Mobile Touch Draggable: Tombol 🐟 dapat digeser bebas di layar perangkat Android/Delta
     - 🗺️ 30+ Lokasi Teleportasi Baru: Copper Canyon, Sewers, Mariana Trench, Crystal Depths, dll.
     - 🗿 Sistem Totem Otomatis: Pasang 1 Totem, Formasi 5 Totem (+), dan Auto-Deploy Loop
@@ -93,14 +93,6 @@ local Config = {
         AutoEquipRod = true,      -- Otomatis mencari & equip joran jika belum dipakai
     },
 
-    -- Anti-AFK & Disconnect Protection (Default: NON-AKTIF, Nyalakan via Menu)
-    AntiAfk = {
-        Enabled = false,          -- Default NON-AKTIF (Mencegah eksekusi tak sengaja)
-        AutoRejoin = true,        -- Otomatis re-teleport ke server jika diaktifkan
-        MicroMovement = true,     -- Gerakan mikro karakter berkala saat diaktifkan
-        MoveInterval = 120,       -- Interval gerakan mikro setiap 2 menit (detik)
-    },
-
     -- Optimasi Grafis & Kinerja (Safe Anti-BAC)
     Performance = {
         FpsBoost = false,       -- Menghilangkan partikel & post-effects (tanpa merusak model/parts)
@@ -163,7 +155,6 @@ local State = {
     -- Runtime states
     IsFishing = false,
     IsSelling = false,
-    IsAntiAfk = false,
     IsFpsBoost = false,
     IsGpuSaver = false,
     IsAutoSell = false,
@@ -259,8 +250,8 @@ function Network:Init(): boolean
 
             self.Remotes["ChargeRod"]       = resolveRF("ChargeFishingRod")
             self.Remotes["RequestGame"]     = resolveRF("RequestFishingMinigameStarted")
-            self.Remotes["CompleteGame"]    = resolveRF("CatchFishCompleted") or resolveRE("FishingCompleted") or resolveRE("CatchFishCompleted") or resolveRF("FishingCompleted")
-            self.Remotes["CancelInput"]     = resolveRF("CancelFishingInputs")
+            self.Remotes["CompleteGame"]    = resolveRE("FishingCompleted") or resolveRE("CatchFishCompleted")
+            self.Remotes["CancelInput"]     = resolveRF("CancelFishingInputs") or resolveRE("CancelFishingInputs")
             self.Remotes["SellAll"]         = resolveRF("SellAllItems")
             self.Remotes["EquipHotbar"]     = resolveRE("EquipToolFromHotbar")
             self.Remotes["UnequipHotbar"]   = resolveRE("UnequipToolFromHotbar")
@@ -295,8 +286,8 @@ function Network:Init(): boolean
 
         self.Remotes["ChargeRod"]       = netFolder:FindFirstChild("RF/ChargeFishingRod")
         self.Remotes["RequestGame"]     = netFolder:FindFirstChild("RF/RequestFishingMinigameStarted")
-        self.Remotes["CompleteGame"]    = netFolder:FindFirstChild("RF/CatchFishCompleted") or netFolder:FindFirstChild("RE/FishingCompleted") or netFolder:FindFirstChild("RF/FishingCompleted") or netFolder:FindFirstChild("RE/CatchFishCompleted")
-        self.Remotes["CancelInput"]     = netFolder:FindFirstChild("RF/CancelFishingInputs")
+        self.Remotes["CompleteGame"]    = netFolder:FindFirstChild("RE/FishingCompleted") or netFolder:FindFirstChild("RE/CatchFishCompleted")
+        self.Remotes["CancelInput"]     = netFolder:FindFirstChild("RF/CancelFishingInputs") or netFolder:FindFirstChild("RE/CancelFishingInputs")
         self.Remotes["SellAll"]         = netFolder:FindFirstChild("RF/SellAllItems")
         self.Remotes["EquipHotbar"]     = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
         self.Remotes["UnequipHotbar"]   = netFolder:FindFirstChild("RE/UnequipToolFromHotbar")
@@ -320,17 +311,17 @@ function Network:Init(): boolean
     return self.HasRemotes
 end
 
--- Wrapper: Lempar Kail (Charge) - Dynamic Live Timestamp (Anti BAC-4218)
+-- Wrapper: Lempar Kail (Charge) - Dynamic Live Timestamp (Anti BAC-4218 & Anti BAC-52110)
 function Network:ChargeRod(power: number?): boolean
     local remote = self.Remotes["ChargeRod"]
     if remote and remote:IsA("RemoteFunction") then
         local now = workspace:GetServerTimeNow()
         local ok, _ = pcall(function()
-            remote:InvokeServer(nil, nil, now, nil)
+            remote:InvokeServer(now)
         end)
         if not ok then
             pcall(function()
-                remote:InvokeServer(power or now)
+                remote:InvokeServer(power or 1)
             end)
         end
         return true
@@ -338,19 +329,19 @@ function Network:ChargeRod(power: number?): boolean
     return false
 end
 
--- Wrapper: Permintaan Minigame - Dynamic Live Timestamp (Anti BAC-4218)
+-- Wrapper: Permintaan Minigame - Dynamic Live Timestamp (Anti BAC-4218 & Anti BAC-52110)
 function Network:RequestMinigame(diff: number?, luck: number?): boolean
     local remote = self.Remotes["RequestGame"]
     if remote and remote:IsA("RemoteFunction") then
         local now = workspace:GetServerTimeNow()
-        local safeLuck = luck or (0.3 + (math.random(10, 30) / 100))
-        local safeDiff = diff or 0
+        local safeDiff = diff or -1.233
+        local safeLuck = luck or 1
         local ok, _ = pcall(function()
             remote:InvokeServer(safeDiff, safeLuck, now)
         end)
         if not ok then
             pcall(function()
-                remote:InvokeServer(-1.233, 1, now)
+                remote:InvokeServer(1.2854545116425, 1, now)
             end)
         end
         return true
@@ -358,15 +349,15 @@ function Network:RequestMinigame(diff: number?, luck: number?): boolean
     return false
 end
 
--- Wrapper: Selesaikan Tangkapan (Reel) - Mendukung RemoteFunction & RemoteEvent
+-- Wrapper: Selesaikan Tangkapan (Reel) - RemoteEvent FishingCompleted Standar Pemain
 function Network:CompleteFishing(): boolean
     local remote = self.Remotes["CompleteGame"]
     if remote then
         local ok, _ = pcall(function()
-            if remote:IsA("RemoteFunction") then
-                remote:InvokeServer()
-            elseif remote:IsA("RemoteEvent") then
+            if remote:IsA("RemoteEvent") then
                 remote:FireServer()
+            elseif remote:IsA("RemoteFunction") then
+                remote:InvokeServer()
             end
         end)
         return ok
@@ -495,100 +486,7 @@ function Network:RefreshMerchant(): boolean
 end
 
 -- ============================================================
--- 4. MODULE: ANTI-AFK
--- ============================================================
-local GuiService = game:GetService("GuiService")
-local AntiAfk = {
-    Enabled = false,
-    AutoRejoin = true,
-    Connections = {} :: { RBXScriptConnection },
-    MicroMoveThread = nil :: thread?,
-}
-
-function AntiAfk:Start(config: { MicroMovement: boolean, MoveInterval: number, AutoRejoin: boolean? }?)
-    if self.Enabled then return end
-    self.Enabled = true
-
-    local interval = (config and config.MoveInterval) or 240
-    local enableMicroMove = true
-    if config and config.MicroMovement ~= nil then
-        enableMicroMove = config.MicroMovement
-    end
-    if config and config.AutoRejoin ~= nil then
-        self.AutoRejoin = config.AutoRejoin
-    end
-
-    -- 1. Tangani Event Idled Engine Roblox (Anti-20 Menit Kick, Lazy VirtualUser)
-    pcall(function()
-        local idleConn = LocalPlayer.Idled:Connect(function()
-            if not self.Enabled then return end
-            pcall(function()
-                local vu = game:GetService("VirtualUser")
-                if vu then
-                    vu:CaptureController()
-                    vu:ClickButton2(Vector2.zero)
-                end
-                print("[Bodoamat | Anti-AFK] Proteksi idle engine dipicu.")
-            end)
-        end)
-        table.insert(self.Connections, idleConn)
-    end)
-
-    -- 2. Auto Rejoin saat muncul dialog Disconnect / Error 267
-    pcall(function()
-        local errConn = GuiService.ErrorMessageChanged:Connect(function(msg)
-            if self.AutoRejoin and self.Enabled and msg and #msg > 0 then
-                warn("[Bodoamat | Rejoin] Terdeteksi pesan disconnect: " .. tostring(msg))
-                task.wait(2.5)
-                pcall(function()
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-                end)
-            end
-        end)
-        table.insert(self.Connections, errConn)
-    end)
-
-    -- 3. Gerakan mikro berkala (mencegah idle timeout server-side)
-    if enableMicroMove then
-        self.MicroMoveThread = task.spawn(function()
-            while self.Enabled do
-                task.wait(interval)
-                if not self.Enabled then break end
-
-                local character = LocalPlayer.Character
-                if character then
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid and humanoid.Health > 0 then
-                        humanoid:Move(Vector3.new(0.005, 0, 0), false)
-                        task.wait(0.08)
-                        humanoid:Move(Vector3.zero, false)
-                    end
-                end
-            end
-        end)
-    end
-
-    print("[Bodoamat] Sistem Anti-AFK & Auto-Rejoin Aktif.")
-end
-
-function AntiAfk:Stop()
-    self.Enabled = false
-
-    for _, conn in ipairs(self.Connections) do
-        conn:Disconnect()
-    end
-    table.clear(self.Connections)
-
-    if self.MicroMoveThread then
-        task.cancel(self.MicroMoveThread)
-        self.MicroMoveThread = nil
-    end
-
-    print("[Bodoamat] Sistem Anti-AFK Dinonaktifkan.")
-end
-
--- ============================================================
--- 5. MODULE: FPS BOOSTER
+-- 4. MODULE: FPS BOOSTER
 -- ============================================================
 local FpsBooster = {
     IsFpsBoosted = false,
@@ -2134,19 +2032,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
     end)
 
-    createToggle(fishPage, "Anti-AFK 24/7 & Auto-Rejoin", "Mencegah kick idle 20 menit & reconnect otomatis saat AFK", state.IsAntiAfk, function(val)
-        state:Set("IsAntiAfk", val)
-        if val then
-            modules.AntiAfk:Start(config.AntiAfk)
-        else
-            modules.AntiAfk:Stop()
-        end
-    end)
-
-    createActionButton(fishPage, "Equip Joran Manual", "Mencari dan memasang joran dari tas ke tangan", function()
-        modules.AutoFish:EnsureRodEquipped(modules.Network)
-    end)
-
     -- ==========================================
     -- ISI KONTEN TAB 2: TOKO & JUAL
     -- ==========================================
@@ -2253,10 +2138,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     createActionButton(sellPage, "Buka Pedagang Keliling (Alien)", "Picu prompt Traveling Merchant dari mana saja", function()
         modules.Merchant:OpenRemoteShop("traveling")
-    end)
-
-    createActionButton(sellPage, "Refresh Stok Merchant", "Kirim remote untuk memperbarui stok barang pedagang", function()
-        modules.Merchant:RefreshStock(modules.Network)
     end)
 
     -- Quick Buy Bait
@@ -2692,15 +2573,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         modules.FpsBooster:SetGpuSaver(val, state)
     end)
 
-    createToggle(optPage, "Anti-AFK 20 Menit & Auto-Rejoin", "Mencegah kick idle dan otomatis masuk kembali jika terputus", state.IsAntiAfk, function(val)
-        state:Set("IsAntiAfk", val)
-        if val then
-            modules.AntiAfk:Start(config.AntiAfk)
-        else
-            modules.AntiAfk:Stop()
-        end
-    end)
-
     -- ==========================================
     -- ISI KONTEN TAB 7: STATUS & STATISTIK
     -- ==========================================
@@ -2733,7 +2605,6 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
             local elapsed = state:GetElapsedTime()
             local caught = state.FishCaught
             local fishStatus = state.IsFishing and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Nonaktif</font>"
-            local afkStatus = state.IsAntiAfk and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Nonaktif</font>"
             local o2Status = state.IsOxygenEquipped and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
             local radarStatus = state.IsRadar and "<font color='#2ecc71'>Aktif</font>" or "<font color='#e74c3c'>Mati</font>"
 
@@ -2744,7 +2615,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
                 "<b>📊 INFORMASI LIVE SESSION:</b>\n\n" ..
                 "• <b>Durasi Menjalankan:</b> <font color='#00d2ff'>%s</font>\n" ..
                 "• <b>Total Ikan Tertangkap:</b> <font color='#2ecc71'>%d Ekor</font>\n" ..
-                "• <b>Auto Fishing:</b> %s | <b>Anti-AFK 24/7:</b> %s\n" ..
+                "• <b>Auto Fishing:</b> %s\n" ..
                 "• <b>Tabung Oksigen:</b> %s | <b>Radar:</b> %s\n" ..
                 "• <b>Posisi Karakter:</b> <font color='#9b59b6'>%s</font>\n" ..
                 "• <b>Status Sistem:</b> %s\n\n" ..
@@ -2752,7 +2623,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
                 "• <b>IsSelling Guard:</b> <font color='#2ecc71'>Aktif (BAC-8228 Guard)</font>\n" ..
                 "• <b>Workspace Part Tamper:</b> <font color='#2ecc71'>Dihapus (BAC-6228 Guard)</font>\n" ..
                 "• <b>GPU Saver Mode:</b> <font color='#2ecc71'>Engine Raster Standby</font>",
-                elapsed, caught, fishStatus, afkStatus, o2Status, radarStatus, posStr, status
+                elapsed, caught, fishStatus, o2Status, radarStatus, posStr, status
             )
             task.wait(1)
         end
@@ -2858,7 +2729,6 @@ local Modules = {
     Merchant = Merchant,
     Movement = Movement,
     FpsBooster = FpsBooster,
-    AntiAfk = AntiAfk,
     UI = BodoamatGui,
 }
 
@@ -2869,11 +2739,6 @@ local function Init()
 
     -- Inisialisasi Jaringan Stealth & Netralisasi Pelaporan BAC
     Network:Init()
-
-    -- Semua otomasi default NONAKTIF untuk keamanan eksekusi (aktifkan via menu UI)
-    if Config.AntiAfk and Config.AntiAfk.Enabled then
-        AntiAfk:Start(Config.AntiAfk)
-    end
 
     BodoamatGui:Create(Config, State, Modules)
 
