@@ -1,11 +1,13 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v3.0.5 ⚡                          ║
+    ║                        ⚡ BE REBEL v3.1 ⚡                            ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
     ║       BAC Stealth Immunity (Bebas BAC-8226/2223/1224/2226)      ║
-    ║       Pure Hardware Tap: Delta C-Closures + VIM (clickCount=1)  ║
+    ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
+    ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
+    ║       Pixel-Perfect Pin & Screen Inset Synchronization          ║
     ║       Default Interval: 1.0 Detik (1000ms) per Klik             ║
     ║       Design Language: Bodoamat Dark-Glassmorphism Hub          ║
     ╚══════════════════════════════════════════════════════════════════╝
@@ -50,7 +52,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.0",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.1",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -133,6 +135,12 @@ local State = {
     -- Tab State
     CurrentTab = "Clicker",
 
+    -- Movement State
+    IsWaterWalk = false,
+    IsInfJump = false,
+    WalkSpeed = 16,
+    JumpPower = 50,
+
     -- Event Listeners Registry
     Listeners = {} :: { [string]: { (any) -> () } }
 }
@@ -167,6 +175,149 @@ function State:GetElapsedTime(): string
     local minutes = math.floor((elapsed % 3600) / 60)
     local seconds = elapsed % 60
     return string.format("%02d:%02d:%02d", hours, minutes, seconds)
+end
+
+-- ====================================================================
+-- MODULE: LOCAL PLAYER & MOVEMENT (BODOAMAT v3.0 ENGINE)
+-- ====================================================================
+local MovementModule = {
+    IsWaterWalk = false,
+    IsInfJump = false,
+    JumpPower = 50,
+    WalkSpeed = 16,
+    
+    WaterPlatform = nil :: Part?,
+    HeartbeatConn = nil :: RBXScriptConnection?,
+    JumpConn = nil :: RBXScriptConnection?,
+}
+
+-- 1. Walk on Water (Jesus Walk)
+function MovementModule:SetWaterWalk(enabled: boolean)
+    if self.IsWaterWalk == enabled then return end
+    self.IsWaterWalk = enabled
+    State:Set("IsWaterWalk", enabled)
+
+    if enabled then
+        pcall(function()
+            if not self.WaterPlatform then
+                local part = Instance.new("Part")
+                part.Name = "BeRebel_WaterWalk"
+                part.Size = Vector3.new(24, 1.2, 24)
+                part.Anchored = true
+                part.CanCollide = true
+                part.Transparency = 1
+                part.Material = Enum.Material.Air
+                part.Parent = workspace
+                self.WaterPlatform = part
+            end
+        end)
+
+        if not self.HeartbeatConn then
+            self.HeartbeatConn = RunService.Heartbeat:Connect(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+                local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+                if hrp and self.WaterPlatform then
+                    -- Platform sejajar di bawah kaki karakter di permukaan air laut (-0.6)
+                    self.WaterPlatform.CFrame = CFrame.new(hrp.Position.X, -0.6, hrp.Position.Z)
+                end
+
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    if self.JumpPower ~= 50 and hum.JumpPower ~= self.JumpPower then
+                        hum.JumpPower = self.JumpPower
+                    end
+                    if self.WalkSpeed ~= 16 and hum.WalkSpeed ~= self.WalkSpeed then
+                        hum.WalkSpeed = self.WalkSpeed
+                    end
+                end
+            end)
+        end
+    else
+        if not self.IsWaterWalk and self.JumpPower == 50 and self.WalkSpeed == 16 then
+            if self.HeartbeatConn then
+                self.HeartbeatConn:Disconnect()
+                self.HeartbeatConn = nil
+            end
+        end
+
+        if self.WaterPlatform then
+            pcall(function() self.WaterPlatform:Destroy() end)
+            self.WaterPlatform = nil
+        end
+    end
+end
+
+-- 2. Infinite Jump
+function MovementModule:SetInfiniteJump(enabled: boolean)
+    if self.IsInfJump == enabled then return end
+    self.IsInfJump = enabled
+    State:Set("IsInfJump", enabled)
+
+    if enabled then
+        if not self.JumpConn then
+            self.JumpConn = UserInputService.JumpRequest:Connect(function()
+                if not self.IsInfJump then return end
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    if char then
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                        end
+                    end
+                end)
+            end)
+        end
+    else
+        if self.JumpConn then
+            self.JumpConn:Disconnect()
+            self.JumpConn = nil
+        end
+    end
+end
+
+-- 3. Custom JumpPower
+function MovementModule:SetJumpPower(power: number)
+    self.JumpPower = math.clamp(power, 50, 250)
+    State:Set("JumpPower", self.JumpPower)
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.JumpPower = self.JumpPower end
+    end
+end
+
+-- 4. Custom WalkSpeed
+function MovementModule:SetWalkSpeed(speed: number)
+    self.WalkSpeed = math.clamp(speed, 16, 150)
+    State:Set("WalkSpeed", self.WalkSpeed)
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = self.WalkSpeed end
+    end
+end
+
+function MovementModule:Cleanup()
+    self:SetWaterWalk(false)
+    self:SetInfiniteJump(false)
+    if self.HeartbeatConn then
+        self.HeartbeatConn:Disconnect()
+        self.HeartbeatConn = nil
+    end
+    if self.JumpConn then
+        self.JumpConn:Disconnect()
+        self.JumpConn = nil
+    end
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = 16
+            hum.JumpPower = 50
+        end
+    end
 end
 
 -- ====================================================================
@@ -330,7 +481,9 @@ end
 local BeRebelGui = {
     ScreenGui = nil :: ScreenGui?,
     MainFrame = nil :: Frame?,
-    FloatingBtn = nil :: TextButton?,
+    FloatingBar = nil :: Frame?,
+    MenuBtn = nil :: TextButton?,
+    PlayBtn = nil :: TextButton?,
     TargetPin = nil :: Frame?,
     CurrentTab = "Clicker",
     Tabs = {} :: { [string]: ScrollingFrame },
@@ -353,11 +506,12 @@ function BeRebelGui:Create()
         end
     end)
 
-    -- 2. Buat ScreenGui Utama dengan Stealth Container
+    -- 2. Buat ScreenGui Utama dengan Stealth Container & Fullscreen Inset Sync
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "FishItHUD"
     screenGui.ResetOnSpawn = false
     screenGui.DisplayOrder = 100000
+    screenGui.IgnoreGuiInset = true -- Sinkronisasi 1:1 Koordinat Layar dengan Mouse/Touch
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
     -- Proteksi syn.protect_gui jika didukung executor
@@ -374,75 +528,150 @@ function BeRebelGui:Create()
     State.TargetPosition = Vector2.new(math.floor(vp.X / 2), math.floor(vp.Y / 2))
 
     -- ========================================================
-    -- A. FLOATING DRAGGABLE "MENU" BUTTON (MOBILE OPTIMIZED)
+    -- A. FLOATING DOCK BAR: [ MENU ] + [ ▶ PLAY / ⏸ PAUSE ]
     -- ========================================================
-    local mobileBtn = Instance.new("TextButton")
-    mobileBtn.Name = "AppFloatingBtn"
-    mobileBtn.Size = UDim2.new(0, 58, 0, 30)
-    mobileBtn.Position = UDim2.new(0, 20, 0.5, -15)
-    mobileBtn.BackgroundColor3 = theme.CardBg
-    mobileBtn.Text = "MENU"
-    mobileBtn.TextColor3 = theme.Text
-    mobileBtn.TextSize = 11
-    mobileBtn.Font = Enum.Font.GothamBold
-    mobileBtn.Active = true
-    mobileBtn.ZIndex = 80
-    mobileBtn.Parent = screenGui
-    self.FloatingBtn = mobileBtn
+    local floatBar = Instance.new("Frame")
+    floatBar.Name = "AppFloatingBar"
+    floatBar.Size = UDim2.new(0, 142, 0, 32)
+    floatBar.Position = UDim2.new(0, 20, 0.5, -16)
+    floatBar.BackgroundTransparency = 1
+    floatBar.Active = true
+    floatBar.ZIndex = 80
+    floatBar.Parent = screenGui
+    self.FloatingBar = floatBar
+
+    local floatLayout = Instance.new("UIListLayout")
+    floatLayout.FillDirection = Enum.FillDirection.Horizontal
+    floatLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    floatLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    floatLayout.Padding = UDim.new(0, 6)
+    floatLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    floatLayout.Parent = floatBar
+
+    -- 1. Tombol MENU
+    local menuBtn = Instance.new("TextButton")
+    menuBtn.Name = "AppMenuBtn"
+    menuBtn.Size = UDim2.new(0, 58, 0, 32)
+    menuBtn.BackgroundColor3 = theme.CardBg
+    menuBtn.Text = "MENU"
+    menuBtn.TextColor3 = theme.Text
+    menuBtn.TextSize = 11
+    menuBtn.Font = Enum.Font.GothamBold
+    menuBtn.Active = true
+    menuBtn.ZIndex = 81
+    menuBtn.LayoutOrder = 1
+    menuBtn.Parent = floatBar
+    self.MenuBtn = menuBtn
 
     local mbCorner = Instance.new("UICorner")
-    mbCorner.CornerRadius = UDim.new(0, 6)
-    mbCorner.Parent = mobileBtn
+    mbCorner.CornerRadius = UDim.new(0, 8)
+    mbCorner.Parent = menuBtn
 
     local mbStroke = Instance.new("UIStroke")
     mbStroke.Color = theme.Accent
     mbStroke.Thickness = 1.2
-    mbStroke.Parent = mobileBtn
+    mbStroke.Parent = menuBtn
 
-    -- Logika Dragging Tombol Mobile MENU (Sentuh & Geser)
-    local mbDragging, mbDragInput, mbDragStart, mbStartPos
-    local mbHasMoved = false
+    -- 2. Tombol PLAY / PAUSE (Di samping tombol MENU)
+    local playBtn = Instance.new("TextButton")
+    playBtn.Name = "AppPlayBtn"
+    playBtn.Size = UDim2.new(0, 76, 0, 32)
+    playBtn.BackgroundColor3 = Color3.fromRGB(24, 36, 44)
+    playBtn.Text = "▶ PLAY"
+    playBtn.TextColor3 = theme.Success
+    playBtn.TextSize = 11
+    playBtn.Font = Enum.Font.GothamBold
+    playBtn.Active = true
+    playBtn.ZIndex = 81
+    playBtn.LayoutOrder = 2
+    playBtn.Parent = floatBar
+    self.PlayBtn = playBtn
 
-    local connMbStart = mobileBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            mbDragging = true
-            mbHasMoved = false
-            mbDragStart = input.Position
-            mbStartPos = mobileBtn.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    mbDragging = false
-                end
-            end)
-        end
-    end)
-    table.insert(self.Connections, connMbStart)
+    local pbCorner = Instance.new("UICorner")
+    pbCorner.CornerRadius = UDim.new(0, 8)
+    pbCorner.Parent = playBtn
 
-    local connMbChange = mobileBtn.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            mbDragInput = input
-        end
-    end)
-    table.insert(self.Connections, connMbChange)
+    local pbStroke = Instance.new("UIStroke")
+    pbStroke.Color = theme.Success
+    pbStroke.Thickness = 1.2
+    pbStroke.Parent = playBtn
 
-    local connMbMove = UserInputService.InputChanged:Connect(function(input)
-        if input == mbDragInput and mbDragging then
-            local delta = input.Position - mbDragStart
-            if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
-                mbHasMoved = true
+    -- Logika Dragging Seluruh Floating Dock Bar (Sentuh & Geser)
+    local fbDragging, fbDragInput, fbDragStart, fbStartPos
+    local fbHasMoved = false
+
+    local function setupDockDrag(btnInstance: GuiButton)
+        local connStart = btnInstance.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                fbDragging = true
+                fbHasMoved = false
+                fbDragStart = input.Position
+                fbStartPos = floatBar.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        fbDragging = false
+                    end
+                end)
             end
-            mobileBtn.Position = UDim2.new(
-                mbStartPos.X.Scale,
-                mbStartPos.X.Offset + delta.X,
-                mbStartPos.Y.Scale,
-                mbStartPos.Y.Offset + delta.Y
+        end)
+        table.insert(self.Connections, connStart)
+
+        local connChange = btnInstance.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                fbDragInput = input
+            end
+        end)
+        table.insert(self.Connections, connChange)
+    end
+
+    setupDockDrag(menuBtn)
+    setupDockDrag(playBtn)
+
+    local connDockMove = UserInputService.InputChanged:Connect(function(input)
+        if input == fbDragInput and fbDragging then
+            local delta = input.Position - fbDragStart
+            if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
+                fbHasMoved = true
+            end
+            floatBar.Position = UDim2.new(
+                fbStartPos.X.Scale,
+                fbStartPos.X.Offset + delta.X,
+                fbStartPos.Y.Scale,
+                fbStartPos.Y.Offset + delta.Y
             )
         end
     end)
-    table.insert(self.Connections, connMbMove)
+    table.insert(self.Connections, connDockMove)
+
+    -- Handler Klik Tombol Floating Bar
+    menuBtn.MouseButton1Click:Connect(function()
+        if not fbHasMoved and self.MainFrame then
+            self.MainFrame.Visible = not self.MainFrame.Visible
+        end
+    end)
+
+    playBtn.MouseButton1Click:Connect(function()
+        if not fbHasMoved then
+            ClickEngine:Toggle()
+        end
+    end)
+
+    State:OnChange("IsRunning", function(running)
+        if running then
+            playBtn.Text = "⏸ PAUSE"
+            playBtn.TextColor3 = theme.Warning
+            playBtn.BackgroundColor3 = Color3.fromRGB(38, 32, 20)
+            pbStroke.Color = theme.Warning
+        else
+            playBtn.Text = "▶ PLAY"
+            playBtn.TextColor3 = theme.Success
+            playBtn.BackgroundColor3 = Color3.fromRGB(24, 36, 44)
+            pbStroke.Color = theme.Success
+        end
+    end)
 
     -- ========================================================
-    -- B. SINGLE TARGET PIN MARKER (DRAGGABLE)
+    -- B. SINGLE TARGET PIN MARKER (PIXEL-PERFECT SYNCED)
     -- ========================================================
     local pinSize = 46
     local targetPin = Instance.new("Frame")
@@ -453,7 +682,7 @@ function BeRebelGui:Create()
     targetPin.BackgroundColor3 = theme.Background
     targetPin.BackgroundTransparency = 0.35
     targetPin.BorderSizePixel = 0
-    targetPin.Active = true
+    targetPin.Active = false -- Click Passthrough: Tidak menyerap klik, langsung tembus ke game
     targetPin.ZIndex = 50
     targetPin.Parent = screenGui
     self.TargetPin = targetPin
@@ -512,16 +741,12 @@ function BeRebelGui:Create()
     chV.ZIndex = 49
     chV.Parent = targetPin
 
-    -- Dragging Target Pin (Touch & Mouse Support)
+    -- Dragging Target Pin (Pixel-Perfect Cursor / Touch Center Tracking)
     local pinDragging = false
-    local pinDragStart = Vector3.zero
-    local pinStartPos = UDim2.new()
 
     local connPinStart = targetPin.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             pinDragging = true
-            pinDragStart = input.Position
-            pinStartPos = targetPin.Position
 
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -534,13 +759,9 @@ function BeRebelGui:Create()
 
     local connDragPin = UserInputService.InputChanged:Connect(function(input)
         if pinDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - pinDragStart
-            local newX = pinStartPos.X.Offset + delta.X
-            local newY = pinStartPos.Y.Offset + delta.Y
-            
             local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-            newX = math.clamp(newX, pinSize / 2, camVp.X - (pinSize / 2))
-            newY = math.clamp(newY, pinSize / 2, camVp.Y - (pinSize / 2))
+            local newX = math.clamp(input.Position.X, pinSize / 2, camVp.X - (pinSize / 2))
+            local newY = math.clamp(input.Position.Y, pinSize / 2, camVp.Y - (pinSize / 2))
 
             targetPin.Position = UDim2.new(0, newX, 0, newY)
             State.TargetPosition = Vector2.new(newX, newY)
@@ -601,13 +822,6 @@ function BeRebelGui:Create()
     mainStroke.Color = theme.Border
     mainStroke.Thickness = 1.2
     mainStroke.Parent = mainFrame
-
-    -- Tombol MENU membuka/menutup MainWindow
-    mobileBtn.MouseButton1Click:Connect(function()
-        if not mbHasMoved then
-            mainFrame.Visible = not mainFrame.Visible
-        end
-    end)
 
     -- Logika Dragging MainWindow (Header & Frame Drag)
     local winDragging, winDragInput, winDragStart, winStartPos
@@ -670,7 +884,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.0"
+    titleLabel.Text = Config.UI.Title .. " v3.1"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -690,32 +904,15 @@ function BeRebelGui:Create()
     subtitleLabel.ZIndex = 62
     subtitleLabel.Parent = header
 
-    -- Tombol Close X
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Name = "CloseButton"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -74, 0, 9)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.fromRGB(240, 90, 90)
-    closeBtn.TextSize = 13
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.ZIndex = 62
-    closeBtn.Parent = header
+    -- ========================================================
+    -- SWAPPED HEADER BUTTONS: [ MAXIMIZE □ ] (LEFT) & [ EXIT X ] (RIGHT)
+    -- ========================================================
 
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 6)
-    closeCorner.Parent = closeBtn
-
-    closeBtn.MouseButton1Click:Connect(function()
-        mainFrame.Visible = false
-    end)
-
-    -- Tombol Maximize / Perbesar Tampilan (□ / ❐)
+    -- 1. Tombol Maximize / Perbesar Tampilan (□ / ❐) -> Posisi KIRI (-74)
     local maxBtn = Instance.new("TextButton")
     maxBtn.Name = "MaximizeButton"
     maxBtn.Size = UDim2.new(0, 30, 0, 30)
-    maxBtn.Position = UDim2.new(1, -38, 0, 9)
+    maxBtn.Position = UDim2.new(1, -74, 0, 9)
     maxBtn.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
     maxBtn.Text = "□"
     maxBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
@@ -748,6 +945,27 @@ function BeRebelGui:Create()
             maxBtn.Text = "□"
             maxBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
         end
+    end)
+
+    -- 2. Tombol Close X -> Posisi KANAN (-38)
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "CloseButton"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -38, 0, 9)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(240, 90, 90)
+    closeBtn.TextSize = 13
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.ZIndex = 62
+    closeBtn.Parent = header
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeBtn
+
+    closeBtn.MouseButton1Click:Connect(function()
+        mainFrame.Visible = false
     end)
 
     -- ========================================================
@@ -1051,7 +1269,7 @@ function BeRebelGui:Create()
     -- ========================================================
     local clickerPage = self.Tabs["Clicker"]
 
-    -- Hero Control Card: Play / Pause
+    -- Hero Control Card: Play / Pause Sync Status
     local heroCard = Instance.new("Frame")
     heroCard.Size = UDim2.new(1, -4, 0, 64)
     heroCard.BackgroundColor3 = theme.CardBg
@@ -1191,15 +1409,59 @@ function BeRebelGui:Create()
     )
 
     -- ========================================================
-    -- TAB 2: 🏃 LOCAL PLAYER (FRONTEND READY UNTUK EKSPANSI)
+    -- TAB 2: 🏃 LOCAL PLAYER (ACTIVE MOVEMENT ENGINE BODOAMAT)
     -- ========================================================
     local movementPage = self.Tabs["Movement"]
 
-    createSectionHeader(movementPage, "KECEPATAN & PERGERAKAN KARAKTER")
-    createToggleCard(movementPage, "Infinite Jump", "Lompat bebas di udara tanpa menyentuh tanah.", false, function(v) end)
-    createToggleCard(movementPage, "Water Walk (Jesus Walk)", "Berjalan di atas permukaan air tanpa tenggelam.", false, function(v) end)
-    createInputCard(movementPage, "Kustom WalkSpeed", "Kecepatan jalan karakter (Default Roblox: 16).", "16", "Contoh: 32", function(t) end)
-    createInputCard(movementPage, "Kustom JumpPower", "Tinggi lompatan karakter (Default Roblox: 50).", "50", "Contoh: 80", function(t) end)
+    createSectionHeader(movementPage, "PERGERAKAN & LOMPATAN (BODOAMAT v3.0)")
+    
+    createToggleCard(
+        movementPage,
+        "Walk On Water (Jesus Walk)",
+        "Berjalan di atas permukaan air laut tanpa tenggelam.",
+        MovementModule.IsWaterWalk,
+        function(val)
+            MovementModule:SetWaterWalk(val)
+        end
+    )
+
+    createToggleCard(
+        movementPage,
+        "Infinite Jump",
+        "Lompat bebas di udara tanpa menyentuh tanah.",
+        MovementModule.IsInfJump,
+        function(val)
+            MovementModule:SetInfiniteJump(val)
+        end
+    )
+
+    createInputCard(
+        movementPage,
+        "Kustom WalkSpeed",
+        "Kecepatan jalan karakter (Default: 16, Maks: 150).",
+        tostring(MovementModule.WalkSpeed),
+        "Contoh: 32",
+        function(text)
+            local num = tonumber(text)
+            if num then
+                MovementModule:SetWalkSpeed(num)
+            end
+        end
+    )
+
+    createInputCard(
+        movementPage,
+        "Kustom JumpPower",
+        "Kekuatan lompatan karakter (Default: 50, Maks: 250).",
+        tostring(MovementModule.JumpPower),
+        "Contoh: 100",
+        function(text)
+            local num = tonumber(text)
+            if num then
+                MovementModule:SetJumpPower(num)
+            end
+        end
+    )
 
     -- ========================================================
     -- TAB 3: 💰 AUTO SELLING (FRONTEND READY UNTUK EKSPANSI)
@@ -1268,10 +1530,14 @@ function BeRebelGui:Create()
                 "• <b>Interval Aktif:</b> <font color='#00d2ff'>%d ms</font> (Hold: %d ms)\n" ..
                 "• <b>Ritme Manusia:</b> %s\n" ..
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
+                "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>Bodoamat UI/UX Engine v3.0</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.1</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
-                State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y), elapsed
+                State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
+                MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
+                MovementModule.IsInfJump and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
+                elapsed
             )
             task.wait(0.5)
         end
@@ -1303,6 +1569,7 @@ end
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
 function BeRebelGui:Destroy()
     ClickEngine:Stop()
+    MovementModule:Cleanup()
 
     for _, conn in ipairs(self.Connections) do
         pcall(function() conn:Disconnect() end)
@@ -1327,6 +1594,7 @@ BeRebelGui:Create()
 
 return {
     ClickEngine = ClickEngine,
+    MovementModule = MovementModule,
     State = State,
     BeRebelGui = BeRebelGui,
 }
