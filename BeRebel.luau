@@ -1,11 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.2 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.3 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-6226/6225/6223/92210)     ║
-    ║       Hardware Input Lifecycle: Event Sync clickCount=0         ║
+    ║       BAC Stealth Immunity (Bebas BAC-9223/6226/6225/6223/92210)║
+    ║       Hardware Input Lifecycle: Target nil/ws + Multi-Frame Hold║
     ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
@@ -62,7 +62,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.2",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.3",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -82,7 +82,7 @@ local Config = {
     },
     Clicker = {
         DefaultInterval = 1000,   -- 1000 ms (1 Detik per klik)
-        DefaultHold = 30,         -- 30 ms press duration (natural human tap)
+        DefaultHold = 45,         -- 45 ms press duration (natural human multi-frame tap)
         Humanize = true,          -- Anti-bot timing & coordinate jitter
         JitterMs = 45,            -- ±45 ms
         JitterPx = 10,            -- ±10 pixel natural touch dispersion
@@ -336,9 +336,9 @@ local ClickEngine = {
     PulseCallback = nil :: (() -> ())?,
 }
 
--- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager clickCount=1 + Full Coordinate Mapping)
+-- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager Target=nil/workspace clickCount=0)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.max(0.025, holdDurationMs / 1000)
+    local holdSec = math.clamp(holdDurationMs / 1000, 0.040, 0.085)
     local executed = false
 
     -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225: Di luar area Topbar Y<65 & Navigasi Sistem)
@@ -348,42 +348,34 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local safeX = math.clamp(x, minX, maxX)
     local safeY = math.clamp(y, minY, maxY)
 
-    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Prioritas Utama: 100% Native & Anti-Cheat Proof)
+    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-9223 & BAC-6226)
+    -- Target = nil / workspace (Bukan 'game' DataModel agar persis hardware input murni)
     if VirtualInputManager then
         local ok = pcall(function()
-            -- Anti BAC-6226: Gunakan clickCount = 0 untuk siklus input resmi engine
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, nil :: any, 0)
             task.wait(holdSec)
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, nil :: any, 0)
         end)
-        if ok then
-            executed = true
+        if not ok then
+            pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, workspace, 0)
+                task.wait(holdSec)
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, workspace, 0)
+            end)
         end
+        executed = true
     end
 
-    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES (Fallback Khusus)
+    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES (Fallback Koordinat Valid)
     if not executed then
         local touchclick = touchclick or (genv and genv.touchclick)
         local tap = tap or (genv and genv.tap)
-        local mouse1press = mouse1press or (genv and genv.mouse1press)
-        local mouse1release = mouse1release or (genv and genv.mouse1release)
-        local mouse1click = mouse1click or (genv and genv.mouse1click)
 
         if touchclick then
             pcall(function() touchclick(safeX, safeY) end)
             executed = true
         elseif tap then
             pcall(function() tap(safeX, safeY) end)
-            executed = true
-        elseif mouse1press and mouse1release then
-            pcall(function()
-                mouse1press()
-                task.wait(holdSec)
-                mouse1release()
-            end)
-            executed = true
-        elseif mouse1click then
-            pcall(function() mouse1click() end)
             executed = true
         end
     end
@@ -414,6 +406,10 @@ function ClickEngine:Start()
             local currentInterval = State.IntervalMs
             local currentHold = State.HoldDurationMs
 
+            local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+            local minX, maxX = 50, math.max(100, camSize.X - 50)
+            local minY, maxY = 65, math.max(120, camSize.Y - 50)
+
             -- 1. GAUSSIAN HUMAN JITTER (Timing & Posisi Alami)
             if State.IsHumanize then
                 local offsetX = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
@@ -421,13 +417,17 @@ function ClickEngine:Start()
                 local offsetMs = math.random(-Config.Clicker.JitterMs, Config.Clicker.JitterMs)
                 local holdOffsetMs = math.random(-4, 6)
                 
-                local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-                local minX, maxX = 50, math.max(100, camSize.X - 50)
-                local minY, maxY = 65, math.max(120, camSize.Y - 50)
                 targetX = math.clamp(targetX + offsetX, minX, maxX)
                 targetY = math.clamp(targetY + offsetY, minY, maxY)
-                currentInterval = math.max(100, currentInterval + offsetMs)
-                currentHold = math.clamp(currentHold + holdOffsetMs, 25, 55)
+                currentInterval = math.max(120, currentInterval + offsetMs)
+                currentHold = math.clamp(currentHold + holdOffsetMs, 40, 85)
+            else
+                -- Micro-drift anti-static pixel tripwire
+                local microX = math.random(-1, 1)
+                local microY = math.random(-1, 1)
+                targetX = math.clamp(targetX + microX, minX, maxX)
+                targetY = math.clamp(targetY + microY, minY, maxY)
+                currentHold = math.clamp(currentHold, 40, 65)
             end
 
             -- Visual Pulse Feedback pada Target Pin
@@ -435,8 +435,8 @@ function ClickEngine:Start()
                 task.spawn(self.PulseCallback)
             end
 
-            -- Durasi hold dinamis (Minimum 25ms untuk simulasi sentuhan natural anti-subframe)
-            local effectiveHold = math.min(currentHold, math.max(25, currentInterval * 0.35))
+            -- Durasi hold dinamis (Minimum 40ms untuk multi-frame engine input)
+            local effectiveHold = math.clamp(currentHold, 40, 85)
 
             -- Eksekusi Klik Nyata pada Layar
             self:ExecuteClick(targetX, targetY, effectiveHold)
@@ -447,10 +447,10 @@ function ClickEngine:Start()
             if State.IsHumanize and (clickCounter >= nextMicroPauseAt) then
                 clickCounter = 0
                 nextMicroPauseAt = math.random(14, 22)
-                local pauseDuration = math.random(140, 260) / 1000
+                local pauseDuration = math.random(180, 320) / 1000
                 task.wait(pauseDuration)
             else
-                local netWait = math.max(0.04, (currentInterval - effectiveHold) / 1000)
+                local netWait = math.max(0.08, (currentInterval - effectiveHold) / 1000)
                 task.wait(netWait)
             end
         end
@@ -1591,7 +1591,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.2</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.3</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
