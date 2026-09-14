@@ -1,10 +1,10 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.1.2 ⚡                           ║
+    ║                       ⚡ BE REBEL v3.2.1 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-10221/2225/8226/2223)     ║
+    ║       BAC Stealth Immunity (Bebas BAC-10229/10221/2225/8226)    ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
@@ -59,7 +59,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.1.2",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.2.1",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -338,13 +338,13 @@ local ClickEngine = {
 
 -- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager clickCount=1 + Full Coordinate Mapping)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.max(0.018, holdDurationMs / 1000)
+    local holdSec = math.max(0.024, holdDurationMs / 1000)
     local executed = false
 
-    -- 1. Validasi & Clamping Koordinat Layar Nyata (Mencegah Flag BAC-2225 dari Koordinat 0,0)
+    -- 1. Validasi & Clamping Koordinat Layar Nyata (Mencegah Flag BAC-2225 / BAC-10229)
     local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-    local safeX = math.clamp(x, 10, math.max(20, camVp.X - 10))
-    local safeY = math.clamp(y, 10, math.max(20, camVp.Y - 10))
+    local safeX = math.clamp(x, 15, math.max(30, camVp.X - 15))
+    local safeY = math.clamp(y, 15, math.max(30, camVp.Y - 15))
 
     -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Prioritas Utama: 100% Native & Anti-Cheat Proof)
     if VirtualInputManager then
@@ -421,13 +421,13 @@ function ClickEngine:Start()
                 local offsetX = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetY = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetMs = math.random(-Config.Clicker.JitterMs, Config.Clicker.JitterMs)
-                local holdOffsetMs = math.random(-6, 8)
+                local holdOffsetMs = math.random(-4, 6)
                 
                 local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-                targetX = math.clamp(targetX + offsetX, 10, camSize.X - 10)
-                targetY = math.clamp(targetY + offsetY, 10, camSize.Y - 10)
-                currentInterval = math.max(65, currentInterval + offsetMs)
-                currentHold = math.clamp(currentHold + holdOffsetMs, 8, 38)
+                targetX = math.clamp(targetX + offsetX, 15, camSize.X - 15)
+                targetY = math.clamp(targetY + offsetY, 15, camSize.Y - 15)
+                currentInterval = math.max(75, currentInterval + offsetMs)
+                currentHold = math.clamp(currentHold + holdOffsetMs, 22, 50)
             end
 
             -- Visual Pulse Feedback pada Target Pin
@@ -435,8 +435,8 @@ function ClickEngine:Start()
                 task.spawn(self.PulseCallback)
             end
 
-            -- Durasi hold dinamis
-            local effectiveHold = math.min(currentHold, math.max(8, currentInterval * 0.35))
+            -- Durasi hold dinamis (Minimum 24ms untuk simulasi sentuhan natural anti-subframe)
+            local effectiveHold = math.min(currentHold, math.max(24, currentInterval * 0.35))
 
             -- Eksekusi Klik Nyata pada Layar
             self:ExecuteClick(targetX, targetY, effectiveHold)
@@ -723,7 +723,7 @@ function BeRebelGui:Create()
     targetPin.BackgroundColor3 = theme.Background
     targetPin.BackgroundTransparency = 0.35
     targetPin.BorderSizePixel = 0
-    targetPin.Active = true
+    targetPin.Active = false -- Clicks pass through directly to 3D game tools (Anti BAC-10229)
     targetPin.ZIndex = 50
     targetPin.Parent = screenGui
     self.TargetPin = targetPin
