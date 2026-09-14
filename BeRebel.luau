@@ -319,17 +319,29 @@ function ClickEngine:Toggle()
 end
 
 local function getSafeGuiContainer(): Instance
-    -- 1. Prioritas Utama: gethui() (Executor Isolated UI - 100% bebas tripwire BAC-10226 & BAC-1228)
-    local gethui = gethui or (getfenv and getfenv().gethui) or (genv and genv.gethui)
+    -- 1. Prioritas Utama: gethui() (Executor Hidden UI - 100% aman & terisolasi dari BAC-6228)
     if gethui then
         local ok, hui = pcall(gethui)
         if ok and hui and typeof(hui) == "Instance" then
             return hui
         end
     end
+    if getfenv and getfenv().gethui then
+        local ok, hui = pcall(getfenv().gethui)
+        if ok and hui and typeof(hui) == "Instance" then
+            return hui
+        end
+    end
+    local genv = (getgenv and getgenv()) or {}
+    if genv.gethui then
+        local ok, hui = pcall(genv.gethui)
+        if ok and hui and typeof(hui) == "Instance" then
+            return hui
+        end
+    end
 
-    -- 2. Fallback Aman: PlayerGui (TIDAK PERNAH menyentuh CoreGui untuk mencegah tripwire BAC-10226 & BAC-6228)
-    return LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
+    -- 2. Fallback aman ke PlayerGui (TIDAK PERNAH MENYENTUH CoreGui untuk mencegah tripwire BAC-6228)
+    return LocalPlayer:WaitForChild("PlayerGui")
 end
 
 -- ====================================================================
@@ -341,30 +353,34 @@ local BeRebelGui = {
 }
 
 function BeRebelGui:Create()
-    -- 1. Stealth Parenting & Protection (Mencegah Deteksi BAC-10226, BAC-1228, BAC-6228)
-    local targetParent = getSafeGuiContainer()
+    -- 1. Bersihkan sisa GUI lama dari container jika ada
+    pcall(function()
+        local container = getSafeGuiContainer()
+        if container then
+            local oldHud = container:FindFirstChild("FishItHUD")
+            if oldHud then oldHud:Destroy() end
+        end
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg then
+            local oldHud = pg:FindFirstChild("FishItHUD")
+            if oldHud then oldHud:Destroy() end
+        end
+    end)
 
+    -- 2. Buat ScreenGui Utama dengan Stealth Container
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "TouchInputBar"
+    screenGui.Name = "FishItHUD"
     screenGui.ResetOnSpawn = false
+    screenGui.DisplayOrder = 100000
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.DisplayOrder = 10
-    screenGui.Enabled = true
-    
+
     -- Proteksi syn.protect_gui jika didukung executor
-    local synProtect = (syn and syn.protect_gui) or (genv and genv.syn and genv.syn.protect_gui) or protectgui or (genv and genv.protectgui)
+    local synProtect = (syn and syn.protect_gui) or (genv and genv.syn and genv.syn.protect_gui) or protectgui
     if synProtect then
         pcall(synProtect, screenGui)
     end
-    
-    local parentOk = pcall(function()
-        screenGui.Parent = targetParent
-    end)
-    if not parentOk or not screenGui.Parent then
-        local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
-        screenGui.Parent = playerGui
-    end
 
+    screenGui.Parent = getSafeGuiContainer()
     self.ScreenGui = screenGui
 
     local theme = Config.UI.Theme
