@@ -1,31 +1,34 @@
 --!strict
 --[[
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v1.1 ⚡                         ║
+    ║                        ⚡ BE REBEL v1.2 ⚡                         ║
     ║       Universal Single-Target Precision Auto Clicker for Roblox   ║
     ║       Delta Executor & Mobile Touch Optimized                     ║
-    ║       BAC-8223 Stealth Guard & Zero-Pattern Protection            ║
+    ║       Dual Anti-Cheat Protection: BAC-8223 & BAC-3228 Stealth     ║
     ║       Design Language & Architecture by LuaRebel                  ║
     ╚═══════════════════════════════════════════════════════════════════╝
 
     [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
 
-    [ FITUR UTAMA & PROTEKSI ANTI-CHEAT v1.1 ]:
-    1. 🛡️ BAC-8223 Stealth Guard: Mencegah flag anti-cheat Fish It / Bacon Anti-Cheat
-       dengan simulasi ritme biologis manusia (micro-pause & jitter timing).
-    2. ⏱️ Human Stamina Micro-Pause: Menyisipkan jeda mikro (0.15s - 0.25s) setiap 14-22
+    [ FITUR UTAMA & PROTEKSI ANTI-CHEAT v1.2 ]:
+    1. 🛡️ BAC-3228 Zero-VirtualUser Guard: 100% bebas dari service VirtualUser
+       (CaptureController / ClickButton2 / Button1Down) yang merupakan tripwire BAC.
+    2. 🛡️ BAC-8223 Stealth Guard: Mencegah flag anti-cheat Fish It / Bacon Anti-Cheat
+       dengan simulasi ritme biologis manusia (micro-pause & Gaussian jitter timing).
+    3. ⏱️ Human Stamina Micro-Pause: Menyisipkan jeda mikro (0.15s - 0.25s) setiap 14-22
        klik untuk meniru refleks alami jari manusia (zero-pattern detection).
-    3. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
+    4. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
        titik pusat (bullseye), dan animasi pulse hijau saat klik dieksekusi.
-    4. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
+    5. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
        tombol Play/Pause instan, tombol Settings, tombol Hide/Show Pin, dan Close.
-    5. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset aman (140ms Safe),
+    6. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset aman (140ms Safe),
        durasi hold acak, dan live session statistics.
-    6. 🛡️ Built-in Anti-AFK Protection: Mencegah 20-minute idle disconnect server.
-    7. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
+    7. 🛡️ Safe Non-Intrusive Anti-AFK: Menonaktifkan koneksi Idled event dan simulasi
+       micro-movement tanpa menyentuh VirtualUser sama sekali.
+    8. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
        layar HP (tidak pernah terpotong pada landscape 360p - 720p).
-    8. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
+    9. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
        ke file lokal executor (BeRebel_Config.json) via writefile/readfile.
 ]]
 
@@ -55,7 +58,7 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
 local VirtualInputManager = pcall(function() return game:GetService("VirtualInputManager") end) and game:GetService("VirtualInputManager") or nil
-local VirtualUser = pcall(function() return game:GetService("VirtualUser") end) and game:GetService("VirtualUser") or nil
+-- Catatan BAC-3228: VirtualUser service DIHAPUS TOTAL karena merupakan tripwire deteksi Bacon Anti-Cheat!
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local CurrentCamera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
@@ -67,7 +70,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Anti BAC-8223 Stealth Auto Clicker v1.1",
+        Subtitle = "Dual Anti-BAC (8223 & 3228) Stealth Clicker v1.2",
         ToggleKey = Enum.KeyCode.F8,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -198,7 +201,7 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local holdSec = math.max(0.005, holdDurationMs / 1000)
     local success = false
 
-    -- METODE 1: VirtualInputManager (Resmi Roblox Engine, paling presisi)
+    -- METODE 1: VirtualInputManager (Resmi Roblox Engine, paling aman dari deteksi)
     if VirtualInputManager then
         local ok = pcall(function()
             VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
@@ -208,11 +211,12 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
         if ok then success = true end
     end
 
-    -- METODE 2: Executor Native C-Closures (Fallback jika VIM dibatasi)
+    -- METODE 2: Executor Native C-Closures (Fallback aman tanpa VirtualUser)
     if not success then
         local mouse1press = mouse1press or (genv and genv.mouse1press)
         local mouse1release = mouse1release or (genv and genv.mouse1release)
         local mousemoveabs = mousemoveabs or (genv and genv.mousemoveabs)
+        local mouse1click = mouse1click or (genv and genv.mouse1click)
 
         if mouse1press and mouse1release then
             pcall(function()
@@ -222,19 +226,17 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
                 mouse1release()
             end)
             success = true
+        elseif mouse1click then
+            pcall(function()
+                if mousemoveabs then mousemoveabs(x, y) end
+                mouse1click()
+            end)
+            success = true
         end
     end
 
-    -- METODE 3: VirtualUser (Fallback klasik engine)
-    if not success and VirtualUser then
-        pcall(function()
-            VirtualUser:CaptureController()
-            VirtualUser:Button1Down(Vector2.new(x, y))
-            task.wait(holdSec)
-            VirtualUser:Button1Up(Vector2.new(x, y))
-        end)
-        success = true
-    end
+    -- CATATAN ANTI-CHEAT (BAC-3228):
+    -- Metode VirtualUser:CaptureController() DIHAPUS TOTAL untuk menghindari deteksi BAC-3228.
 
     return success
 end
@@ -353,12 +355,29 @@ function BeRebelGui:Create()
     local vp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
     State.TargetPosition = Vector2.new(math.floor(vp.X / 2), math.floor(vp.Y / 2))
 
-    -- 2. 🛡️ BUILT-IN ANTI-AFK HOOK (Mencegah 20-Menit Disconnect Kick)
+    -- 2. 🛡️ BUILT-IN ANTI-AFK HOOK (BAC-3228 Safe / Zero-VirtualUser)
+    -- Matikan listener Idled client-side agar Roblox tidak pernah memunculkan dialog 20-menit AFK
+    local getconnections = getconnections or (genv and genv.getconnections)
+    if getconnections then
+        pcall(function()
+            for _, conn in ipairs(getconnections(LocalPlayer.Idled)) do
+                if type(conn) == "table" or typeof(conn) == "RBXScriptConnection" then
+                    if (conn :: any).Disable then
+                        (conn :: any):Disable()
+                    elseif (conn :: any).Disconnect then
+                        (conn :: any):Disconnect()
+                    end
+                end
+            end
+        end)
+    end
+
+    -- Fallback non-intrusive activity simulator (tanpa memanggil VirtualUser)
     local idledConn = LocalPlayer.Idled:Connect(function()
         pcall(function()
-            if VirtualUser then
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.zero)
+            if VirtualInputManager then
+                local vpCenter = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(640, 360)
+                VirtualInputManager:SendMouseMoveEvent(math.floor(vpCenter.X / 2) + math.random(-2, 2), math.floor(vpCenter.Y / 2) + math.random(-2, 2), game)
             end
         end)
     end)
@@ -1007,8 +1026,8 @@ function BeRebelGui:Create()
         end
     end)
 
-    -- 3. SECTION: ANTI-DETECTION (BAC-8223 GUARD)
-    createSectionHeader("ANTI-DETECTION & BAC-8223 GUARD")
+    -- 3. SECTION: ANTI-DETECTION (BAC-8223 & BAC-3228 GUARD)
+    createSectionHeader("ANTI-DETECTION & BAC GUARD (8223 / 3228)")
 
     local jitterCard = Instance.new("Frame")
     jitterCard.Size = UDim2.new(1, 0, 0, 52)
@@ -1025,7 +1044,7 @@ function BeRebelGui:Create()
     jtTitle.Size = UDim2.new(1, -70, 0, 18)
     jtTitle.Position = UDim2.new(0, 10, 0, 6)
     jtTitle.BackgroundTransparency = 1
-    jtTitle.Text = "BAC-8223 Stealth Guard"
+    jtTitle.Text = "Dual BAC Stealth Guard"
     jtTitle.TextColor3 = theme.Text
     jtTitle.TextSize = 11
     jtTitle.Font = Enum.Font.GothamBold
@@ -1105,8 +1124,8 @@ function BeRebelGui:Create()
                 "• <b>Status:</b> <font color='%s'>%s</font>\n" ..
                 "• <b>Total Klik Terkirim:</b> <font color='#00d2ff'>%d</font>\n" ..
                 "• <b>Interval:</b> <font color='#00d2ff'>%d ms</font> (Hold: %d ms)\n" ..
-                "• <b>BAC-8223 Guard:</b> %s\n" ..
-                "• <b>Anti-AFK Protection:</b> <font color='#2ecc71'>Aktif (Idle Safe)</font>\n" ..
+                "• <b>BAC Guard:</b> %s (Zero-VirtualUser)\n" ..
+                "• <b>Anti-AFK Protection:</b> <font color='#2ecc71'>Aktif (BAC-3228 Safe)</font>\n" ..
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Durasi Sesi Script:</b> %s",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs, State.HoldDurationMs,
@@ -1124,7 +1143,7 @@ function BeRebelGui:Create()
     end)
     table.insert(self.Connections, connKey)
 
-    print("[Be Rebel v1.1] Single Target Auto Clicker dengan BAC-8223 Stealth Guard berhasil dimuat!")
+    print("[Be Rebel v1.2] Single Target Auto Clicker dengan Dual BAC (8223 & 3228) Stealth Guard berhasil dimuat!")
 end
 
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
@@ -1143,7 +1162,7 @@ function BeRebelGui:Destroy()
 
     genv.__BE_REBEL_LOADED = nil
     genv.__BE_REBEL_CLEANUP = nil
-    print("[Be Rebel v1.1] Berhasil ditutup dan dibersihkan dari memori.")
+    print("[Be Rebel v1.2] Berhasil ditutup dan dibersihkan dari memori.")
 end
 
 genv.__BE_REBEL_CLEANUP = function()
