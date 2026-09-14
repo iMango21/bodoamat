@@ -1,36 +1,36 @@
 --!strict
 --[[
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v1.3 ⚡                         ║
+    ║                        ⚡ BE REBEL v1.4 ⚡                         ║
     ║       Universal Single-Target Precision Auto Clicker for Roblox   ║
     ║       Delta Executor & Mobile Touch Optimized                     ║
-    ║       Triple BAC Protection: BAC-8223, BAC-3228 & BAC-92210       ║
-    ║       100% Pure Screen Clicker (No Game Remote Injections)        ║
+    ║       Full BAC Suite Immunity: BAC-8223, 3228, 3229, 92210        ║
+    ║       100% Pure Screen Clicker (Zero-Tampering & Zero-Remotes)    ║
     ║       Design Language & Architecture by LuaRebel                  ║
     ╚═══════════════════════════════════════════════════════════════════╝
 
     [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
 
-    [ FITUR UTAMA & PROTEKSI ANTI-CHEAT v1.3 ]:
-    1. 🛡️ 100% Pure Screen Clicker: Murni mengklik titik layar (X,Y) tanpa pernah
+    [ FITUR UTAMA & PROTEKSI ANTI-CHEAT v1.4 ]:
+    1. 🛡️ BAC-3229 Zero-Tamper Guard: 100% bebas dari manipulasi getconnections(Idled)
+       atau hooking pada LocalPlayer.Idled yang menjadi pemicu notifikasi BAC-3229.
+    2. 🛡️ 100% Pure Screen Clicker: Murni mengklik titik layar (X,Y) tanpa pernah
        menyentuh remote internal game (CastRod, Reel, dll) sehingga kebal ban remote.
-    2. 🛡️ BAC-92210 Pointer Sync: Mengirim event pergerakan kursor (MouseMove) sebelum
+    3. 🛡️ BAC-92210 Pointer Sync: Mengirim event pergerakan kursor (MouseMove) sebelum
        event tombol mouse untuk mencegah deteksi anomali desinkronisasi koordinat pointer.
-    3. 🛡️ BAC-3228 Zero-VirtualUser Guard: 100% bebas dari service VirtualUser
+    4. 🛡️ BAC-3228 Zero-VirtualUser Guard: 100% bebas dari service VirtualUser
        (CaptureController / ClickButton2 / Button1Down) yang menjadi tripwire BAC.
-    4. 🛡️ BAC-8223 Stealth Guard: Mencegah flag anti-cheat Fish It / Bacon Anti-Cheat
+    5. 🛡️ BAC-8223 Stealth Guard: Mencegah flag anti-cheat Fish It / Bacon Anti-Cheat
        dengan simulasi ritme biologis manusia (micro-pause & Gaussian jitter timing).
-    5. ⏱️ Human Stamina Micro-Pause: Menyisipkan jeda mikro (0.15s - 0.25s) setiap 14-22
+    6. ⏱️ Human Stamina Micro-Pause: Menyisipkan jeda mikro (0.15s - 0.25s) setiap 14-22
        klik untuk meniru refleks alami jari manusia (zero-pattern detection).
-    6. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
+    7. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
        titik pusat (bullseye), dan animasi pulse hijau saat klik dieksekusi.
-    7. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
+    8. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
        tombol Play/Pause instan, tombol Settings, tombol Hide/Show Pin, dan Close.
-    8. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset aman (140ms Safe),
+    9. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset aman (140ms Safe, 1s),
        durasi hold acak, dan live session statistics.
-    9. 🛡️ Safe Non-Intrusive Anti-AFK: Menonaktifkan koneksi Idled event dan simulasi
-       micro-movement tanpa menyentuh VirtualUser sama sekali.
     10. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
        layar HP (tidak pernah terpotong pada landscape 360p - 720p).
     11. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
@@ -75,7 +75,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Triple Anti-BAC Stealth Clicker v1.3",
+        Subtitle = "Full BAC Suite Immunity Clicker v1.4",
         ToggleKey = Enum.KeyCode.F8,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -358,34 +358,6 @@ function BeRebelGui:Create()
     local theme = Config.UI.Theme
     local vp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
     State.TargetPosition = Vector2.new(math.floor(vp.X / 2), math.floor(vp.Y / 2))
-
-    -- 2. 🛡️ BUILT-IN ANTI-AFK HOOK (BAC-3228 Safe / Zero-VirtualUser)
-    -- Matikan listener Idled client-side agar Roblox tidak pernah memunculkan dialog 20-menit AFK
-    local getconnections = getconnections or (genv and genv.getconnections)
-    if getconnections then
-        pcall(function()
-            for _, conn in ipairs(getconnections(LocalPlayer.Idled)) do
-                if type(conn) == "table" or typeof(conn) == "RBXScriptConnection" then
-                    if (conn :: any).Disable then
-                        (conn :: any):Disable()
-                    elseif (conn :: any).Disconnect then
-                        (conn :: any):Disconnect()
-                    end
-                end
-            end
-        end)
-    end
-
-    -- Fallback non-intrusive activity simulator (tanpa memanggil VirtualUser)
-    local idledConn = LocalPlayer.Idled:Connect(function()
-        pcall(function()
-            if VirtualInputManager then
-                local vpCenter = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(640, 360)
-                VirtualInputManager:SendMouseMoveEvent(math.floor(vpCenter.X / 2) + math.random(-2, 2), math.floor(vpCenter.Y / 2) + math.random(-2, 2), game)
-            end
-        end)
-    end)
-    table.insert(self.Connections, idledConn)
 
     -- ========================================================
     -- A. SINGLE TARGET PIN MARKER (DRAGGABLE)
@@ -1143,12 +1115,13 @@ function BeRebelGui:Create()
             statText.Text = string.format(
                 "• <b>Status:</b> <font color='%s'>%s</font>\n" ..
                 "• <b>Total Klik Terkirim:</b> <font color='#00d2ff'>%d</font>\n" ..
-                "• <b>Interval:</b> <font color='#00d2ff'>%d ms</font> (Hold: %d ms)\n" ..
-                "• <b>BAC Guard:</b> %s (Zero-VirtualUser)\n" ..
-                "• <b>Anti-AFK Protection:</b> <font color='#2ecc71'>Aktif (BAC-3228 Safe)</font>\n" ..
+                "• <b>Interval:</b> <font color='#00d2ff'>%d ms%s</font> (Hold: %d ms)\n" ..
+                "• <b>BAC Guard:</b> %s\n" ..
+                "• <b>Sistem Proteksi:</b> <font color='#2ecc71'>BAC-3229 Tamper-Free</font>\n" ..
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Durasi Sesi Script:</b> %s",
-                statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs, State.HoldDurationMs,
+                statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
+                State.IntervalMs == 1000 and " [1s]" or "", State.HoldDurationMs,
                 jitterStr, math.floor(pos.X), math.floor(pos.Y), elapsed
             )
             task.wait(0.5)
@@ -1163,7 +1136,7 @@ function BeRebelGui:Create()
     end)
     table.insert(self.Connections, connKey)
 
-    print("[Be Rebel v1.3] Single Target Auto Clicker dengan Triple BAC (8223, 3228, 92210) Stealth Guard berhasil dimuat!")
+    print("[Be Rebel v1.4] Single Target Auto Clicker dengan Full BAC Immunity Suite berhasil dimuat!")
 end
 
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
@@ -1182,7 +1155,7 @@ function BeRebelGui:Destroy()
 
     genv.__BE_REBEL_LOADED = nil
     genv.__BE_REBEL_CLEANUP = nil
-    print("[Be Rebel v1.3] Berhasil ditutup dan dibersihkan dari memori.")
+    print("[Be Rebel v1.4] Berhasil ditutup dan dibersihkan dari memori.")
 end
 
 genv.__BE_REBEL_CLEANUP = function()
