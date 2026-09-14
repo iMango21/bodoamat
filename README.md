@@ -103,9 +103,9 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 ### 7. Antarmuka Minimalis Elegan & Clean Typography (Bebas Icon / Emoji)
 - Tampilan modern bernuansa *Dark-Glassmorphism* tanpa icon/emoji yang mengalihkan perhatian, dirancang simpel namun tetap elegan dengan tipografi bersih (*clean typography*) dan aksen warna tematik.
 - **Ukuran Lega & Tombol Maximize (`[□]` / `[❐]`)**: Ukuran jendela default diperbesar menjadi 640x480 (responsif terhadap layar), dan dilengkapi tombol Maximize di sebelah tombol keluar `(X)` untuk memperbesar tampilan secara instan hingga 880x620.
-- **6 Tab Kontrol Bersih (Local Player Pertama)**:
+- **6 Tab Kontrol Bersih (Local Player Pertama & Auto Selling)**:
   1. *Local Player* (Id: `Movement` - Walk On Water, Infinite Jump, Jump Power)
-  2. *Selling* (Toko, Black Market, Auto-Sell & Auto-Favorite)
+  2. *Auto Selling* (Id: `Selling` - Kartu Auto Selling Atomic Hub, Toko, Black Market, & Auto-Favorite)
   3. *Totem* (Deploy Totem, Oksigen Laut Dalam, Radar, & Cuaca)
   4. *Teleport* (Scanner Pemain & 59 Lokasi Terurut A-Z)
   5. *Optimasi* (GPU Saver & FPS Booster)
@@ -113,11 +113,16 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **Tombol Floating Mobile (`MENU`)**: Badge tombol minimalis elegan bertuliskan `MENU` yang dapat digeser bebas (*touch draggable*) di layar perangkat Android/iOS untuk membuka/menutup antarmuka.
 - **Keybind PC**: Tekan tombol `RightShift` pada keyboard.
 
-### 8. Tab Local Player & Movement (Desain Atomic Hub)
-- Tab pertama di sidebar **Local Player** (Id: `Movement`) mengusung kartu section **MOVEMENT**:
+### 8. Kartu Khusus Bergaya Atomic Hub
+- **Tab Local Player** (Header `MOVEMENT`):
   - `Walk On Water (Jesus Walk)`: Berjalan di atas permukaan air laut tanpa jatuh.
   - `Infinite Jump`: Lompat bebas di udara tanpa batas.
   - `Set Jump Power`: Input box numerik (50 - 250) aman dari tripwire anti-cheat *BAC-7214*.
+- **Tab Auto Selling** (Header `Auto Selling` dengan Tombol Collapsible `^`):
+  - `Selling Type`: Pilihan mode penjualan (`With Limit` atau `All`) dengan tombol toggle selector.
+  - `Enable Auto Selling`: Switch toggle geser modern iOS (dengan Sell Delay default 1 detik).
+  - `Sell Limit`: Input box numerik batas kapasitas tas ikan (default: `1000`).
+  - `Sell Delay (Seconds)`: Input box jeda penjualan dalam detik (default: `1`).
 
 ---
 

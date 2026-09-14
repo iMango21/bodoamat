@@ -87,7 +87,9 @@ local Config = {
     AutoSell = {
         Enabled = false,          -- Default NON-AKTIF
         Interval = 45,            -- Menjual otomatis setiap N detik
-        Threshold = 100,          -- Batas jumlah ikan di tas sebelum dijual (misal: 100 -> jika 101 maka auto-sell)
+        Threshold = 1000,         -- Batas jumlah ikan di tas sebelum dijual (default: 1000)
+        SellDelay = 1,            -- Jeda detik antar siklus auto-sell (default: 1 detik)
+        SellingType = "With Limit", -- Pilihan metode: "With Limit" atau "All"
         AutoFavorite = false,     -- Default NON-AKTIF
         MinRarity = "Legendary",  -- Tingkat kelangkaan minimal yang diamankan (Legendary, Mitos, Secret)
         MerchantSafeTp = false,   -- Default NON-AKTIF
@@ -141,6 +143,9 @@ local State = {
     IsFpsBoost = false,
     IsGpuSaver = false,
     IsAutoSell = false,
+    SellLimit = 1000,
+    SellDelay = 1,
+    SellingType = "With Limit",
     IsAutoFavorite = false,
     MinFavoriteRarity = "Legendary",
 
@@ -774,7 +779,9 @@ local AutoSell = {
     FavoriteThread = nil :: thread?,
     AutoFavoriteEnabled = true, -- Default AKTIF untuk memproteksi ikan bernilai tinggi!
     MinFavoriteRarity = "Legendary", -- Pilihan mulai dari Legendary, Mitos, Secret (Anti BAC-4214)
-    MaxFishThreshold = 100, -- Batas jumlah ikan di tas sebelum dijual (misal: 100 -> jika 101 maka auto-sell)
+    MaxFishThreshold = 1000, -- Batas jumlah ikan di tas sebelum dijual (default: 1000)
+    SellDelay = 1, -- Jeda detik antar siklus auto-sell (default: 1 detik)
+    SellingType = "With Limit", -- Pilihan metode: "With Limit" atau "All"
     FavoritedCache = {} :: { [string]: boolean },
 }
 
@@ -830,11 +837,28 @@ function AutoSell:GetInventoryCount(): number
     return count
 end
 
--- Set batas jumlah ikan sebelum dijual otomatis
+-- Set batas jumlah ikan sebelum dijual otomatis (Sell Limit)
 function AutoSell:SetThreshold(count: number)
     local val = math.max(0, math.floor(count or 0))
     self.MaxFishThreshold = val
-    print(string.format("[Bodoamat | AutoSell] Batas kapasitas ikan diset: %d (otomatis jual saat mencapai %d)", val, val + 1))
+    print(string.format("[Bodoamat | AutoSell] Batas kapasitas ikan diset: %d", val))
+end
+
+-- Set jeda detik penjualan otomatis (Sell Delay)
+function AutoSell:SetSellDelay(seconds: number)
+    local val = math.max(1, math.floor(seconds or 1))
+    self.SellDelay = val
+    print(string.format("[Bodoamat | AutoSell] Jeda penjualan diset: %d detik", val))
+end
+
+-- Set tipe penjualan: "With Limit" atau "All"
+function AutoSell:SetSellingType(stype: string)
+    if stype == "All" then
+        self.SellingType = "All"
+    else
+        self.SellingType = "With Limit"
+    end
+    print(string.format("[Bodoamat | AutoSell] Tipe penjualan diset: %s", self.SellingType))
 end
 
 -- Deteksi status memancing aktif (Anti BAC-6219 Guard)
@@ -1019,35 +1043,41 @@ function AutoSell:Start(interval: number, network: any, state: any, teleportMod:
     local sleepTime = math.max(15, interval or 45)
 
     self.Thread = task.spawn(function()
-        print(string.format("[Bodoamat | AutoSell] Penjualan otomatis aktif (Timer: %ds, Threshold: %d ikan).", sleepTime, self.MaxFishThreshold))
+        print(string.format("[Bodoamat | AutoSell] Penjualan otomatis aktif (Tipe: %s, Delay: %ds, Limit: %d).", self.SellingType, self.SellDelay or 1, self.MaxFishThreshold))
 
         local timerAccumulator = 0
         while self.Running do
-            task.wait(1.5)
+            local delaySec = math.max(1, self.SellDelay or 1)
+            task.wait(delaySec)
             if not self.Running then break end
-            timerAccumulator = timerAccumulator + 1.5
+            timerAccumulator = timerAccumulator + delaySec
 
             local shouldSell = false
 
-            -- Pengecekan Batas Kapasitas Ikan (Threshold)
-            -- Misal: MaxFishThreshold = 100, jika jumlah ikan/item > 100 (misal 101), langsung jual otomatis
-            if self.MaxFishThreshold > 0 then
+            if self.SellingType == "All" then
                 local currentCount = self:GetInventoryCount()
-                if currentCount > self.MaxFishThreshold then
-                    print(string.format("[Bodoamat | AutoSell] Kapasitas tercapai (%d > %d), menjual ikan otomatis...", currentCount, self.MaxFishThreshold))
+                if currentCount > 0 then
                     shouldSell = true
                 end
             else
-                -- Jika threshold diset 0, gunakan interval waktu berkala
-                if timerAccumulator >= sleepTime then
-                    shouldSell = true
+                -- "With Limit"
+                if self.MaxFishThreshold > 0 then
+                    local currentCount = self:GetInventoryCount()
+                    if currentCount >= self.MaxFishThreshold then
+                        print(string.format("[Bodoamat | AutoSell] Limit tercapai (%d >= %d), menjual ikan...", currentCount, self.MaxFishThreshold))
+                        shouldSell = true
+                    end
+                else
+                    if timerAccumulator >= sleepTime then
+                        shouldSell = true
+                    end
                 end
             end
 
             if shouldSell then
                 timerAccumulator = 0
                 self:ExecuteSell(network, state, teleportMod)
-                task.wait(3) -- Cooldown aman mencegah spam jika tas penuh ikan favorit
+                task.wait(math.max(1, self.SellDelay or 1))
             end
         end
     end)
@@ -2273,7 +2303,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
     local tabList = {
         { Id = "Movement", Label = "Local Player" },
-        { Id = "Selling",  Label = "Selling" },
+        { Id = "Selling",  Label = "Auto Selling" },
         { Id = "Totem",    Label = "Totem" },
         { Id = "Teleport", Label = "Teleport" },
         { Id = "Optimasi", Label = "Optimasi" },
@@ -2497,80 +2527,304 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     -- ==========================================
     local sellPage = self.Tabs["Selling"]
 
-    createToggle(sellPage, "Auto Sell Ikan", "Menjual hasil tangkapan otomatis secara berkala atau saat kapasitas tercapai", state.IsAutoSell, function(val)
-        state:Set("IsAutoSell", val)
-        if val then
+    -- ==========================================
+    -- KARTU KHUSUS: AUTO SELLING (ATOMIC HUB STYLE)
+    -- ==========================================
+    local autoSellCard = Instance.new("Frame")
+    autoSellCard.Name = "AutoSellCard"
+    autoSellCard.Size = UDim2.new(1, -4, 0, 0)
+    autoSellCard.AutomaticSize = Enum.AutomaticSize.Y
+    autoSellCard.BackgroundColor3 = config.UI.Theme.CardBg
+    autoSellCard.BorderSizePixel = 0
+    autoSellCard.Parent = sellPage
+
+    local asCorner = Instance.new("UICorner")
+    asCorner.CornerRadius = UDim.new(0, 8)
+    asCorner.Parent = autoSellCard
+
+    local asStroke = Instance.new("UIStroke")
+    asStroke.Color = config.UI.Theme.Border
+    asStroke.Thickness = 1
+    asStroke.Parent = autoSellCard
+
+    local asHeader = Instance.new("Frame")
+    asHeader.Name = "Header"
+    asHeader.Size = UDim2.new(1, 0, 0, 38)
+    asHeader.BackgroundTransparency = 1
+    asHeader.Parent = autoSellCard
+
+    local asHeaderPad = Instance.new("UIPadding")
+    asHeaderPad.PaddingLeft = UDim.new(0, 12)
+    asHeaderPad.PaddingRight = UDim.new(0, 12)
+    asHeaderPad.Parent = asHeader
+
+    local asTitle = Instance.new("TextLabel")
+    asTitle.Size = UDim2.new(1, -30, 1, 0)
+    asTitle.BackgroundTransparency = 1
+    asTitle.Text = "Auto Selling"
+    asTitle.TextColor3 = config.UI.Theme.Text
+    asTitle.TextSize = 13
+    asTitle.Font = Enum.Font.GothamBold
+    asTitle.TextXAlignment = Enum.TextXAlignment.Left
+    asTitle.Parent = asHeader
+
+    local asChevron = Instance.new("TextButton")
+    asChevron.Size = UDim2.new(0, 24, 0, 24)
+    asChevron.Position = UDim2.new(1, -24, 0.5, -12)
+    asChevron.BackgroundTransparency = 1
+    asChevron.Text = "^"
+    asChevron.TextColor3 = config.UI.Theme.TextSubtle
+    asChevron.TextSize = 13
+    asChevron.Font = Enum.Font.GothamBold
+    asChevron.Parent = asHeader
+
+    local asBody = Instance.new("Frame")
+    asBody.Name = "Body"
+    asBody.Size = UDim2.new(1, 0, 0, 0)
+    asBody.Position = UDim2.new(0, 0, 0, 38)
+    asBody.AutomaticSize = Enum.AutomaticSize.Y
+    asBody.BackgroundTransparency = 1
+    asBody.Parent = autoSellCard
+
+    local asBodyLayout = Instance.new("UIListLayout")
+    asBodyLayout.Padding = UDim.new(0, 4)
+    asBodyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    asBodyLayout.Parent = asBody
+
+    local asBodyPad = Instance.new("UIPadding")
+    asBodyPad.PaddingLeft = UDim.new(0, 12)
+    asBodyPad.PaddingRight = UDim.new(0, 12)
+    asBodyPad.PaddingBottom = UDim.new(0, 12)
+    asBodyPad.Parent = asBody
+
+    asChevron.MouseButton1Click:Connect(function()
+        asBody.Visible = not asBody.Visible
+        asChevron.Text = asBody.Visible and "^" or "v"
+    end)
+
+    -- 1. Selling Type
+    local rowType = Instance.new("Frame")
+    rowType.LayoutOrder = 1
+    rowType.Size = UDim2.new(1, 0, 0, 48)
+    rowType.BackgroundTransparency = 1
+    rowType.Parent = asBody
+
+    local rowTypeTitle = Instance.new("TextLabel")
+    rowTypeTitle.Size = UDim2.new(1, -120, 0, 20)
+    rowTypeTitle.Position = UDim2.new(0, 0, 0, 4)
+    rowTypeTitle.BackgroundTransparency = 1
+    rowTypeTitle.Text = "Selling Type"
+    rowTypeTitle.TextColor3 = config.UI.Theme.Text
+    rowTypeTitle.TextSize = 12
+    rowTypeTitle.Font = Enum.Font.GothamBold
+    rowTypeTitle.TextXAlignment = Enum.TextXAlignment.Left
+    rowTypeTitle.Parent = rowType
+
+    local rowTypeSub = Instance.new("TextLabel")
+    rowTypeSub.Size = UDim2.new(1, -120, 0, 16)
+    rowTypeSub.Position = UDim2.new(0, 0, 0, 24)
+    rowTypeSub.BackgroundTransparency = 1
+    rowTypeSub.Text = "Choose how you want to sell your items"
+    rowTypeSub.TextColor3 = config.UI.Theme.TextSubtle
+    rowTypeSub.TextSize = 10
+    rowTypeSub.Font = Enum.Font.Gotham
+    rowTypeSub.TextXAlignment = Enum.TextXAlignment.Left
+    rowTypeSub.Parent = rowType
+
+    local typeBtn = Instance.new("TextButton")
+    typeBtn.Size = UDim2.new(0, 110, 0, 30)
+    typeBtn.Position = UDim2.new(1, -110, 0.5, -15)
+    typeBtn.BackgroundColor3 = Color3.fromRGB(35, 38, 50)
+    typeBtn.Text = (modules.AutoSell.SellingType or "With Limit") .. "  ^"
+    typeBtn.TextColor3 = Color3.fromRGB(230, 235, 245)
+    typeBtn.TextSize = 11
+    typeBtn.Font = Enum.Font.GothamMedium
+    typeBtn.Parent = rowType
+
+    local typeCorner = Instance.new("UICorner")
+    typeCorner.CornerRadius = UDim.new(0, 6)
+    typeCorner.Parent = typeBtn
+
+    local typeStroke = Instance.new("UIStroke")
+    typeStroke.Color = config.UI.Theme.Border
+    typeStroke.Thickness = 1
+    typeStroke.Parent = typeBtn
+
+    typeBtn.MouseButton1Click:Connect(function()
+        if modules.AutoSell.SellingType == "With Limit" then
+            modules.AutoSell:SetSellingType("All")
+        else
+            modules.AutoSell:SetSellingType("With Limit")
+        end
+        state.SellingType = modules.AutoSell.SellingType
+        typeBtn.Text = modules.AutoSell.SellingType .. "  ^"
+    end)
+
+    -- 2. Enable Auto Selling
+    local rowEnable = Instance.new("Frame")
+    rowEnable.LayoutOrder = 2
+    rowEnable.Size = UDim2.new(1, 0, 0, 42)
+    rowEnable.BackgroundTransparency = 1
+    rowEnable.Parent = asBody
+
+    local rowEnableTitle = Instance.new("TextLabel")
+    rowEnableTitle.Size = UDim2.new(1, -70, 1, 0)
+    rowEnableTitle.BackgroundTransparency = 1
+    rowEnableTitle.Text = "Enable Auto Selling"
+    rowEnableTitle.TextColor3 = config.UI.Theme.Text
+    rowEnableTitle.TextSize = 12
+    rowEnableTitle.Font = Enum.Font.GothamBold
+    rowEnableTitle.TextXAlignment = Enum.TextXAlignment.Left
+    rowEnableTitle.Parent = rowEnable
+
+    local switchTrack = Instance.new("TextButton")
+    switchTrack.Size = UDim2.new(0, 46, 0, 24)
+    switchTrack.Position = UDim2.new(1, -46, 0.5, -12)
+    switchTrack.BackgroundColor3 = state.IsAutoSell and config.UI.Theme.Success or Color3.fromRGB(48, 52, 66)
+    switchTrack.Text = ""
+    switchTrack.AutoButtonColor = false
+    switchTrack.Parent = rowEnable
+
+    local trackCorner = Instance.new("UICorner")
+    trackCorner.CornerRadius = UDim.new(0, 12)
+    trackCorner.Parent = switchTrack
+
+    local switchKnob = Instance.new("Frame")
+    switchKnob.Size = UDim2.new(0, 18, 0, 18)
+    switchKnob.Position = state.IsAutoSell and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+    switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    switchKnob.BorderSizePixel = 0
+    switchKnob.Parent = switchTrack
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(0, 9)
+    knobCorner.Parent = switchKnob
+
+    switchTrack.MouseButton1Click:Connect(function()
+        local newState = not state.IsAutoSell
+        state:Set("IsAutoSell", newState)
+
+        local targetBg = newState and config.UI.Theme.Success or Color3.fromRGB(48, 52, 66)
+        local targetPos = newState and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+
+        pcall(function()
+            local TweenService = game:GetService("TweenService")
+            local tInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            TweenService:Create(switchTrack, tInfo, { BackgroundColor3 = targetBg }):Play()
+            TweenService:Create(switchKnob, tInfo, { Position = targetPos }):Play()
+        end)
+
+        if newState then
             modules.AutoSell:Start(config.AutoSell.Interval, modules.Network, state, modules.Teleport)
         else
             modules.AutoSell:Stop()
         end
     end)
 
-    -- Input Kapasitas Ikan (Threshold Auto-Sell: misal 100 -> jika 101 otomatis jual)
-    local thresholdCard = Instance.new("Frame")
-    thresholdCard.Size = UDim2.new(1, -4, 0, 48)
-    thresholdCard.BackgroundColor3 = config.UI.Theme.CardBg
-    thresholdCard.BorderSizePixel = 0
-    thresholdCard.Parent = sellPage
+    -- 3. Sell Limit
+    local rowLimit = Instance.new("Frame")
+    rowLimit.LayoutOrder = 3
+    rowLimit.Size = UDim2.new(1, 0, 0, 44)
+    rowLimit.BackgroundTransparency = 1
+    rowLimit.Parent = asBody
 
-    local tCorner = Instance.new("UICorner")
-    tCorner.CornerRadius = UDim.new(0, 8)
-    tCorner.Parent = thresholdCard
+    local rowLimitTitle = Instance.new("TextLabel")
+    rowLimitTitle.Size = UDim2.new(1, -120, 1, 0)
+    rowLimitTitle.BackgroundTransparency = 1
+    rowLimitTitle.Text = "Sell Limit"
+    rowLimitTitle.TextColor3 = config.UI.Theme.Text
+    rowLimitTitle.TextSize = 12
+    rowLimitTitle.Font = Enum.Font.GothamBold
+    rowLimitTitle.TextXAlignment = Enum.TextXAlignment.Left
+    rowLimitTitle.Parent = rowLimit
 
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(1, -110, 0, 20)
-    tLabel.Position = UDim2.new(0, 12, 0, 6)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = "Batas Jumlah Ikan (Threshold Auto Sell)"
-    tLabel.TextColor3 = config.UI.Theme.Text
-    tLabel.TextSize = 11
-    tLabel.Font = Enum.Font.GothamBold
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = thresholdCard
+    local limitBox = Instance.new("TextBox")
+    limitBox.Size = UDim2.new(0, 110, 0, 30)
+    limitBox.Position = UDim2.new(1, -110, 0.5, -15)
+    limitBox.BackgroundColor3 = Color3.fromRGB(35, 38, 50)
+    limitBox.BorderSizePixel = 0
+    limitBox.Text = tostring(modules.AutoSell.MaxFishThreshold or (config.AutoSell and config.AutoSell.Threshold) or 1000)
+    limitBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    limitBox.PlaceholderText = "1000"
+    limitBox.PlaceholderColor3 = Color3.fromRGB(130, 135, 150)
+    limitBox.TextSize = 12
+    limitBox.Font = Enum.Font.GothamBold
+    limitBox.ClearTextOnFocus = false
+    limitBox.Parent = rowLimit
 
-    local tSub = Instance.new("TextLabel")
-    tSub.Size = UDim2.new(1, -110, 0, 14)
-    tSub.Position = UDim2.new(0, 12, 0, 26)
-    tSub.BackgroundTransparency = 1
-    tSub.Text = "Contoh: 100 (Ikan ke-101 otomatis terjual)"
-    tSub.TextColor3 = config.UI.Theme.TextSubtle
-    tSub.TextSize = 9
-    tSub.Font = Enum.Font.Gotham
-    tSub.TextXAlignment = Enum.TextXAlignment.Left
-    tSub.Parent = thresholdCard
+    local limitCorner = Instance.new("UICorner")
+    limitCorner.CornerRadius = UDim.new(0, 6)
+    limitCorner.Parent = limitBox
 
-    local tBox = Instance.new("TextBox")
-    tBox.Size = UDim2.new(0, 85, 0, 30)
-    tBox.Position = UDim2.new(1, -97, 0, 9)
-    tBox.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
-    tBox.BorderSizePixel = 0
-    tBox.Text = tostring(modules.AutoSell.MaxFishThreshold or (config.AutoSell and config.AutoSell.Threshold) or 100)
-    tBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tBox.PlaceholderText = "100"
-    tBox.PlaceholderColor3 = Color3.fromRGB(130, 135, 150)
-    tBox.TextSize = 12
-    tBox.Font = Enum.Font.GothamBold
-    tBox.ClearTextOnFocus = false
-    tBox.Parent = thresholdCard
+    local limitStroke = Instance.new("UIStroke")
+    limitStroke.Color = config.UI.Theme.Border
+    limitStroke.Thickness = 1
+    limitStroke.Parent = limitBox
 
-    local tbCorner = Instance.new("UICorner")
-    tbCorner.CornerRadius = UDim.new(0, 6)
-    tbCorner.Parent = tBox
-
-    local tbStroke = Instance.new("UIStroke")
-    tbStroke.Color = config.UI.Theme.Border
-    tbStroke.Thickness = 1
-    tbStroke.Parent = tBox
-
-    tBox.FocusLost:Connect(function()
-        local num = tonumber(tBox.Text)
+    limitBox.FocusLost:Connect(function()
+        local num = tonumber(limitBox.Text)
         if num and num >= 0 then
             num = math.floor(num)
             modules.AutoSell:SetThreshold(num)
             if config.AutoSell then config.AutoSell.Threshold = num end
-            tBox.Text = tostring(num)
+            state.SellLimit = num
+            limitBox.Text = tostring(num)
         else
-            tBox.Text = tostring(modules.AutoSell.MaxFishThreshold)
+            limitBox.Text = tostring(modules.AutoSell.MaxFishThreshold)
+        end
+    end)
+
+    -- 4. Sell Delay (Seconds)
+    local rowDelay = Instance.new("Frame")
+    rowDelay.LayoutOrder = 4
+    rowDelay.Size = UDim2.new(1, 0, 0, 44)
+    rowDelay.BackgroundTransparency = 1
+    rowDelay.Parent = asBody
+
+    local rowDelayTitle = Instance.new("TextLabel")
+    rowDelayTitle.Size = UDim2.new(1, -120, 1, 0)
+    rowDelayTitle.BackgroundTransparency = 1
+    rowDelayTitle.Text = "Sell Delay (Seconds)"
+    rowDelayTitle.TextColor3 = config.UI.Theme.Text
+    rowDelayTitle.TextSize = 12
+    rowDelayTitle.Font = Enum.Font.GothamBold
+    rowDelayTitle.TextXAlignment = Enum.TextXAlignment.Left
+    rowDelayTitle.Parent = rowDelay
+
+    local delayBox = Instance.new("TextBox")
+    delayBox.Size = UDim2.new(0, 110, 0, 30)
+    delayBox.Position = UDim2.new(1, -110, 0.5, -15)
+    delayBox.BackgroundColor3 = Color3.fromRGB(35, 38, 50)
+    delayBox.BorderSizePixel = 0
+    delayBox.Text = tostring(modules.AutoSell.SellDelay or (config.AutoSell and config.AutoSell.SellDelay) or 1)
+    delayBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    delayBox.PlaceholderText = "1"
+    delayBox.PlaceholderColor3 = Color3.fromRGB(130, 135, 150)
+    delayBox.TextSize = 12
+    delayBox.Font = Enum.Font.GothamBold
+    delayBox.ClearTextOnFocus = false
+    delayBox.Parent = rowDelay
+
+    local delayCorner = Instance.new("UICorner")
+    delayCorner.CornerRadius = UDim.new(0, 6)
+    delayCorner.Parent = delayBox
+
+    local delayStroke = Instance.new("UIStroke")
+    delayStroke.Color = config.UI.Theme.Border
+    delayStroke.Thickness = 1
+    delayStroke.Parent = delayBox
+
+    delayBox.FocusLost:Connect(function()
+        local num = tonumber(delayBox.Text)
+        if num and num >= 1 then
+            num = math.floor(num)
+            modules.AutoSell:SetSellDelay(num)
+            if config.AutoSell then config.AutoSell.SellDelay = num end
+            state.SellDelay = num
+            delayBox.Text = tostring(num)
+        else
+            modules.AutoSell:SetSellDelay(1)
+            delayBox.Text = "1"
         end
     end)
 
