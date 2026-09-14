@@ -181,17 +181,29 @@ local ClickEngine = {
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
     local holdSec = math.max(0.005, holdDurationMs / 1000)
     local success = false
+    local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
-    -- METODE 1: VirtualInputManager (Resmi Roblox Engine, Sinkronisasi MouseMove untuk Anti BAC-92210)
+    -- METODE 1: VirtualInputManager (Device-Adaptive Input Simulation)
     if VirtualInputManager then
-        local ok = pcall(function()
-            VirtualInputManager:SendMouseMoveEvent(x, y, game)
-            task.wait(0.002)
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-            task.wait(holdSec)
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        end)
-        if ok then success = true end
+        if isMobile then
+            -- 🛡️ Anti BAC-2226: Kirim Touch Event asli untuk perangkat mobile/touchscreen
+            local okTouch = pcall(function()
+                VirtualInputManager:SendTouchEvent(1, 0, x, y) -- TouchBegan
+                task.wait(holdSec)
+                VirtualInputManager:SendTouchEvent(1, 2, x, y) -- TouchEnded
+            end)
+            if okTouch then success = true end
+        else
+            -- 🛡️ Anti BAC-92210: Sinkronisasi MouseMove untuk PC / Desktop
+            local okMouse = pcall(function()
+                VirtualInputManager:SendMouseMoveEvent(x, y, game)
+                task.wait(0.002)
+                VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+                task.wait(holdSec)
+                VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+            end)
+            if okMouse then success = true end
+        end
     end
 
     -- METODE 2: Executor Native C-Closures (Fallback aman tanpa VirtualUser)
