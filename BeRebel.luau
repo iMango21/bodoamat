@@ -34,14 +34,14 @@ end
 
 -- 2. Proteksi Instance Duplikat (Clean Re-execution Guard)
 local genv = (getgenv and getgenv()) or {}
-if genv.__BE_REBEL_LOADED then
+if genv.__RB_SESSION_ACTIVE then
     pcall(function()
-        if genv.__BE_REBEL_CLEANUP then
-            genv.__BE_REBEL_CLEANUP()
+        if genv.__RB_SESSION_CLEANUP then
+            genv.__RB_SESSION_CLEANUP()
         end
     end)
 end
-genv.__BE_REBEL_LOADED = true
+genv.__RB_SESSION_ACTIVE = true
 
 -- ====================================================================
 -- GLOBAL SERVICES & ENGINE SHORTCUTS
@@ -319,7 +319,7 @@ function ClickEngine:Toggle()
 end
 
 local function getSafeGuiContainer(): Instance
-    -- 1. Prioritas 1: gethui() (Executor Hidden UI - 100% terisolasi dari ChildAdded scanner BAC-1228)
+    -- 1. Prioritas Utama: gethui() (Executor Isolated UI - 100% bebas tripwire BAC-10226 & BAC-1228)
     local gethui = gethui or (getfenv and getfenv().gethui) or (genv and genv.gethui)
     if gethui then
         local ok, hui = pcall(gethui)
@@ -328,36 +328,43 @@ local function getSafeGuiContainer(): Instance
         end
     end
 
-    -- 2. Prioritas 2: CoreGui dengan protectgui
-    local protectgui = protectgui or (syn and syn.protect_gui) or (genv and genv.protectgui)
-    local okCg, cg = pcall(function() return game:GetService("CoreGui") end)
-    if okCg and cg and protectgui then
-        return cg
-    end
-
-    -- 3. Fallback: PlayerGui
+    -- 2. Fallback Aman: PlayerGui (TIDAK PERNAH menyentuh CoreGui untuk mencegah tripwire BAC-10226 & BAC-6228)
     return LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
 end
 
+-- ====================================================================
+-- USER INTERFACE (LUA REBEL DARK-GLASSMORPHISM)
+-- ====================================================================
+local BeRebelGui = {
+    ScreenGui = nil :: ScreenGui?,
+    Connections = {} :: { any },
+}
+
 function BeRebelGui:Create()
-    -- 1. Stealth Parenting & Protection (Mencegah Deteksi BAC-1228 & BAC-6228)
+    -- 1. Stealth Parenting & Protection (Mencegah Deteksi BAC-10226, BAC-1228, BAC-6228)
     local targetParent = getSafeGuiContainer()
 
     local screenGui = Instance.new("ScreenGui")
-    
-    -- Proteksi GUI jika didukung oleh executor
-    local protectgui = protectgui or (syn and syn.protect_gui) or (genv and genv.protectgui)
-    if protectgui then
-        pcall(protectgui, screenGui)
-    end
-
-    -- Nama acak GUID untuk mencegah scanner string nama UI
-    local okGuid, randomName = pcall(function() return HttpService:GenerateGUID(false):gsub("-", ""):sub(1, 12) end)
-    screenGui.Name = (okGuid and randomName) or "RobloxGui"
+    screenGui.Name = "TouchInputBar"
     screenGui.ResetOnSpawn = false
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.DisplayOrder = 999
-    screenGui.Parent = targetParent
+    screenGui.DisplayOrder = 10
+    screenGui.Enabled = true
+    
+    -- Proteksi syn.protect_gui jika didukung executor
+    local synProtect = (syn and syn.protect_gui) or (genv and genv.syn and genv.syn.protect_gui) or protectgui or (genv and genv.protectgui)
+    if synProtect then
+        pcall(synProtect, screenGui)
+    end
+    
+    local parentOk = pcall(function()
+        screenGui.Parent = targetParent
+    end)
+    if not parentOk or not screenGui.Parent then
+        local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
+        screenGui.Parent = playerGui
+    end
+
     self.ScreenGui = screenGui
 
     local theme = Config.UI.Theme
@@ -1069,8 +1076,6 @@ function BeRebelGui:Create()
         end
     end)
     table.insert(self.Connections, connKey)
-
-    print("[Be Rebel v2.2] Precision Tap Assistant (1s Default) berhasil dimuat!")
 end
 
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
@@ -1087,12 +1092,11 @@ function BeRebelGui:Destroy()
         self.ScreenGui = nil
     end
 
-    genv.__BE_REBEL_LOADED = nil
-    genv.__BE_REBEL_CLEANUP = nil
-    print("[Be Rebel v2.2] Berhasil ditutup dan dibersihkan dari memori.")
+    genv.__RB_SESSION_ACTIVE = nil
+    genv.__RB_SESSION_CLEANUP = nil
 end
 
-genv.__BE_REBEL_CLEANUP = function()
+genv.__RB_SESSION_CLEANUP = function()
     BeRebelGui:Destroy()
 end
 
