@@ -1,10 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.4.0 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.4.1 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-9223/5228/5227/6228/7227) ║
+    ║       BAC Stealth Immunity (Bebas BAC-7229/9223/5228/5227/6228) ║
+    ║       Humanoid State Guard: Safe Jump Buffer (Anti BAC-7229)    ║
     ║       Hardware Input Lifecycle: Down (count=0) -> Up (count=0)  ║
     ║       Zero Camera/CoreGui Tamper: Clean Viewport & gethui()     ║
     ║       DisplayOrder Normalization: Standard UI Layer (Order=10)  ║
@@ -64,7 +65,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.0",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.1",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -251,7 +252,7 @@ function MovementModule:SetWaterWalk(enabled: boolean)
     end
 end
 
--- 2. Infinite Jump (Bodoamat Clean Implementation - Bebas BAC-7227 Physics Flag)
+-- 2. Infinite Jump (Bodoamat Clean Implementation - Bebas BAC-7227 & Anti BAC-7229 State Flag)
 function MovementModule:SetInfiniteJump(enabled: boolean)
     if self.IsInfJump == enabled then return end
     self.IsInfJump = enabled
@@ -266,7 +267,9 @@ function MovementModule:SetInfiniteJump(enabled: boolean)
                     if char then
                         local hum = char:FindFirstChildOfClass("Humanoid")
                         if hum and hum.Health > 0 then
-                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                            -- Anti BAC-7229: Jangan pernah paksa ChangeState(Jumping) saat Freefall di udara
+                            -- Gunakan hum.Jump = true (Engine Native Auto-Jump Buffer yang legal dan aman)
+                            hum.Jump = true
                         end
                     end
                 end)
@@ -287,7 +290,10 @@ function MovementModule:SetJumpPower(power: number)
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.JumpPower = self.JumpPower end
+        if hum then
+            hum.UseJumpPower = true
+            hum.JumpPower = self.JumpPower
+        end
     end
 end
 
@@ -928,7 +934,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.4.0"
+    titleLabel.Text = Config.UI.Title .. " v3.4.1"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1584,7 +1590,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.0</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.1</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
