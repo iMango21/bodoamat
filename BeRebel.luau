@@ -1,10 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.2.1 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.2.2 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-10229/10221/2225/8226)    ║
+    ║       BAC Stealth Immunity (Bebas BAC-92210/10229/10221/2225)   ║
+    ║       Pointer Sync: SendMouseMoveEvent Sebelum ButtonDown       ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
@@ -59,7 +60,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.2.1",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.2.2",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -346,9 +347,18 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local safeX = math.clamp(x, 15, math.max(30, camVp.X - 15))
     local safeY = math.clamp(y, 15, math.max(30, camVp.Y - 15))
 
+    -- 2. Sinkronisasi Kursor Layar Executor (Fallback Driver)
+    local mousemoveabs = mousemoveabs or (genv and genv.mousemoveabs) or (genv and genv.movemouseabs) or (genv and genv.mouseto)
+    if mousemoveabs then
+        pcall(function() mousemoveabs(safeX, safeY) end)
+    end
+
     -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Prioritas Utama: 100% Native & Anti-Cheat Proof)
     if VirtualInputManager then
         local ok = pcall(function()
+            -- Anti BAC-92210: Sinkronisasi posisi pointer kursor engine terlebih dahulu sebelum tombol ditekan
+            VirtualInputManager:SendMouseMoveEvent(safeX, safeY, game)
+            task.wait(0.004)
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 1)
             task.wait(holdSec)
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 1)
@@ -933,7 +943,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.2"
+    titleLabel.Text = Config.UI.Title .. " v3.2.2"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1589,7 +1599,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.2</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.2.2</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
