@@ -1,11 +1,10 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.2.2 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.0 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-92210/10229/10221/2225)   ║
-    ║       Pointer Sync: SendMouseMoveEvent Sebelum ButtonDown       ║
+    ║       BAC Stealth Immunity (Bebas BAC-6223/92210/10229/10221)   ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
@@ -60,7 +59,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.2.2",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.0",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -80,10 +79,10 @@ local Config = {
     },
     Clicker = {
         DefaultInterval = 1000,   -- 1000 ms (1 Detik per klik)
-        DefaultHold = 28,         -- 28 ms press duration
+        DefaultHold = 30,         -- 30 ms press duration (natural human tap)
         Humanize = true,          -- Anti-bot timing & coordinate jitter
-        JitterMs = 32,            -- ±32 ms
-        JitterPx = 3,             -- ±3 pixel offset
+        JitterMs = 45,            -- ±45 ms
+        JitterPx = 10,            -- ±10 pixel natural touch dispersion
     }
 }
 
@@ -339,7 +338,7 @@ local ClickEngine = {
 
 -- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager clickCount=1 + Full Coordinate Mapping)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.max(0.024, holdDurationMs / 1000)
+    local holdSec = math.max(0.025, holdDurationMs / 1000)
     local executed = false
 
     -- 1. Validasi & Clamping Koordinat Layar Nyata (Mencegah Flag BAC-2225 / BAC-10229)
@@ -347,18 +346,9 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local safeX = math.clamp(x, 15, math.max(30, camVp.X - 15))
     local safeY = math.clamp(y, 15, math.max(30, camVp.Y - 15))
 
-    -- 2. Sinkronisasi Kursor Layar Executor (Fallback Driver)
-    local mousemoveabs = mousemoveabs or (genv and genv.mousemoveabs) or (genv and genv.movemouseabs) or (genv and genv.mouseto)
-    if mousemoveabs then
-        pcall(function() mousemoveabs(safeX, safeY) end)
-    end
-
     -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Prioritas Utama: 100% Native & Anti-Cheat Proof)
     if VirtualInputManager then
         local ok = pcall(function()
-            -- Anti BAC-92210: Sinkronisasi posisi pointer kursor engine terlebih dahulu sebelum tombol ditekan
-            VirtualInputManager:SendMouseMoveEvent(safeX, safeY, game)
-            task.wait(0.004)
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 1)
             task.wait(holdSec)
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 1)
@@ -436,8 +426,8 @@ function ClickEngine:Start()
                 local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
                 targetX = math.clamp(targetX + offsetX, 15, camSize.X - 15)
                 targetY = math.clamp(targetY + offsetY, 15, camSize.Y - 15)
-                currentInterval = math.max(75, currentInterval + offsetMs)
-                currentHold = math.clamp(currentHold + holdOffsetMs, 22, 50)
+                currentInterval = math.max(100, currentInterval + offsetMs)
+                currentHold = math.clamp(currentHold + holdOffsetMs, 25, 55)
             end
 
             -- Visual Pulse Feedback pada Target Pin
@@ -445,8 +435,8 @@ function ClickEngine:Start()
                 task.spawn(self.PulseCallback)
             end
 
-            -- Durasi hold dinamis (Minimum 24ms untuk simulasi sentuhan natural anti-subframe)
-            local effectiveHold = math.min(currentHold, math.max(24, currentInterval * 0.35))
+            -- Durasi hold dinamis (Minimum 25ms untuk simulasi sentuhan natural anti-subframe)
+            local effectiveHold = math.min(currentHold, math.max(25, currentInterval * 0.35))
 
             -- Eksekusi Klik Nyata pada Layar
             self:ExecuteClick(targetX, targetY, effectiveHold)
@@ -460,7 +450,7 @@ function ClickEngine:Start()
                 local pauseDuration = math.random(140, 260) / 1000
                 task.wait(pauseDuration)
             else
-                local netWait = math.max(0.002, (currentInterval - effectiveHold) / 1000)
+                local netWait = math.max(0.04, (currentInterval - effectiveHold) / 1000)
                 task.wait(netWait)
             end
         end
@@ -943,7 +933,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.2.2"
+    titleLabel.Text = Config.UI.Title .. " v3.3.0"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1599,7 +1589,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.2.2</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.0</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
