@@ -1,10 +1,12 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.4.3 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.4.4 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-2223/3226/7229/9223/5228) ║
+    ║       BAC Stealth Immunity (Bebas BAC-3225/2223/3226/7229/9223) ║
+    ║       Dynamic Viewport Resolver (Zero Stale Camera Viewport)    ║
+    ║       Zero-Interference TargetPin (Passive Drag via UIS)        ║
     ║       Pure VIM Native C++ Lifecycle (Zero Synthetic TouchMoved) ║
     ║       Pure Integer Coordinates (math.floor safeX/safeY)         ║
     ║       Default Human Rhythm: OFF / Mati (Sesuai Preferensi User) ║
@@ -12,7 +14,7 @@
     ║       Hardware Input Lifecycle: Down (count=0) -> Up (count=0)  ║
     ║       Zero Camera/CoreGui Tamper: Clean Viewport & gethui()     ║
     ║       DisplayOrder Normalization: Standard UI Layer (Order=10)  ║
-    ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
+    ║       Safe Inset Guard: Dynamic Clamping di Bawah Topbar (Y≥70) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
@@ -56,7 +58,33 @@ pcall(function()
     VirtualInputManager = game:GetService("VirtualInputManager")
 end)
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local CurrentCamera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
+
+-- Helper Resolver Kamera & Viewport Dinamis (Anti BAC-3225: Mencegah Stale / Dead Camera Viewport)
+local function getLiveCamera(): Camera?
+    local cam = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera")
+    return cam
+end
+
+local function getLiveViewportSize(): Vector2
+    local cam = getLiveCamera()
+    if cam and cam.ViewportSize and cam.ViewportSize.X > 200 and cam.ViewportSize.Y > 200 then
+        return cam.ViewportSize
+    end
+    return Vector2.new(1280, 720)
+end
+
+local function getSafeScreenBounds(): (number, number, number, number)
+    local vp = getLiveViewportSize()
+    local topInset, bottomInset = Vector2.zero, Vector2.zero
+    pcall(function()
+        topInset, bottomInset = GuiService:GetGuiInset()
+    end)
+    local minX = math.max(60, math.floor(topInset.X + 25))
+    local maxX = math.max(minX + 100, math.floor(vp.X - bottomInset.X - 50))
+    local minY = math.max(70, math.floor(topInset.Y + 30))
+    local maxY = math.max(minY + 100, math.floor(vp.Y - bottomInset.Y - 50))
+    return minX, maxX, minY, maxY
+end
 
 -- Forward Declaration untuk GUI Controller
 local BeRebelGui = nil :: any
@@ -68,7 +96,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.3",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.4",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -345,14 +373,12 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local holdSec = math.clamp(holdDurationMs / 1000, 0.045, 0.085)
     local executed = false
 
-    -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225, BAC-3226 & BAC-2223: Integer pixel murni & di luar Topbar Y<65)
-    local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-    local minX, maxX = 50, math.max(100, camVp.X - 50)
-    local minY, maxY = 65, math.max(120, camVp.Y - 50)
+    -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-3225, BAC-6225, BAC-3226 & BAC-2223)
+    local minX, maxX, minY, maxY = getSafeScreenBounds()
     local safeX = math.floor(math.clamp(x, minX, maxX))
     local safeY = math.floor(math.clamp(y, minY, maxY))
 
-    -- ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-2223, BAC-3226, BAC-6226 & BAC-9223)
+    -- ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-2223, BAC-3225, BAC-3226, BAC-6226 & BAC-9223)
     -- Transisi Resmi Standar C++ Engine: Down (count=0) -> Hold -> Up (count=0)
     if VirtualInputManager then
         local ok = pcall(function()
@@ -391,9 +417,7 @@ function ClickEngine:Start()
             local currentInterval = State.IntervalMs
             local currentHold = State.HoldDurationMs
 
-            local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-            local minX, maxX = 50, math.max(100, camSize.X - 50)
-            local minY, maxY = 65, math.max(120, camSize.Y - 50)
+            local minX, maxX, minY, maxY = getSafeScreenBounds()
 
             -- 1. GAUSSIAN HUMAN JITTER (Timing & Posisi Alami)
             if State.IsHumanize then
@@ -417,8 +441,8 @@ function ClickEngine:Start()
                 task.spawn(self.PulseCallback)
             end
 
-            -- Durasi hold dinamis (Minimum 40ms untuk multi-frame engine input)
-            local effectiveHold = math.clamp(currentHold, 40, 85)
+            -- Durasi hold dinamis (Minimum 45ms untuk multi-frame engine input)
+            local effectiveHold = math.clamp(currentHold, 45, 85)
 
             -- Eksekusi Klik Nyata pada Layar
             self:ExecuteClick(targetX, targetY, effectiveHold)
@@ -537,8 +561,11 @@ function BeRebelGui:Create()
     self.ScreenGui = screenGui
 
     local theme = Config.UI.Theme
-    local vp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-    State.TargetPosition = Vector2.new(math.floor(vp.X / 2), math.floor(vp.Y / 2))
+    local vp = getLiveViewportSize()
+    local minBoundX, maxBoundX, minBoundY, maxBoundY = getSafeScreenBounds()
+    local defaultTargetX = math.floor(math.clamp(vp.X * 0.5, minBoundX, maxBoundX))
+    local defaultTargetY = math.floor(math.clamp(vp.Y * 0.55, minBoundY, maxBoundY))
+    State.TargetPosition = Vector2.new(defaultTargetX, defaultTargetY)
 
     -- ========================================================
     -- A. FLOATING DOCK BAR: [ MENU ] + [ ▶ PLAY / ⏸ PAUSE ]
@@ -708,7 +735,9 @@ function BeRebelGui:Create()
     targetPin.BackgroundColor3 = theme.Background
     targetPin.BackgroundTransparency = 0.35
     targetPin.BorderSizePixel = 0
-    targetPin.Active = false -- Clicks pass through directly to 3D game tools (Anti BAC-10229)
+    targetPin.Active = false -- Clicks pass through directly to 3D game tools (Anti BAC-10229 & BAC-3225)
+    pcall(function() (targetPin :: any).Interactable = false end)
+    pcall(function() (targetPin :: any).Selectable = false end)
     targetPin.ZIndex = 50
     targetPin.Parent = screenGui
     self.TargetPin = targetPin
@@ -731,6 +760,7 @@ function BeRebelGui:Create()
     centerDot.BackgroundColor3 = theme.AccentGlow
     centerDot.BorderSizePixel = 0
     centerDot.Active = false
+    pcall(function() (centerDot :: any).Interactable = false end)
     centerDot.ZIndex = 52
     centerDot.Parent = targetPin
 
@@ -746,6 +776,7 @@ function BeRebelGui:Create()
     pinLabel.TextSize = 13
     pinLabel.Font = Enum.Font.GothamBold
     pinLabel.Active = false
+    pcall(function() (pinLabel :: any).Interactable = false end)
     pinLabel.ZIndex = 51
     pinLabel.Parent = targetPin
 
@@ -757,6 +788,7 @@ function BeRebelGui:Create()
     chH.BackgroundTransparency = 0.5
     chH.BorderSizePixel = 0
     chH.Active = false
+    pcall(function() (chH :: any).Interactable = false end)
     chH.ZIndex = 49
     chH.Parent = targetPin
 
@@ -768,32 +800,42 @@ function BeRebelGui:Create()
     chV.BackgroundTransparency = 0.5
     chV.BorderSizePixel = 0
     chV.Active = false
+    pcall(function() (chV :: any).Interactable = false end)
     chV.ZIndex = 49
     chV.Parent = targetPin
 
-    -- Dragging Target Pin (Pixel-Perfect Cursor / Touch Center Tracking)
+    -- Dragging Target Pin via UserInputService (Anti BAC-3225 / BAC-3226: Zero TargetPin.InputBegan Event Leak)
     local pinDragging = false
+    local pinDragInput = nil
 
-    local connPinStart = targetPin.InputBegan:Connect(function(input)
+    local connPinInput = UserInputService.InputBegan:Connect(function(input, processed)
+        -- Jangan geser pin jika auto-clicker sedang aktif atau processed oleh UI modal
+        if State.IsRunning or not State.IsPinVisible then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            pinDragging = true
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    pinDragging = false
-                end
-            end)
+            local touchPos = Vector2.new(input.Position.X, input.Position.Y)
+            local currentPinPos = State.TargetPosition
+            local dist = (touchPos - currentPinPos).Magnitude
+            if dist <= 32 then
+                pinDragging = true
+                pinDragInput = input
+            end
         end
     end)
-    table.insert(self.Connections, connPinStart)
+    table.insert(self.Connections, connPinInput)
+
+    local connDragEnd = UserInputService.InputEnded:Connect(function(input)
+        if input == pinDragInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            pinDragging = false
+            pinDragInput = nil
+        end
+    end)
+    table.insert(self.Connections, connDragEnd)
 
     local connDragPin = UserInputService.InputChanged:Connect(function(input)
-        if pinDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-            local minX, maxX = 50, math.max(100, camVp.X - 50)
-            local minY, maxY = 65, math.max(120, camVp.Y - 50)
-            local newX = math.clamp(input.Position.X, minX, maxX)
-            local newY = math.clamp(input.Position.Y, minY, maxY)
+        if pinDragging and not State.IsRunning and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local minX, maxX, minY, maxY = getSafeScreenBounds()
+            local newX = math.floor(math.clamp(input.Position.X, minX, maxX))
+            local newY = math.floor(math.clamp(input.Position.Y, minY, maxY))
 
             targetPin.Position = UDim2.new(0, newX, 0, newY)
             State.TargetPosition = Vector2.new(newX, newY)
@@ -831,8 +873,9 @@ function BeRebelGui:Create()
     -- ========================================================
     -- C. JENDELA UTAMA HUB (BODOAMAT MAIN WINDOW)
     -- ========================================================
-    local initW = math.min(620, math.max(540, vp.X - 40))
-    local initH = math.min(460, math.max(400, vp.Y - 40))
+    local liveVp = getLiveViewportSize()
+    local initW = math.min(620, math.max(540, liveVp.X - 40))
+    local initH = math.min(460, math.max(400, liveVp.Y - 40))
 
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
@@ -1580,7 +1623,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.3</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.4</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
