@@ -1,39 +1,33 @@
 --!strict
 --[[
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v1.4 ⚡                         ║
-    ║       Universal Single-Target Precision Auto Clicker for Roblox   ║
+    ║                        ⚡ BE REBEL v2.0 ⚡                         ║
+    ║       Universal Pure Single-Target Auto Clicker for Roblox        ║
     ║       Delta Executor & Mobile Touch Optimized                     ║
-    ║       Full BAC Suite Immunity: BAC-8223, 3228, 3229, 92210        ║
-    ║       100% Pure Screen Clicker (Zero-Tampering & Zero-Remotes)    ║
+    ║       100% Pure Screen Input Simulation (Zero Game Injection)     ║
+    ║       Default Interval: 1.0 Detik (1000ms) per Klik               ║
     ║       Design Language & Architecture by LuaRebel                  ║
     ╚═══════════════════════════════════════════════════════════════════╝
 
     [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
 
-    [ FITUR UTAMA & PROTEKSI ANTI-CHEAT v1.4 ]:
-    1. 🛡️ BAC-3229 Zero-Tamper Guard: 100% bebas dari manipulasi getconnections(Idled)
-       atau hooking pada LocalPlayer.Idled yang menjadi pemicu notifikasi BAC-3229.
-    2. 🛡️ 100% Pure Screen Clicker: Murni mengklik titik layar (X,Y) tanpa pernah
-       menyentuh remote internal game (CastRod, Reel, dll) sehingga kebal ban remote.
-    3. 🛡️ BAC-92210 Pointer Sync: Mengirim event pergerakan kursor (MouseMove) sebelum
-       event tombol mouse untuk mencegah deteksi anomali desinkronisasi koordinat pointer.
-    4. 🛡️ BAC-3228 Zero-VirtualUser Guard: 100% bebas dari service VirtualUser
-       (CaptureController / ClickButton2 / Button1Down) yang menjadi tripwire BAC.
-    5. 🛡️ BAC-8223 Stealth Guard: Mencegah flag anti-cheat Fish It / Bacon Anti-Cheat
-       dengan simulasi ritme biologis manusia (micro-pause & Gaussian jitter timing).
-    6. ⏱️ Human Stamina Micro-Pause: Menyisipkan jeda mikro (0.15s - 0.25s) setiap 14-22
-       klik untuk meniru refleks alami jari manusia (zero-pattern detection).
-    7. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
+    [ FITUR UTAMA v2.0 - PURE AUTO CLICKER ]:
+    1. 🛡️ 100% Pure Simulated Hardware Clicker: Sama sekali TIDAK menggunakan injeksi
+       remote game (CastRod/Reel/Fish/Network). Murni menekan koordinat layar visual (X, Y).
+    2. ⏱️ Default Interval 1 Detik (1000ms): Laju klik ideal untuk game/minigame yang
+       memerlukan ketukan ritmis 1 detik tanpa membebani game engine.
+    3. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
        titik pusat (bullseye), dan animasi pulse hijau saat klik dieksekusi.
-    8. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
+    4. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
        tombol Play/Pause instan, tombol Settings, tombol Hide/Show Pin, dan Close.
-    9. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset aman (140ms Safe, 1s),
+    5. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset cepat (1s, 500ms, 140ms),
        durasi hold acak, dan live session statistics.
-    10. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
+    6. 🛡️ Pointer Pre-Sync & Human Rhythm: Sinkronisasi kursor alami (MouseMove) dan
+       Gaussian timing jitter saat mode Humanize diaktifkan.
+    7. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
        layar HP (tidak pernah terpotong pada landscape 360p - 720p).
-    11. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
+    8. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
        ke file lokal executor (BeRebel_Config.json) via writefile/readfile.
 ]]
 
@@ -75,7 +69,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Full BAC Suite Immunity Clicker v1.4",
+        Subtitle = "Pure Universal Screen Clicker v2.0 (1s Default)",
         ToggleKey = Enum.KeyCode.F8,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -94,10 +88,10 @@ local Config = {
         }
     },
     Clicker = {
-        DefaultInterval = 140,    -- 140 ms (Safe Zone Anti BAC-8223 ~7.1 CPS)
-        DefaultHold = 22,         -- 22 ms durasi tahan tekan dasar
-        Humanize = true,          -- Default AKTIF demi keamanan Anti BAC-8223!
-        JitterMs = 28,            -- Variasi acak timing (±28 ms)
+        DefaultInterval = 1000,   -- 1000 ms (Default: 1 Detik per klik)
+        DefaultHold = 28,         -- 28 ms durasi tahan tekan dasar
+        Humanize = true,          -- Simulasi ritme variasi alami
+        JitterMs = 32,            -- Variasi acak timing (±32 ms)
         JitterPx = 3,             -- Variasi acak koordinat (±3 pixel)
     }
 }
@@ -859,7 +853,7 @@ function BeRebelGui:Create()
     intervalInput.Position = UDim2.new(0, 10, 0, 28)
     intervalInput.BackgroundColor3 = theme.Sidebar
     intervalInput.Text = tostring(State.IntervalMs)
-    intervalInput.PlaceholderText = "Contoh: 140 atau 1000 (1 Detik)"
+    intervalInput.PlaceholderText = "Default: 1000 (1 Detik)"
     intervalInput.TextColor3 = theme.Text
     intervalInput.PlaceholderColor3 = theme.TextSubtle
     intervalInput.TextSize = 12
@@ -1136,7 +1130,7 @@ function BeRebelGui:Create()
     end)
     table.insert(self.Connections, connKey)
 
-    print("[Be Rebel v1.4] Single Target Auto Clicker dengan Full BAC Immunity Suite berhasil dimuat!")
+    print("[Be Rebel v2.0] Pure Universal Auto Clicker (1s Default) berhasil dimuat!")
 end
 
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
@@ -1155,7 +1149,7 @@ function BeRebelGui:Destroy()
 
     genv.__BE_REBEL_LOADED = nil
     genv.__BE_REBEL_CLEANUP = nil
-    print("[Be Rebel v1.4] Berhasil ditutup dan dibersihkan dari memori.")
+    print("[Be Rebel v2.0] Berhasil ditutup dan dibersihkan dari memori.")
 end
 
 genv.__BE_REBEL_CLEANUP = function()
