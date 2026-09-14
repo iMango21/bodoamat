@@ -1,14 +1,14 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v3.0 ⚡                            ║
-    ║       Universal Pure Screen Assistant & Hub (Bodoamat UI/UX)         ║
-    ║       Delta Executor & Mobile Touch Optimized                        ║
-    ║       100% Pure Screen Input Simulation (Zero Game Injection)        ║
-    ║       BAC Stealth Immunity Architecture                              ║
-    ║       Default Interval: 1.0 Detik (1000ms) per Klik                  ║
-    ║       Design Language: Bodoamat Dark-Glassmorphism Hub               ║
-    ╚══════════════════════════════════════════════════════════════════════╝
+    ║                        ⚡ BE REBEL v3.0.3 ⚡                          ║
+    ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
+    ║       Delta Executor & Android Mobile Touch Specialized         ║
+    ║       100% Pure Capacitive Touch Simulation (Zero Game Hook)    ║
+    ║       BAC Stealth Immunity (Bebas BAC-1224 & BAC-2226)          ║
+    ║       Default Interval: 1.0 Detik (1000ms) per Klik             ║
+    ║       Design Language: Bodoamat Dark-Glassmorphism Hub          ║
+    ╚══════════════════════════════════════════════════════════════════╝
 
     [ CARA EKSEKUSI GITHUB (LOADSTRING ANTI-CACHE) ]:
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau?t=" .. tostring(os.time())))()
@@ -170,52 +170,63 @@ function State:GetElapsedTime(): string
 end
 
 -- ====================================================================
--- INPUT SIMULATION ENGINE (100% PURE HARDWARE SCREEN TAPPING)
+-- INPUT SIMULATION ENGINE (DELTA EXECUTOR ANDROID TOUCH SPECIALIZED)
 -- ====================================================================
 local ClickEngine = {
     RunnerThread = nil :: thread?,
     PulseCallback = nil :: (() -> ())?,
+    TouchCounter = 0,
 }
 
--- Eksekusi 1 Ketukan (Tap / Mouse Click) pada Koordinat (X, Y)
+-- Eksekusi 1 Ketukan (Android Touch / PC Mouse) pada Koordinat (X, Y)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.max(0.005, holdDurationMs / 1000)
+    local holdSec = math.max(0.012, holdDurationMs / 1000)
+    local isTouchDevice = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
     local success = false
-    local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
-    -- METODE 1: VirtualInputManager (Device-Adaptive Input Simulation)
+    -- METODE 1: VirtualInputManager (Khusus Android: 3-Phase Capacitive Touch Simulation)
     if VirtualInputManager then
-        if isMobile then
-            -- 🛡️ Anti BAC-2226: Kirim Touch Event asli untuk perangkat mobile/touchscreen
-            local okTouch = pcall(function()
-                VirtualInputManager:SendTouchEvent(1, 0, x, y) -- TouchBegan
-                task.wait(holdSec)
-                VirtualInputManager:SendTouchEvent(1, 2, x, y) -- TouchEnded
+        if isTouchDevice or UserInputService.TouchEnabled then
+            -- ANDROID / DELTA EXECUTOR TOUCH SIMULATION (Bebas BAC-1224 & BAC-2226)
+            local ok = pcall(function()
+                self.TouchCounter = (self.TouchCounter % 10) + 1
+                local tId = self.TouchCounter
+                
+                -- Phase 1: TouchBegan (Jari menyentuh layar HP)
+                VirtualInputManager:SendTouchEvent(tId, 0, x, y)
+                
+                -- Phase 2: Micro-Settle (Pergeseran mikroskopis ujung jari manusia ~0.3-0.5px)
+                local driftX = x + ((math.random() - 0.5) * 0.8)
+                local driftY = y + ((math.random() - 0.5) * 0.8)
+                local settleDelay = math.min(0.005, holdSec * 0.2)
+                task.wait(settleDelay)
+                VirtualInputManager:SendTouchEvent(tId, 1, driftX, driftY)
+                
+                -- Phase 3: Hold Duration & TouchEnded (Jari diangkat dari layar HP)
+                local remainingHold = math.max(0.006, holdSec - settleDelay)
+                task.wait(remainingHold)
+                VirtualInputManager:SendTouchEvent(tId, 2, driftX, driftY)
             end)
-            if okTouch then success = true end
+            if ok then success = true end
         else
-            -- 🛡️ Anti BAC-92210: Sinkronisasi MouseMove untuk PC / Desktop
-            local okMouse = pcall(function()
-                VirtualInputManager:SendMouseMoveEvent(x, y, game)
-                task.wait(0.002)
+            -- DESKTOP / PC MOUSE SIMULATION FALLBACK
+            local ok = pcall(function()
                 VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
                 task.wait(holdSec)
                 VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
             end)
-            if okMouse then success = true end
+            if ok then success = true end
         end
     end
 
-    -- METODE 2: Executor Native C-Closures (Fallback aman tanpa VirtualUser)
+    -- METODE 2: Executor Native C-Closures Fallback
     if not success then
         local mouse1press = mouse1press or (genv and genv.mouse1press)
         local mouse1release = mouse1release or (genv and genv.mouse1release)
-        local mousemoveabs = mousemoveabs or (genv and genv.mousemoveabs)
         local mouse1click = mouse1click or (genv and genv.mouse1click)
 
         if mouse1press and mouse1release then
             pcall(function()
-                if mousemoveabs then mousemoveabs(x, y) end
                 mouse1press()
                 task.wait(holdSec)
                 mouse1release()
@@ -223,7 +234,6 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
             success = true
         elseif mouse1click then
             pcall(function()
-                if mousemoveabs then mousemoveabs(x, y) end
                 mouse1click()
             end)
             success = true
