@@ -1,11 +1,12 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.3 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.4 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-9223/6226/6225/6223/92210)║
-    ║       Hardware Input Lifecycle: Target nil/ws + Multi-Frame Hold║
+    ║       BAC Stealth Immunity (Bebas BAC-8227/9223/6226/6225/92210)║
+    ║       Hardware Input Lifecycle: DataModel game + Multi-Frame    ║
+    ║       Physics Infinite Jump: AssemblyLinearVelocity (No State)  ║
     ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
@@ -62,7 +63,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.3",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.4",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -211,10 +212,12 @@ function MovementModule:SetWaterWalk(enabled: boolean)
         pcall(function()
             if not self.WaterPlatform then
                 local part = Instance.new("Part")
-                part.Name = "TerrainWaterPlate"
+                part.Name = "Terrain" -- Nama native map agar lolos part tampering scan (Anti BAC-6228)
                 part.Size = Vector3.new(24, 1.2, 24)
                 part.Anchored = true
                 part.CanCollide = true
+                part.CanQuery = false -- Anti-Cheat raycast lolos tembus ke air alami
+                part.CanTouch = false
                 part.Transparency = 1
                 part.Material = Enum.Material.Air
                 part.Archivable = false
@@ -256,7 +259,7 @@ function MovementModule:SetWaterWalk(enabled: boolean)
     end
 end
 
--- 2. Infinite Jump
+-- 2. Infinite Jump (Physics-Based AssemblyLinearVelocity - Bebas Mutasi HumanoidState BAC-8227)
 function MovementModule:SetInfiniteJump(enabled: boolean)
     if self.IsInfJump == enabled then return end
     self.IsInfJump = enabled
@@ -269,9 +272,13 @@ function MovementModule:SetInfiniteJump(enabled: boolean)
                 pcall(function()
                     local char = LocalPlayer.Character
                     if char then
+                        local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
                         local hum = char:FindFirstChildOfClass("Humanoid")
-                        if hum and hum.Health > 0 then
-                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                        if hrp and hum and hum.Health > 0 then
+                            -- Anti BAC-8227: Gunakan impulse fisika murni tanpa memicu HumanoidState Jumping ilegal di udara
+                            local currentVel = hrp.AssemblyLinearVelocity
+                            local jumpVelocity = math.max(50, hum.JumpPower)
+                            hrp.AssemblyLinearVelocity = Vector3.new(currentVel.X, jumpVelocity, currentVel.Z)
                         end
                     end
                 end)
@@ -336,9 +343,9 @@ local ClickEngine = {
     PulseCallback = nil :: (() -> ())?,
 }
 
--- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager Target=nil/workspace clickCount=0)
+-- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager Target=game clickCount=0)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.clamp(holdDurationMs / 1000, 0.040, 0.085)
+    local holdSec = math.clamp(holdDurationMs / 1000, 0.045, 0.085)
     local executed = false
 
     -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225: Di luar area Topbar Y<65 & Navigasi Sistem)
@@ -348,22 +355,17 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local safeX = math.clamp(x, minX, maxX)
     local safeY = math.clamp(y, minY, maxY)
 
-    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-9223 & BAC-6226)
-    -- Target = nil / workspace (Bukan 'game' DataModel agar persis hardware input murni)
+    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-8227 & BAC-6226)
+    -- Target = game (Standard Engine DataModel Root), clickCount = 0
     if VirtualInputManager then
         local ok = pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, nil :: any, 0)
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
             task.wait(holdSec)
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, nil :: any, 0)
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
         end)
-        if not ok then
-            pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, workspace, 0)
-                task.wait(holdSec)
-                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, workspace, 0)
-            end)
+        if ok then
+            executed = true
         end
-        executed = true
     end
 
     -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES (Fallback Koordinat Valid)
@@ -1591,7 +1593,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.3</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.4</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
