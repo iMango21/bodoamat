@@ -1,13 +1,13 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.8 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.4.0 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-5228/5227/6228/7227/8227) ║
-    ║       DisplayOrder Normalization: Standard Layer (DisplayOrder=10║
-    ║       Zero Camera Tamper: Clean Viewport & Isolated gethui()    ║
-    ║       Hardware Input Lifecycle: DataModel game + Multi-Frame    ║
+    ║       BAC Stealth Immunity (Bebas BAC-9223/5228/5227/6228/7227) ║
+    ║       Hardware Input Lifecycle: Down (count=0) -> Up (count=0)  ║
+    ║       Zero Camera/CoreGui Tamper: Clean Viewport & gethui()     ║
+    ║       DisplayOrder Normalization: Standard UI Layer (Order=10)  ║
     ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
@@ -64,7 +64,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.8",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.0",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -343,8 +343,8 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local safeX = math.clamp(x, minX, maxX)
     local safeY = math.clamp(y, minY, maxY)
 
-    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-8227 & BAC-6226)
-    -- Target = game (Standard Engine DataModel Root), clickCount = 0
+    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-6226 & Anti BAC-9223)
+    -- Transisi Resmi Standar C++ Engine: Down (clickCount=0) -> Hold -> Up (clickCount=0)
     if VirtualInputManager then
         local ok = pcall(function()
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
@@ -928,7 +928,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.3.2"
+    titleLabel.Text = Config.UI.Title .. " v3.4.0"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1584,7 +1584,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.8</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.0</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
