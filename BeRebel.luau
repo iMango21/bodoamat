@@ -1,10 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.0 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.1 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-6223/92210/10229/10221)   ║
+    ║       BAC Stealth Immunity (Bebas BAC-6225/6223/92210/10229)    ║
+    ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
@@ -39,6 +40,7 @@ genv.__RB_SESSION_ACTIVE = true
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
@@ -59,7 +61,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.0",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.1",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -341,10 +343,12 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local holdSec = math.max(0.025, holdDurationMs / 1000)
     local executed = false
 
-    -- 1. Validasi & Clamping Koordinat Layar Nyata (Mencegah Flag BAC-2225 / BAC-10229)
+    -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225: Di luar area Topbar Y<65 & Navigasi Sistem)
     local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-    local safeX = math.clamp(x, 15, math.max(30, camVp.X - 15))
-    local safeY = math.clamp(y, 15, math.max(30, camVp.Y - 15))
+    local minX, maxX = 50, math.max(100, camVp.X - 50)
+    local minY, maxY = 65, math.max(120, camVp.Y - 50)
+    local safeX = math.clamp(x, minX, maxX)
+    local safeY = math.clamp(y, minY, maxY)
 
     -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Prioritas Utama: 100% Native & Anti-Cheat Proof)
     if VirtualInputManager then
@@ -424,8 +428,10 @@ function ClickEngine:Start()
                 local holdOffsetMs = math.random(-4, 6)
                 
                 local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-                targetX = math.clamp(targetX + offsetX, 15, camSize.X - 15)
-                targetY = math.clamp(targetY + offsetY, 15, camSize.Y - 15)
+                local minX, maxX = 50, math.max(100, camSize.X - 50)
+                local minY, maxY = 65, math.max(120, camSize.Y - 50)
+                targetX = math.clamp(targetX + offsetX, minX, maxX)
+                targetY = math.clamp(targetY + offsetY, minY, maxY)
                 currentInterval = math.max(100, currentInterval + offsetMs)
                 currentHold = math.clamp(currentHold + holdOffsetMs, 25, 55)
             end
@@ -801,8 +807,10 @@ function BeRebelGui:Create()
     local connDragPin = UserInputService.InputChanged:Connect(function(input)
         if pinDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-            local newX = math.clamp(input.Position.X, pinSize / 2, camVp.X - (pinSize / 2))
-            local newY = math.clamp(input.Position.Y, pinSize / 2, camVp.Y - (pinSize / 2))
+            local minX, maxX = 50, math.max(100, camVp.X - 50)
+            local minY, maxY = 65, math.max(120, camVp.Y - 50)
+            local newX = math.clamp(input.Position.X, minX, maxX)
+            local newY = math.clamp(input.Position.Y, minY, maxY)
 
             targetPin.Position = UDim2.new(0, newX, 0, newY)
             State.TargetPosition = Vector2.new(newX, newY)
@@ -933,7 +941,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.3.0"
+    titleLabel.Text = Config.UI.Title .. " v3.3.1"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1589,7 +1597,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.0</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.1</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
