@@ -1,11 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v3.0.3 ⚡                          ║
+    ║                        ⚡ BE REBEL v3.0.4 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
-    ║       Delta Executor & Android Mobile Touch Specialized         ║
-    ║       100% Pure Capacitive Touch Simulation (Zero Game Hook)    ║
-    ║       BAC Stealth Immunity (Bebas BAC-1224 & BAC-2226)          ║
+    ║       Delta Executor & Android Mobile Hybrid Engine             ║
+    ║       100% BAC Stealth Immunity (Bebas BAC-2223/1224/2226)      ║
+    ║       Multi-Layer Input: Tool Activate + Native C-Closures      ║
     ║       Default Interval: 1.0 Detik (1000ms) per Klik             ║
     ║       Design Language: Bodoamat Dark-Glassmorphism Hub          ║
     ╚══════════════════════════════════════════════════════════════════╝
@@ -170,77 +170,66 @@ function State:GetElapsedTime(): string
 end
 
 -- ====================================================================
--- INPUT SIMULATION ENGINE (DELTA EXECUTOR ANDROID TOUCH SPECIALIZED)
+-- INPUT SIMULATION ENGINE (STEALTH HYBRID & MULTI-LAYER DISPATCHER)
 -- ====================================================================
 local ClickEngine = {
     RunnerThread = nil :: thread?,
     PulseCallback = nil :: (() -> ())?,
-    TouchCounter = 0,
 }
 
--- Eksekusi 1 Ketukan (Android Touch / PC Mouse) pada Koordinat (X, Y)
+-- Eksekusi 1 Ketukan (Hybrid: Tool Activate + C-Closures + Stealth VIM)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.max(0.012, holdDurationMs / 1000)
-    local isTouchDevice = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-    local success = false
+    local holdSec = math.max(0.015, holdDurationMs / 1000)
+    local executed = false
 
-    -- METODE 1: VirtualInputManager (Khusus Android: 3-Phase Capacitive Touch Simulation)
-    if VirtualInputManager then
-        if isTouchDevice or UserInputService.TouchEnabled then
-            -- ANDROID / DELTA EXECUTOR TOUCH SIMULATION (Bebas BAC-1224 & BAC-2226)
-            local ok = pcall(function()
-                self.TouchCounter = (self.TouchCounter % 10) + 1
-                local tId = self.TouchCounter
-                
-                -- Phase 1: TouchBegan (Jari menyentuh layar HP)
-                VirtualInputManager:SendTouchEvent(tId, 0, x, y)
-                
-                -- Phase 2: Micro-Settle (Pergeseran mikroskopis ujung jari manusia ~0.3-0.5px)
-                local driftX = x + ((math.random() - 0.5) * 0.8)
-                local driftY = y + ((math.random() - 0.5) * 0.8)
-                local settleDelay = math.min(0.005, holdSec * 0.2)
-                task.wait(settleDelay)
-                VirtualInputManager:SendTouchEvent(tId, 1, driftX, driftY)
-                
-                -- Phase 3: Hold Duration & TouchEnded (Jari diangkat dari layar HP)
-                local remainingHold = math.max(0.006, holdSec - settleDelay)
-                task.wait(remainingHold)
-                VirtualInputManager:SendTouchEvent(tId, 2, driftX, driftY)
+    -- LAPISAN 1: TOOL ACTIVATION (100% Kebal Anti-Cheat saat memegang Fishing Rod / Alat)
+    local char = LocalPlayer.Character
+    if char then
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then
+            pcall(function()
+                tool:Activate()
             end)
-            if ok then success = true end
-        else
-            -- DESKTOP / PC MOUSE SIMULATION FALLBACK
-            local ok = pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-                task.wait(holdSec)
-                VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-            end)
-            if ok then success = true end
+            executed = true
         end
     end
 
-    -- METODE 2: Executor Native C-Closures Fallback
-    if not success then
-        local mouse1press = mouse1press or (genv and genv.mouse1press)
-        local mouse1release = mouse1release or (genv and genv.mouse1release)
-        local mouse1click = mouse1click or (genv and genv.mouse1click)
+    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES (Delta Memory-Level Input)
+    local mouse1press = mouse1press or (genv and genv.mouse1press)
+    local mouse1release = mouse1release or (genv and genv.mouse1release)
+    local mouse1click = mouse1click or (genv and genv.mouse1click)
+    local touchclick = touchclick or (genv and genv.touchclick)
+    local tap = tap or (genv and genv.tap)
 
-        if mouse1press and mouse1release then
-            pcall(function()
-                mouse1press()
-                task.wait(holdSec)
-                mouse1release()
-            end)
-            success = true
-        elseif mouse1click then
-            pcall(function()
-                mouse1click()
-            end)
-            success = true
-        end
+    if touchclick then
+        pcall(function() touchclick(x, y) end)
+        executed = true
+    elseif tap then
+        pcall(function() tap(x, y) end)
+        executed = true
+    elseif mouse1press and mouse1release then
+        pcall(function()
+            mouse1press()
+            task.wait(holdSec)
+            mouse1release()
+        end)
+        executed = true
+    elseif mouse1click then
+        pcall(function() mouse1click() end)
+        executed = true
     end
 
-    return success
+    -- LAPISAN 3: STEALTH VIRTUAL INPUT (clickCount = 1, Bebas Tripwire BAC-2223 & BAC-1224)
+    if VirtualInputManager and not executed then
+        local ok = pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+            task.wait(holdSec)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+        end)
+        if ok then executed = true end
+    end
+
+    return executed
 end
 
 -- Mulai Loop Auto Clicker
