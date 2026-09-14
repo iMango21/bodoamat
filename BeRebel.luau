@@ -1,11 +1,12 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.4.2 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.4.3 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-3226/7229/9223/5228/6228) ║
-    ║       Pure Integer VIM Simulation (math.floor safeX/safeY)      ║
+    ║       BAC Stealth Immunity (Bebas BAC-2223/3226/7229/9223/5228) ║
+    ║       Pure VIM Native C++ Lifecycle (Zero Synthetic TouchMoved) ║
+    ║       Pure Integer Coordinates (math.floor safeX/safeY)         ║
     ║       Default Human Rhythm: OFF / Mati (Sesuai Preferensi User) ║
     ║       Humanoid State Guard: Safe Jump Buffer (Anti BAC-7229)    ║
     ║       Hardware Input Lifecycle: Down (count=0) -> Up (count=0)  ║
@@ -67,7 +68,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.2",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.3",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -344,14 +345,14 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local holdSec = math.clamp(holdDurationMs / 1000, 0.045, 0.085)
     local executed = false
 
-    -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225 & BAC-3226: Integer pixel murni & di luar Topbar Y<65)
+    -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225, BAC-3226 & BAC-2223: Integer pixel murni & di luar Topbar Y<65)
     local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
     local minX, maxX = 50, math.max(100, camVp.X - 50)
     local minY, maxY = 65, math.max(120, camVp.Y - 50)
     local safeX = math.floor(math.clamp(x, minX, maxX))
     local safeY = math.floor(math.clamp(y, minY, maxY))
 
-    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-6226, BAC-9223 & BAC-3226)
+    -- ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-2223, BAC-3226, BAC-6226 & BAC-9223)
     -- Transisi Resmi Standar C++ Engine: Down (count=0) -> Hold -> Up (count=0)
     if VirtualInputManager then
         local ok = pcall(function()
@@ -360,20 +361,6 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
         end)
         if ok then
-            executed = true
-        end
-    end
-
-    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES (Fallback Koordinat Valid)
-    if not executed then
-        local touchclick = touchclick or (genv and genv.touchclick)
-        local tap = tap or (genv and genv.tap)
-
-        if touchclick then
-            pcall(function() touchclick(safeX, safeY) end)
-            executed = true
-        elseif tap then
-            pcall(function() tap(safeX, safeY) end)
             executed = true
         end
     end
@@ -415,17 +402,14 @@ function ClickEngine:Start()
                 local offsetMs = math.random(-Config.Clicker.JitterMs, Config.Clicker.JitterMs)
                 local holdOffsetMs = math.random(-4, 6)
                 
-                targetX = math.clamp(targetX + offsetX, minX, maxX)
-                targetY = math.clamp(targetY + offsetY, minY, maxY)
+                targetX = math.floor(math.clamp(targetX + offsetX, minX, maxX))
+                targetY = math.floor(math.clamp(targetY + offsetY, minY, maxY))
                 currentInterval = math.max(120, currentInterval + offsetMs)
                 currentHold = math.clamp(currentHold + holdOffsetMs, 40, 85)
             else
-                -- Micro-drift anti-static pixel tripwire
-                local microX = math.random(-1, 1)
-                local microY = math.random(-1, 1)
-                targetX = math.clamp(targetX + microX, minX, maxX)
-                targetY = math.clamp(targetY + microY, minY, maxY)
-                currentHold = math.clamp(currentHold, 40, 65)
+                -- Pure Exact Static Coordinate Locked (Zero TouchMoved jitter)
+                targetX = math.floor(math.clamp(targetX, minX, maxX))
+                targetY = math.floor(math.clamp(targetY, minY, maxY))
             end
 
             -- Visual Pulse Feedback pada Target Pin
@@ -940,7 +924,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.4.2"
+    titleLabel.Text = Config.UI.Title .. " v3.4.3"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1596,7 +1580,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.2</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.3</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
