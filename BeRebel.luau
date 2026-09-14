@@ -1,10 +1,10 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v3.1 ⚡                            ║
+    ║                       ⚡ BE REBEL v3.1.1 ⚡                           ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-8226/2223/1224/2226)      ║
+    ║       BAC Stealth Immunity (Bebas BAC-2225/8226/2223/1224/2226) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
     ║       Pixel-Perfect Pin & Screen Inset Synchronization          ║
@@ -41,7 +41,10 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
-local VirtualInputManager = pcall(function() return game:GetService("VirtualInputManager") end) and game:GetService("VirtualInputManager") or nil
+local VirtualInputManager = nil
+pcall(function()
+    VirtualInputManager = game:GetService("VirtualInputManager")
+end)
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local CurrentCamera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
 
@@ -52,7 +55,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.1",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.1.1",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -201,12 +204,13 @@ function MovementModule:SetWaterWalk(enabled: boolean)
         pcall(function()
             if not self.WaterPlatform then
                 local part = Instance.new("Part")
-                part.Name = "BeRebel_WaterWalk"
+                part.Name = "TerrainWaterPlate"
                 part.Size = Vector3.new(24, 1.2, 24)
                 part.Anchored = true
                 part.CanCollide = true
                 part.Transparency = 1
                 part.Material = Enum.Material.Air
+                part.Archivable = false
                 part.Parent = workspace
                 self.WaterPlatform = part
             end
@@ -328,44 +332,58 @@ local ClickEngine = {
     PulseCallback = nil :: (() -> ())?,
 }
 
--- Eksekusi 1 Ketukan Hardware Layar (Delta C-Closures + VIM clickCount=1)
+-- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager clickCount=1 + Full Coordinate Mapping)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
     local holdSec = math.max(0.018, holdDurationMs / 1000)
     local executed = false
 
-    -- LAPISAN 1: EXECUTOR NATIVE C-CLOSURES (Injeksi Memori Delta Android)
-    local mouse1press = mouse1press or (genv and genv.mouse1press)
-    local mouse1release = mouse1release or (genv and genv.mouse1release)
-    local mouse1click = mouse1click or (genv and genv.mouse1click)
-    local touchclick = touchclick or (genv and genv.touchclick)
-    local tap = tap or (genv and genv.tap)
+    -- 1. Validasi & Clamping Koordinat Layar Nyata (Mencegah Flag BAC-2225 dari Koordinat 0,0)
+    local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+    local safeX = math.clamp(x, 10, math.max(20, camVp.X - 10))
+    local safeY = math.clamp(y, 10, math.max(20, camVp.Y - 10))
 
-    if touchclick then
-        pcall(function() touchclick(x, y) end)
-        executed = true
-    elseif tap then
-        pcall(function() tap(x, y) end)
-        executed = true
-    elseif mouse1press and mouse1release then
-        pcall(function()
-            mouse1press()
+    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Prioritas Utama: 100% Native & Anti-Cheat Proof)
+    if VirtualInputManager then
+        local ok = pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 1)
             task.wait(holdSec)
-            mouse1release()
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 1)
         end)
-        executed = true
-    elseif mouse1click then
-        pcall(function() mouse1click() end)
-        executed = true
+        if ok then
+            executed = true
+        end
     end
 
-    -- LAPISAN 2: ROBLOX ENGINE VIRTUAL INPUT (clickCount = 1 Standar Engine)
-    if VirtualInputManager and not executed then
-        local ok = pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
-            task.wait(holdSec)
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
-        end)
-        if ok then executed = true end
+    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES DENGAN PENETAPAN POSISI KURSOR (Fallback Khusus)
+    if not executed then
+        local mousemoveabs = mousemoveabs or (genv and genv.mousemoveabs) or (genv and genv.movemouseabs) or (genv and genv.mouseto)
+        if mousemoveabs then
+            pcall(function() mousemoveabs(safeX, safeY) end)
+        end
+
+        local touchclick = touchclick or (genv and genv.touchclick)
+        local tap = tap or (genv and genv.tap)
+        local mouse1press = mouse1press or (genv and genv.mouse1press)
+        local mouse1release = mouse1release or (genv and genv.mouse1release)
+        local mouse1click = mouse1click or (genv and genv.mouse1click)
+
+        if touchclick then
+            pcall(function() touchclick(safeX, safeY) end)
+            executed = true
+        elseif tap then
+            pcall(function() tap(safeX, safeY) end)
+            executed = true
+        elseif mouse1press and mouse1release then
+            pcall(function()
+                mouse1press()
+                task.wait(holdSec)
+                mouse1release()
+            end)
+            executed = true
+        elseif mouse1click then
+            pcall(function() mouse1click() end)
+            executed = true
+        end
     end
 
     return executed
