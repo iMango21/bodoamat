@@ -1,30 +1,17 @@
 --!strict
 --[[
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v2.2 ⚡                         ║
-    ║       Universal Pure Single-Target Auto Clicker for Roblox        ║
-    ║       Delta Executor & Mobile Touch Optimized                     ║
-    ║       Zero-Keyword Stealth UI (BAC-7226 Immunity)                 ║
-    ║       100% Pure Screen Input Simulation (Zero Game Injection)     ║
-    ║       Default Interval: 1.0 Detik (1000ms) per Klik               ║
-    ║       Design Language & Architecture by LuaRebel                  ║
-    ╚═══════════════════════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════════════════════════╗
+    ║                        ⚡ BE REBEL v3.0 ⚡                            ║
+    ║       Universal Pure Screen Assistant & Hub (Bodoamat UI/UX)         ║
+    ║       Delta Executor & Mobile Touch Optimized                        ║
+    ║       100% Pure Screen Input Simulation (Zero Game Injection)        ║
+    ║       BAC Stealth Immunity Architecture                              ║
+    ║       Default Interval: 1.0 Detik (1000ms) per Klik                  ║
+    ║       Design Language: Bodoamat Dark-Glassmorphism Hub               ║
+    ╚══════════════════════════════════════════════════════════════════════╝
 
-    [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
-
-    [ FITUR UTAMA v2.2 - PURE STEALTH TAP ASSISTANT ]:
-    1. 🛡️ BAC-7226 Keyword Sanitation: Menghilangkan semua kata kunci sensitif dari UI
-       sehingga kebal dari string memory / OCR scanning anti-cheat.
-    2. 🛡️ BAC-1228 Stealth GUI Shield: Wadah gethui() terisolasi & protectgui.
-    3. 🛡️ 100% Pure Simulated Hardware Clicker: Murni menekan koordinat layar visual (X, Y).
-    4. ⏱️ Default Interval 1 Detik (1000ms): Pengaturan fleksibel murni via TextBox.
-    5. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair & center dot.
-    6. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag, Play/Pause.
-    7. ⚙️ Settings Modal: Konfigurasi interval kustom, durasi hold, dan live statistics.
-    8. 🛡️ Pointer Pre-Sync & Human Rhythm: Sinkronisasi kursor alami & Gaussian timing jitter.
-    9. 📱 Mobile Landscape Responsive Modal: Menyesuaikan resolusi layar HP secara otomatis.
-    10. 💾 Auto-Save File Persistence: Tersimpan otomatis ke BeRebel_Config.json.
+    [ CARA EKSEKUSI GITHUB (LOADSTRING ANTI-CACHE) ]:
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau?t=" .. tostring(os.time())))()
 ]]
 
 -- 1. Tunggu game selesai dimuat
@@ -53,20 +40,18 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
 local VirtualInputManager = pcall(function() return game:GetService("VirtualInputManager") end) and game:GetService("VirtualInputManager") or nil
--- Catatan BAC-3228: VirtualUser service DIHAPUS TOTAL karena merupakan tripwire deteksi Bacon Anti-Cheat!
-
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local CurrentCamera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
 
 -- ====================================================================
--- KONFIGURASI DEFAULT & TEMA (LUA REBEL DARK-GLASSMORPHISM)
+-- KONFIGURASI TEMA (BODOAMAT DARK-GLASSMORPHISM)
 -- ====================================================================
 local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Precision Tap Assistant v2.2 (1s Default)",
-        ToggleKey = Enum.KeyCode.F8,
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.0",
+        ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
             CardBg      = Color3.fromRGB(24, 28, 38),
@@ -84,11 +69,11 @@ local Config = {
         }
     },
     Clicker = {
-        DefaultInterval = 1000,   -- 1000 ms (Default: 1 Detik per klik)
-        DefaultHold = 28,         -- 28 ms durasi tahan tekan dasar
-        Humanize = true,          -- Simulasi ritme variasi alami
-        JitterMs = 32,            -- Variasi acak timing (±32 ms)
-        JitterPx = 3,             -- Variasi acak koordinat (±3 pixel)
+        DefaultInterval = 1000,   -- 1000 ms (1 Detik per klik)
+        DefaultHold = 28,         -- 28 ms press duration
+        Humanize = true,          -- Anti-bot timing & coordinate jitter
+        JitterMs = 32,            -- ±32 ms
+        JitterPx = 3,             -- ±3 pixel offset
     }
 }
 
@@ -135,16 +120,18 @@ local State = {
     IntervalMs = savedData.IntervalMs or Config.Clicker.DefaultInterval,
     HoldDurationMs = savedData.HoldDurationMs or Config.Clicker.DefaultHold,
     IsPinVisible = true,
-    IsSettingsOpen = false,
     IsHumanize = (savedData.IsHumanize ~= nil) and savedData.IsHumanize or Config.Clicker.Humanize,
     
-    -- Target Screen Position
+    -- Target Screen Position (Tengah Layar Default)
     TargetPosition = Vector2.new(640, 360),
     
     -- Live Statistics
     TotalClicks = 0,
     StartTime = os.time(),
     LastStatus = "Siap (Standby)",
+
+    -- Tab State
+    CurrentTab = "Clicker",
 
     -- Event Listeners Registry
     Listeners = {} :: { [string]: { (any) -> () } }
@@ -158,7 +145,6 @@ function State:Set(key: string, value: any)
         end
     end
 
-    -- Auto-save preferensi jika ada perubahan konfigurasi
     if key == "IntervalMs" or key == "HoldDurationMs" or key == "IsHumanize" then
         Storage:Save({
             IntervalMs = self.IntervalMs,
@@ -184,7 +170,7 @@ function State:GetElapsedTime(): string
 end
 
 -- ====================================================================
--- INPUT SIMULATION ENGINE (BAC-8223 STEALTH GUARD PROTECTED)
+-- INPUT SIMULATION ENGINE (100% PURE HARDWARE SCREEN TAPPING)
 -- ====================================================================
 local ClickEngine = {
     RunnerThread = nil :: thread?,
@@ -199,7 +185,6 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     -- METODE 1: VirtualInputManager (Resmi Roblox Engine, Sinkronisasi MouseMove untuk Anti BAC-92210)
     if VirtualInputManager then
         local ok = pcall(function()
-            -- 🛡️ Anti BAC-92210: Sinkronisasi posisi pointer kursor sebelum menekan tombol
             VirtualInputManager:SendMouseMoveEvent(x, y, game)
             task.wait(0.002)
             VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
@@ -233,13 +218,10 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
         end
     end
 
-    -- CATATAN ANTI-CHEAT (BAC-3228):
-    -- Metode VirtualUser:CaptureController() DIHAPUS TOTAL untuk menghindari deteksi BAC-3228.
-
     return success
 end
 
--- Mulai Loop Auto Clicker dengan BAC-8223 Stealth Protection
+-- Mulai Loop Auto Clicker
 function ClickEngine:Start()
     if State.IsRunning then return end
     State:Set("IsRunning", true)
@@ -256,7 +238,7 @@ function ClickEngine:Start()
             local currentInterval = State.IntervalMs
             local currentHold = State.HoldDurationMs
 
-            -- 🛡️ 1. BAC-8223 GAUSSIAN HUMAN JITTER (Zero-Pattern Protection)
+            -- 1. GAUSSIAN HUMAN JITTER (Timing & Posisi Alami)
             if State.IsHumanize then
                 local offsetX = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetY = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
@@ -275,22 +257,21 @@ function ClickEngine:Start()
                 task.spawn(self.PulseCallback)
             end
 
-            -- Durasi hold dinamis (maksimal 35% dari total interval agar klik tidak freeze)
+            -- Durasi hold dinamis
             local effectiveHold = math.min(currentHold, math.max(8, currentInterval * 0.35))
 
-            -- Eksekusi Klik Nyata
+            -- Eksekusi Klik Nyata pada Layar
             self:ExecuteClick(targetX, targetY, effectiveHold)
             State:Set("TotalClicks", State.TotalClicks + 1)
             clickCounter = clickCounter + 1
 
-            -- 🛡️ 2. BAC-8223 HUMAN STAMINA MICRO-PAUSE (Refleks Alami Jari)
+            -- 2. HUMAN STAMINA MICRO-PAUSE (Refleks Jari Manusia)
             if State.IsHumanize and (clickCounter >= nextMicroPauseAt) then
                 clickCounter = 0
                 nextMicroPauseAt = math.random(14, 22)
-                local pauseDuration = math.random(140, 260) / 1000 -- 0.14s - 0.26s
+                local pauseDuration = math.random(140, 260) / 1000
                 task.wait(pauseDuration)
             else
-                -- ⏱️ KOMPENSASI TIMING INTERVAL: Kurangi jeda dengan durasi hold yang telah berlalu
                 local netWait = math.max(0.002, (currentInterval - effectiveHold) / 1000)
                 task.wait(netWait)
             end
@@ -318,6 +299,9 @@ function ClickEngine:Toggle()
     end
 end
 
+-- ====================================================================
+-- STEALTH CONTAINER & GUI ENGINE (BODOAMAT ARCHITECTURE)
+-- ====================================================================
 local function getSafeGuiContainer(): Instance
     -- 1. Prioritas Utama: gethui() (Executor Hidden UI - 100% aman & terisolasi dari BAC-6228)
     if gethui then
@@ -332,9 +316,9 @@ local function getSafeGuiContainer(): Instance
             return hui
         end
     end
-    local genv = (getgenv and getgenv()) or {}
-    if genv.gethui then
-        local ok, hui = pcall(genv.gethui)
+    local genvRef = (getgenv and getgenv()) or {}
+    if genvRef.gethui then
+        local ok, hui = pcall(genvRef.gethui)
         if ok and hui and typeof(hui) == "Instance" then
             return hui
         end
@@ -344,11 +328,14 @@ local function getSafeGuiContainer(): Instance
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- ====================================================================
--- USER INTERFACE (LUA REBEL DARK-GLASSMORPHISM)
--- ====================================================================
 local BeRebelGui = {
     ScreenGui = nil :: ScreenGui?,
+    MainFrame = nil :: Frame?,
+    FloatingBtn = nil :: TextButton?,
+    TargetPin = nil :: Frame?,
+    CurrentTab = "Clicker",
+    Tabs = {} :: { [string]: ScrollingFrame },
+    TabButtons = {} :: { [string]: TextButton },
     Connections = {} :: { any },
 }
 
@@ -375,7 +362,7 @@ function BeRebelGui:Create()
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
     -- Proteksi syn.protect_gui jika didukung executor
-    local synProtect = (syn and syn.protect_gui) or (genv and genv.syn and genv.syn.protect_gui) or protectgui
+    local synProtect = (syn and syn.protect_gui) or (genv.syn and genv.syn.protect_gui) or protectgui
     if synProtect then
         pcall(synProtect, screenGui)
     end
@@ -388,7 +375,75 @@ function BeRebelGui:Create()
     State.TargetPosition = Vector2.new(math.floor(vp.X / 2), math.floor(vp.Y / 2))
 
     -- ========================================================
-    -- A. SINGLE TARGET PIN MARKER (DRAGGABLE)
+    -- A. FLOATING DRAGGABLE "MENU" BUTTON (MOBILE OPTIMIZED)
+    -- ========================================================
+    local mobileBtn = Instance.new("TextButton")
+    mobileBtn.Name = "AppFloatingBtn"
+    mobileBtn.Size = UDim2.new(0, 58, 0, 30)
+    mobileBtn.Position = UDim2.new(0, 20, 0.5, -15)
+    mobileBtn.BackgroundColor3 = theme.CardBg
+    mobileBtn.Text = "MENU"
+    mobileBtn.TextColor3 = theme.Text
+    mobileBtn.TextSize = 11
+    mobileBtn.Font = Enum.Font.GothamBold
+    mobileBtn.Active = true
+    mobileBtn.ZIndex = 80
+    mobileBtn.Parent = screenGui
+    self.FloatingBtn = mobileBtn
+
+    local mbCorner = Instance.new("UICorner")
+    mbCorner.CornerRadius = UDim.new(0, 6)
+    mbCorner.Parent = mobileBtn
+
+    local mbStroke = Instance.new("UIStroke")
+    mbStroke.Color = theme.Accent
+    mbStroke.Thickness = 1.2
+    mbStroke.Parent = mobileBtn
+
+    -- Logika Dragging Tombol Mobile MENU (Sentuh & Geser)
+    local mbDragging, mbDragInput, mbDragStart, mbStartPos
+    local mbHasMoved = false
+
+    local connMbStart = mobileBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            mbDragging = true
+            mbHasMoved = false
+            mbDragStart = input.Position
+            mbStartPos = mobileBtn.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    mbDragging = false
+                end
+            end)
+        end
+    end)
+    table.insert(self.Connections, connMbStart)
+
+    local connMbChange = mobileBtn.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            mbDragInput = input
+        end
+    end)
+    table.insert(self.Connections, connMbChange)
+
+    local connMbMove = UserInputService.InputChanged:Connect(function(input)
+        if input == mbDragInput and mbDragging then
+            local delta = input.Position - mbDragStart
+            if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
+                mbHasMoved = true
+            end
+            mobileBtn.Position = UDim2.new(
+                mbStartPos.X.Scale,
+                mbStartPos.X.Offset + delta.X,
+                mbStartPos.Y.Scale,
+                mbStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    table.insert(self.Connections, connMbMove)
+
+    -- ========================================================
+    -- B. SINGLE TARGET PIN MARKER (DRAGGABLE)
     -- ========================================================
     local pinSize = 46
     local targetPin = Instance.new("Frame")
@@ -402,6 +457,7 @@ function BeRebelGui:Create()
     targetPin.Active = true
     targetPin.ZIndex = 50
     targetPin.Parent = screenGui
+    self.TargetPin = targetPin
 
     local pinCorner = Instance.new("UICorner")
     pinCorner.CornerRadius = UDim.new(1, 0)
@@ -413,7 +469,6 @@ function BeRebelGui:Create()
     pinStroke.Transparency = 0.1
     pinStroke.Parent = targetPin
 
-    -- Titik Pusat Target (Center Bullseye Dot)
     local centerDot = Instance.new("Frame")
     centerDot.Name = "CenterDot"
     centerDot.Size = UDim2.new(0, 8, 0, 8)
@@ -428,7 +483,6 @@ function BeRebelGui:Create()
     dotCorner.CornerRadius = UDim.new(1, 0)
     dotCorner.Parent = centerDot
 
-    -- Label Angka "1"
     local pinLabel = Instance.new("TextLabel")
     pinLabel.Size = UDim2.new(1, 0, 1, 0)
     pinLabel.BackgroundTransparency = 1
@@ -439,7 +493,6 @@ function BeRebelGui:Create()
     pinLabel.ZIndex = 51
     pinLabel.Parent = targetPin
 
-    -- Garis Crosshair (Horizontal & Vertikal)
     local chH = Instance.new("Frame")
     chH.Size = UDim2.new(1, 10, 0, 1)
     chH.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -460,12 +513,12 @@ function BeRebelGui:Create()
     chV.ZIndex = 49
     chV.Parent = targetPin
 
-    -- Logika Dragging Target Pin (Touch & Mouse Support)
+    -- Dragging Target Pin (Touch & Mouse Support)
     local pinDragging = false
     local pinDragStart = Vector3.zero
     local pinStartPos = UDim2.new()
 
-    targetPin.InputBegan:Connect(function(input)
+    local connPinStart = targetPin.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             pinDragging = true
             pinDragStart = input.Position
@@ -478,6 +531,7 @@ function BeRebelGui:Create()
             end)
         end
     end)
+    table.insert(self.Connections, connPinStart)
 
     local connDragPin = UserInputService.InputChanged:Connect(function(input)
         if pinDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
@@ -523,527 +577,666 @@ function BeRebelGui:Create()
     end)
 
     -- ========================================================
-    -- B. FLOATING CONTROLLER BAR (TOOLBAR MELAYANG)
+    -- C. JENDELA UTAMA HUB (BODOAMAT MAIN WINDOW)
     -- ========================================================
-    local barWidth = 200
-    local barHeight = 42
-    local floatBar = Instance.new("Frame")
-    floatBar.Name = "FloatingControllerBar"
-    floatBar.Size = UDim2.new(0, barWidth, 0, barHeight)
-    floatBar.Position = UDim2.new(0, 30, 0.5, -barHeight / 2)
-    floatBar.BackgroundColor3 = theme.Background
-    floatBar.BorderSizePixel = 0
-    floatBar.Active = true
-    floatBar.ZIndex = 60
-    floatBar.Parent = screenGui
+    local initW = math.min(620, math.max(540, vp.X - 40))
+    local initH = math.min(460, math.max(400, vp.Y - 40))
 
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(0, 8)
-    barCorner.Parent = floatBar
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainWindow"
+    mainFrame.Size = UDim2.new(0, initW, 0, initH)
+    mainFrame.Position = UDim2.new(0.5, -math.floor(initW / 2), 0.5, -math.floor(initH / 2))
+    mainFrame.BackgroundColor3 = theme.Background
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.ClipsDescendants = true
+    mainFrame.ZIndex = 60
+    mainFrame.Parent = screenGui
+    self.MainFrame = mainFrame
 
-    local barStroke = Instance.new("UIStroke")
-    barStroke.Color = theme.Border
-    barStroke.Thickness = 1.4
-    barStroke.Parent = floatBar
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 12)
+    mainCorner.Parent = mainFrame
 
-    -- Drag Handle Bar (Grip ⋮⋮)
-    local dragHandle = Instance.new("TextButton")
-    dragHandle.Name = "DragHandle"
-    dragHandle.Size = UDim2.new(0, 22, 1, 0)
-    dragHandle.Position = UDim2.new(0, 0, 0, 0)
-    dragHandle.BackgroundColor3 = theme.Sidebar
-    dragHandle.Text = "⋮⋮"
-    dragHandle.TextColor3 = theme.TextSubtle
-    dragHandle.TextSize = 13
-    dragHandle.Font = Enum.Font.GothamBold
-    dragHandle.AutoButtonColor = false
-    dragHandle.ZIndex = 61
-    dragHandle.Parent = floatBar
+    local mainStroke = Instance.new("UIStroke")
+    mainStroke.Color = theme.Border
+    mainStroke.Thickness = 1.2
+    mainStroke.Parent = mainFrame
 
-    local dhCorner = Instance.new("UICorner")
-    dhCorner.CornerRadius = UDim.new(0, 8)
-    dhCorner.Parent = dragHandle
+    -- Tombol MENU membuka/menutup MainWindow
+    mobileBtn.MouseButton1Click:Connect(function()
+        if not mbHasMoved then
+            mainFrame.Visible = not mainFrame.Visible
+        end
+    end)
 
-    -- Dragging Logic Toolbar (Delta Touch Support)
-    local barDragging = false
-    local barDragStart = Vector3.zero
-    local barStartPos = UDim2.new()
+    -- Logika Dragging MainWindow (Header & Frame Drag)
+    local winDragging, winDragInput, winDragStart, winStartPos
+    local connWinStart = mainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            winDragging = true
+            winDragStart = input.Position
+            winStartPos = mainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    winDragging = false
+                end
+            end)
+        end
+    end)
+    table.insert(self.Connections, connWinStart)
 
-    local function setupBarDrag(targetElement: GuiObject)
-        targetElement.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                barDragging = true
-                barDragStart = input.Position
-                barStartPos = floatBar.Position
+    local connWinChange = mainFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            winDragInput = input
+        end
+    end)
+    table.insert(self.Connections, connWinChange)
 
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        barDragging = false
-                    end
-                end)
-            end
+    local connWinMove = UserInputService.InputChanged:Connect(function(input)
+        if input == winDragInput and winDragging then
+            local delta = input.Position - winDragStart
+            mainFrame.Position = UDim2.new(
+                winStartPos.X.Scale,
+                winStartPos.X.Offset + delta.X,
+                winStartPos.Y.Scale,
+                winStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    table.insert(self.Connections, connWinMove)
+
+    -- Header Bar
+    local header = Instance.new("Frame")
+    header.Name = "Header"
+    header.Size = UDim2.new(1, 0, 0, 48)
+    header.BackgroundColor3 = theme.CardBg
+    header.BorderSizePixel = 0
+    header.ZIndex = 61
+    header.Parent = mainFrame
+
+    local headerCorner = Instance.new("UICorner")
+    headerCorner.CornerRadius = UDim.new(0, 12)
+    headerCorner.Parent = header
+
+    local headerPatch = Instance.new("Frame")
+    headerPatch.Size = UDim2.new(1, 0, 0, 10)
+    headerPatch.Position = UDim2.new(0, 0, 1, -10)
+    headerPatch.BackgroundColor3 = theme.CardBg
+    headerPatch.BorderSizePixel = 0
+    headerPatch.ZIndex = 61
+    headerPatch.Parent = header
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0, 240, 0, 22)
+    titleLabel.Position = UDim2.new(0, 16, 0, 6)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = Config.UI.Title .. " v3.0"
+    titleLabel.TextColor3 = theme.Accent
+    titleLabel.TextSize = 15
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.ZIndex = 62
+    titleLabel.Parent = header
+
+    local subtitleLabel = Instance.new("TextLabel")
+    subtitleLabel.Size = UDim2.new(0, 280, 0, 16)
+    subtitleLabel.Position = UDim2.new(0, 16, 0, 26)
+    subtitleLabel.BackgroundTransparency = 1
+    subtitleLabel.Text = Config.UI.Subtitle
+    subtitleLabel.TextColor3 = theme.TextSubtle
+    subtitleLabel.TextSize = 10
+    subtitleLabel.Font = Enum.Font.Gotham
+    subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    subtitleLabel.ZIndex = 62
+    subtitleLabel.Parent = header
+
+    -- Tombol Close X
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "CloseButton"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -74, 0, 9)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(240, 90, 90)
+    closeBtn.TextSize = 13
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.ZIndex = 62
+    closeBtn.Parent = header
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeBtn
+
+    closeBtn.MouseButton1Click:Connect(function()
+        mainFrame.Visible = false
+    end)
+
+    -- Tombol Maximize / Perbesar Tampilan (□ / ❐)
+    local maxBtn = Instance.new("TextButton")
+    maxBtn.Name = "MaximizeButton"
+    maxBtn.Size = UDim2.new(0, 30, 0, 30)
+    maxBtn.Position = UDim2.new(1, -38, 0, 9)
+    maxBtn.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+    maxBtn.Text = "□"
+    maxBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
+    maxBtn.TextSize = 15
+    maxBtn.Font = Enum.Font.GothamBold
+    maxBtn.ZIndex = 62
+    maxBtn.Parent = header
+
+    local maxCorner = Instance.new("UICorner")
+    maxCorner.CornerRadius = UDim.new(0, 6)
+    maxCorner.Parent = maxBtn
+
+    local isMaximized = false
+    maxBtn.MouseButton1Click:Connect(function()
+        isMaximized = not isMaximized
+        local currentCam = Workspace.CurrentCamera
+        local currentVp = (currentCam and currentCam.ViewportSize) or Vector2.new(1280, 720)
+        if isMaximized then
+            local targetW = math.min(840, currentVp.X - 30)
+            local targetH = math.min(580, currentVp.Y - 30)
+            mainFrame.Size = UDim2.new(0, targetW, 0, targetH)
+            mainFrame.Position = UDim2.new(0.5, -math.floor(targetW / 2), 0.5, -math.floor(targetH / 2))
+            maxBtn.Text = "❐"
+            maxBtn.TextColor3 = Color3.fromRGB(255, 180, 50)
+        else
+            local targetW = math.min(620, math.max(540, currentVp.X - 40))
+            local targetH = math.min(460, math.max(400, currentVp.Y - 40))
+            mainFrame.Size = UDim2.new(0, targetW, 0, targetH)
+            mainFrame.Position = UDim2.new(0.5, -math.floor(targetW / 2), 0.5, -math.floor(targetH / 2))
+            maxBtn.Text = "□"
+            maxBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
+        end
+    end)
+
+    -- ========================================================
+    -- D. SIDEBAR NAVIGASI TAB (KIRI)
+    -- ========================================================
+    local sidebar = Instance.new("Frame")
+    sidebar.Name = "Sidebar"
+    sidebar.Size = UDim2.new(0, 138, 1, -48)
+    sidebar.Position = UDim2.new(0, 0, 0, 48)
+    sidebar.BackgroundColor3 = theme.Sidebar
+    sidebar.BorderSizePixel = 0
+    sidebar.ZIndex = 61
+    sidebar.Parent = mainFrame
+
+    local contentArea = Instance.new("Frame")
+    contentArea.Name = "ContentArea"
+    contentArea.Size = UDim2.new(1, -148, 1, -58)
+    contentArea.Position = UDim2.new(0, 143, 0, 53)
+    contentArea.BackgroundTransparency = 1
+    contentArea.ZIndex = 61
+    contentArea.Parent = mainFrame
+
+    local function createTab(tabName: string): ScrollingFrame
+        local page = Instance.new("ScrollingFrame")
+        page.Name = tabName .. "Page"
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1
+        page.BorderSizePixel = 0
+        page.ScrollBarThickness = 4
+        page.ScrollBarImageColor3 = theme.Accent
+        page.Visible = false
+        page.CanvasSize = UDim2.new(0, 0, 0, 0)
+        page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        page.ZIndex = 62
+        page.Parent = contentArea
+
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 8)
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = page
+
+        local pagePadding = Instance.new("UIPadding")
+        pagePadding.PaddingRight = UDim.new(0, 6)
+        pagePadding.PaddingBottom = UDim.new(0, 12)
+        pagePadding.Parent = page
+
+        self.Tabs[tabName] = page
+        return page
+    end
+
+    local tabList = {
+        { Id = "Clicker",   Label = "🎯 Auto Clicker" },
+        { Id = "Movement",  Label = "🏃 Local Player" },
+        { Id = "Selling",   Label = "💰 Auto Selling" },
+        { Id = "Teleport",  Label = "📍 Teleportasi" },
+        { Id = "Status",    Label = "📊 Status & Sesi" },
+    }
+
+    local tabLayout = Instance.new("UIListLayout")
+    tabLayout.Padding = UDim.new(0, 4)
+    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabLayout.Parent = sidebar
+
+    local sidebarPadding = Instance.new("UIPadding")
+    sidebarPadding.PaddingTop = UDim.new(0, 6)
+    sidebarPadding.PaddingLeft = UDim.new(0, 6)
+    sidebarPadding.PaddingRight = UDim.new(0, 6)
+    sidebarPadding.Parent = sidebar
+
+    for _, t in ipairs(tabList) do
+        createTab(t.Id)
+
+        local btn = Instance.new("TextButton")
+        btn.Name = t.Id .. "TabBtn"
+        btn.Size = UDim2.new(1, 0, 0, 32)
+        btn.BackgroundColor3 = (t.Id == self.CurrentTab) and theme.CardBg or Color3.fromRGB(20, 22, 30)
+        btn.Text = t.Label
+        btn.TextColor3 = (t.Id == self.CurrentTab) and theme.Accent or theme.TextSubtle
+        btn.TextSize = 11
+        btn.Font = Enum.Font.GothamMedium
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.ZIndex = 62
+        btn.Parent = sidebar
+
+        local pad = Instance.new("UIPadding")
+        pad.PaddingLeft = UDim.new(0, 8)
+        pad.Parent = btn
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = btn
+
+        self.TabButtons[t.Id] = btn
+
+        btn.MouseButton1Click:Connect(function()
+            self:SwitchTab(t.Id)
         end)
     end
 
-    setupBarDrag(dragHandle)
-    setupBarDrag(floatBar)
+    -- ========================================================
+    -- KOMPONEN UI BUILDER HELPER (BODOAMAT CARDS)
+    -- ========================================================
+    local function createSectionHeader(parent: Instance, text: string)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -4, 0, 22)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = text
+        lbl.TextColor3 = theme.Accent
+        lbl.TextSize = 11
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.ZIndex = 63
+        lbl.Parent = parent
+    end
 
-    local connDragBar = UserInputService.InputChanged:Connect(function(input)
-        if barDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - barDragStart
-            local newX = barStartPos.X.Offset + delta.X
-            local newY = barStartPos.Y.Offset + delta.Y
-            local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-            newX = math.clamp(newX, 10, camVp.X - barWidth - 10)
-            newY = math.clamp(newY, 10, camVp.Y - barHeight - 10)
+    local function createToggleCard(parent: Instance, title: string, desc: string, default: boolean, onToggle: (boolean) -> ())
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, -4, 0, 50)
+        card.BackgroundColor3 = theme.CardBg
+        card.BorderSizePixel = 0
+        card.ZIndex = 63
+        card.Parent = parent
 
-            floatBar.Position = UDim2.new(barStartPos.X.Scale, newX, barStartPos.Y.Scale, newY)
-        end
-    end)
-    table.insert(self.Connections, connDragBar)
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 8)
+        cCorner.Parent = card
 
-    -- Container Tombol Aksi
-    local btnContainer = Instance.new("Frame")
-    btnContainer.Size = UDim2.new(1, -26, 1, -8)
-    btnContainer.Position = UDim2.new(0, 24, 0, 4)
-    btnContainer.BackgroundTransparency = 1
-    btnContainer.ZIndex = 61
-    btnContainer.Parent = floatBar
+        local tLabel = Instance.new("TextLabel")
+        tLabel.Size = UDim2.new(1, -70, 0, 20)
+        tLabel.Position = UDim2.new(0, 12, 0, 6)
+        tLabel.BackgroundTransparency = 1
+        tLabel.Text = title
+        tLabel.TextColor3 = theme.Text
+        tLabel.TextSize = 12
+        tLabel.Font = Enum.Font.GothamBold
+        tLabel.TextXAlignment = Enum.TextXAlignment.Left
+        tLabel.ZIndex = 64
+        tLabel.Parent = card
 
-    local btnLayout = Instance.new("UIListLayout")
-    btnLayout.FillDirection = Enum.FillDirection.Horizontal
-    btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-    btnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    btnLayout.Padding = UDim.new(0, 5)
-    btnLayout.Parent = btnContainer
+        local dLabel = Instance.new("TextLabel")
+        dLabel.Size = UDim2.new(1, -70, 0, 16)
+        dLabel.Position = UDim2.new(0, 12, 0, 26)
+        dLabel.BackgroundTransparency = 1
+        dLabel.Text = desc
+        dLabel.TextColor3 = theme.TextSubtle
+        dLabel.TextSize = 10
+        dLabel.Font = Enum.Font.Gotham
+        dLabel.TextXAlignment = Enum.TextXAlignment.Left
+        dLabel.ZIndex = 64
+        dLabel.Parent = card
 
-    -- 1. Tombol Play / Pause (▶ / ⏸)
-    local playBtn = Instance.new("TextButton")
-    playBtn.Name = "PlayButton"
-    playBtn.Size = UDim2.new(0, 62, 0, 32)
-    playBtn.BackgroundColor3 = theme.CardBg
-    playBtn.Text = "▶ PLAY"
-    playBtn.TextColor3 = theme.Success
-    playBtn.TextSize = 11
-    playBtn.Font = Enum.Font.GothamBold
-    playBtn.ZIndex = 62
-    playBtn.Parent = btnContainer
+        local toggleBtn = Instance.new("TextButton")
+        toggleBtn.Size = UDim2.new(0, 48, 0, 26)
+        toggleBtn.Position = UDim2.new(1, -58, 0.5, -13)
+        toggleBtn.BackgroundColor3 = default and theme.Success or Color3.fromRGB(48, 52, 68)
+        toggleBtn.Text = default and "ON" or "OFF"
+        toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        toggleBtn.TextSize = 11
+        toggleBtn.Font = Enum.Font.GothamBold
+        toggleBtn.ZIndex = 64
+        toggleBtn.Parent = card
 
-    local playCorner = Instance.new("UICorner")
-    playCorner.CornerRadius = UDim.new(0, 6)
-    playCorner.Parent = playBtn
+        local tgCorner = Instance.new("UICorner")
+        tgCorner.CornerRadius = UDim.new(0, 13)
+        tgCorner.Parent = toggleBtn
 
-    local playStroke = Instance.new("UIStroke")
-    playStroke.Color = theme.Success
-    playStroke.Thickness = 1.2
-    playStroke.Parent = playBtn
+        local isToggled = default
+        toggleBtn.MouseButton1Click:Connect(function()
+            isToggled = not isToggled
+            toggleBtn.Text = isToggled and "ON" or "OFF"
+            toggleBtn.BackgroundColor3 = isToggled and theme.Success or Color3.fromRGB(48, 52, 68)
+            onToggle(isToggled)
+        end)
+    end
 
-    playBtn.MouseButton1Click:Connect(function()
+    local function createInputCard(parent: Instance, title: string, desc: string, defaultText: string, placeholder: string, onFocusLost: (string) -> ())
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, -4, 0, 68)
+        card.BackgroundColor3 = theme.CardBg
+        card.BorderSizePixel = 0
+        card.ZIndex = 63
+        card.Parent = parent
+
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 8)
+        cCorner.Parent = card
+
+        local tLabel = Instance.new("TextLabel")
+        tLabel.Size = UDim2.new(1, -20, 0, 18)
+        tLabel.Position = UDim2.new(0, 12, 0, 6)
+        tLabel.BackgroundTransparency = 1
+        tLabel.Text = title
+        tLabel.TextColor3 = theme.Text
+        tLabel.TextSize = 12
+        tLabel.Font = Enum.Font.GothamBold
+        tLabel.TextXAlignment = Enum.TextXAlignment.Left
+        tLabel.ZIndex = 64
+        tLabel.Parent = card
+
+        local dLabel = Instance.new("TextLabel")
+        dLabel.Size = UDim2.new(1, -20, 0, 14)
+        dLabel.Position = UDim2.new(0, 12, 0, 24)
+        dLabel.BackgroundTransparency = 1
+        dLabel.Text = desc
+        dLabel.TextColor3 = theme.TextSubtle
+        dLabel.TextSize = 9
+        dLabel.Font = Enum.Font.Gotham
+        dLabel.TextXAlignment = Enum.TextXAlignment.Left
+        dLabel.ZIndex = 64
+        dLabel.Parent = card
+
+        local textBox = Instance.new("TextBox")
+        textBox.Size = UDim2.new(1, -24, 0, 24)
+        textBox.Position = UDim2.new(0, 12, 0, 38)
+        textBox.BackgroundColor3 = theme.Sidebar
+        textBox.Text = defaultText
+        textBox.PlaceholderText = placeholder
+        textBox.TextColor3 = theme.Text
+        textBox.PlaceholderColor3 = theme.TextSubtle
+        textBox.TextSize = 11
+        textBox.Font = Enum.Font.GothamBold
+        textBox.ClearTextOnFocus = false
+        textBox.ZIndex = 64
+        textBox.Parent = card
+
+        local tbCorner = Instance.new("UICorner")
+        tbCorner.CornerRadius = UDim.new(0, 6)
+        tbCorner.Parent = textBox
+
+        local tbStroke = Instance.new("UIStroke")
+        tbStroke.Color = theme.Border
+        tbStroke.Thickness = 1
+        tbStroke.Parent = textBox
+
+        textBox.FocusLost:Connect(function()
+            onFocusLost(textBox.Text)
+        end)
+    end
+
+    local function createActionButton(parent: Instance, label: string, desc: string, btnText: string, onClick: () -> ())
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, -4, 0, 48)
+        card.BackgroundColor3 = theme.CardBg
+        card.BorderSizePixel = 0
+        card.ZIndex = 63
+        card.Parent = parent
+
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 8)
+        cCorner.Parent = card
+
+        local tLabel = Instance.new("TextLabel")
+        tLabel.Size = UDim2.new(1, -110, 0, 20)
+        tLabel.Position = UDim2.new(0, 12, 0, 5)
+        tLabel.BackgroundTransparency = 1
+        tLabel.Text = label
+        tLabel.TextColor3 = theme.Text
+        tLabel.TextSize = 12
+        tLabel.Font = Enum.Font.GothamBold
+        tLabel.TextXAlignment = Enum.TextXAlignment.Left
+        tLabel.ZIndex = 64
+        tLabel.Parent = card
+
+        local dLabel = Instance.new("TextLabel")
+        dLabel.Size = UDim2.new(1, -110, 0, 16)
+        dLabel.Position = UDim2.new(0, 12, 0, 25)
+        dLabel.BackgroundTransparency = 1
+        dLabel.Text = desc
+        dLabel.TextColor3 = theme.TextSubtle
+        dLabel.TextSize = 10
+        dLabel.Font = Enum.Font.Gotham
+        dLabel.TextXAlignment = Enum.TextXAlignment.Left
+        dLabel.ZIndex = 64
+        dLabel.Parent = card
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 90, 0, 30)
+        btn.Position = UDim2.new(1, -98, 0.5, -15)
+        btn.BackgroundColor3 = theme.Sidebar
+        btn.Text = btnText
+        btn.TextColor3 = theme.Accent
+        btn.TextSize = 11
+        btn.Font = Enum.Font.GothamBold
+        btn.ZIndex = 64
+        btn.Parent = card
+
+        local bCorner = Instance.new("UICorner")
+        bCorner.CornerRadius = UDim.new(0, 6)
+        bCorner.Parent = btn
+
+        local bStroke = Instance.new("UIStroke")
+        bStroke.Color = theme.Border
+        bStroke.Thickness = 1
+        bStroke.Parent = btn
+
+        btn.MouseButton1Click:Connect(onClick)
+    end
+
+    -- ========================================================
+    -- TAB 1: 🎯 AUTO CLICKER (AKTIF & BERFUNGSI PENUH)
+    -- ========================================================
+    local clickerPage = self.Tabs["Clicker"]
+
+    -- Hero Control Card: Play / Pause
+    local heroCard = Instance.new("Frame")
+    heroCard.Size = UDim2.new(1, -4, 0, 64)
+    heroCard.BackgroundColor3 = theme.CardBg
+    heroCard.BorderSizePixel = 0
+    heroCard.ZIndex = 63
+    heroCard.Parent = clickerPage
+
+    local hCorner = Instance.new("UICorner")
+    hCorner.CornerRadius = UDim.new(0, 8)
+    hCorner.Parent = heroCard
+
+    local hStroke = Instance.new("UIStroke")
+    hStroke.Color = theme.Accent
+    hStroke.Thickness = 1.2
+    hStroke.Parent = heroCard
+
+    local hTitle = Instance.new("TextLabel")
+    hTitle.Size = UDim2.new(1, -120, 0, 22)
+    hTitle.Position = UDim2.new(0, 14, 0, 10)
+    hTitle.BackgroundTransparency = 1
+    hTitle.Text = "Status Ketukan Layar"
+    hTitle.TextColor3 = theme.Text
+    hTitle.TextSize = 13
+    hTitle.Font = Enum.Font.GothamBold
+    hTitle.TextXAlignment = Enum.TextXAlignment.Left
+    hTitle.ZIndex = 64
+    hTitle.Parent = heroCard
+
+    local hStatus = Instance.new("TextLabel")
+    hStatus.Size = UDim2.new(1, -120, 0, 18)
+    hStatus.Position = UDim2.new(0, 14, 0, 32)
+    hStatus.BackgroundTransparency = 1
+    hStatus.Text = "Standby (1.0s Default per klik)"
+    hStatus.TextColor3 = theme.Success
+    hStatus.TextSize = 11
+    hStatus.Font = Enum.Font.GothamMedium
+    hStatus.TextXAlignment = Enum.TextXAlignment.Left
+    hStatus.ZIndex = 64
+    hStatus.Parent = heroCard
+
+    local mainPlayBtn = Instance.new("TextButton")
+    mainPlayBtn.Size = UDim2.new(0, 96, 0, 38)
+    mainPlayBtn.Position = UDim2.new(1, -110, 0.5, -19)
+    mainPlayBtn.BackgroundColor3 = Color3.fromRGB(28, 38, 48)
+    mainPlayBtn.Text = "▶ PLAY"
+    mainPlayBtn.TextColor3 = theme.Success
+    mainPlayBtn.TextSize = 12
+    mainPlayBtn.Font = Enum.Font.GothamBold
+    mainPlayBtn.ZIndex = 64
+    mainPlayBtn.Parent = heroCard
+
+    local mpCorner = Instance.new("UICorner")
+    mpCorner.CornerRadius = UDim.new(0, 8)
+    mpCorner.Parent = mainPlayBtn
+
+    local mpStroke = Instance.new("UIStroke")
+    mpStroke.Color = theme.Success
+    mpStroke.Thickness = 1.4
+    mpStroke.Parent = mainPlayBtn
+
+    mainPlayBtn.MouseButton1Click:Connect(function()
         ClickEngine:Toggle()
     end)
 
     State:OnChange("IsRunning", function(running)
         if running then
-            playBtn.Text = "⏸ PAUSE"
-            playBtn.TextColor3 = theme.Warning
-            playBtn.BackgroundColor3 = Color3.fromRGB(38, 32, 20)
-            playStroke.Color = theme.Warning
-            barStroke.Color = theme.Accent
+            mainPlayBtn.Text = "⏸ PAUSE"
+            mainPlayBtn.TextColor3 = theme.Warning
+            mainPlayBtn.BackgroundColor3 = Color3.fromRGB(38, 32, 20)
+            mpStroke.Color = theme.Warning
+            hStatus.Text = "Berjalan: Mengetuk target layar..."
+            hStatus.TextColor3 = theme.Warning
         else
-            playBtn.Text = "▶ PLAY"
-            playBtn.TextColor3 = theme.Success
-            playBtn.BackgroundColor3 = theme.CardBg
-            playStroke.Color = theme.Success
-            barStroke.Color = theme.Border
+            mainPlayBtn.Text = "▶ PLAY"
+            mainPlayBtn.TextColor3 = theme.Success
+            mainPlayBtn.BackgroundColor3 = Color3.fromRGB(28, 38, 48)
+            mpStroke.Color = theme.Success
+            hStatus.Text = "Standby (Siap digunakan)"
+            hStatus.TextColor3 = theme.Success
         end
     end)
 
-    -- 2. Tombol Settings (⚙)
-    local setBtn = Instance.new("TextButton")
-    setBtn.Name = "SettingsButton"
-    setBtn.Size = UDim2.new(0, 32, 0, 32)
-    setBtn.BackgroundColor3 = theme.CardBg
-    setBtn.Text = "⚙"
-    setBtn.TextColor3 = theme.Accent
-    setBtn.TextSize = 14
-    setBtn.Font = Enum.Font.GothamBold
-    setBtn.ZIndex = 62
-    setBtn.Parent = btnContainer
+    createSectionHeader(clickerPage, "PENGATURAN TIMING KLIK")
 
-    local setCorner = Instance.new("UICorner")
-    setCorner.CornerRadius = UDim.new(0, 6)
-    setCorner.Parent = setBtn
+    -- 1. Interval Input TextBox
+    createInputCard(
+        clickerPage,
+        "Interval Klik (Milidetik / ms)",
+        "Waktu jeda antar ketukan (1000ms = 1 Detik). Ubah dengan mengetik angka.",
+        tostring(State.IntervalMs),
+        "Default: 1000",
+        function(text)
+            local num = tonumber(text)
+            if num and num >= 10 then
+                State:Set("IntervalMs", math.floor(num))
+            end
+        end
+    )
 
-    -- 3. Tombol Toggle Visibility Pin (👁)
-    local eyeBtn = Instance.new("TextButton")
-    eyeBtn.Name = "EyeButton"
-    eyeBtn.Size = UDim2.new(0, 32, 0, 32)
-    eyeBtn.BackgroundColor3 = theme.CardBg
-    eyeBtn.Text = "👁"
-    eyeBtn.TextColor3 = theme.Text
-    eyeBtn.TextSize = 13
-    eyeBtn.Font = Enum.Font.GothamBold
-    eyeBtn.ZIndex = 62
-    eyeBtn.Parent = btnContainer
+    -- 2. Durasi Tahan / Hold Time
+    createInputCard(
+        clickerPage,
+        "Durasi Tekan / Hold Time (ms)",
+        "Berapa lama layar ditekan sebelum dilepas (Default: 28 ms).",
+        tostring(State.HoldDurationMs),
+        "Default: 28",
+        function(text)
+            local num = tonumber(text)
+            if num and num >= 5 then
+                State:Set("HoldDurationMs", math.floor(num))
+            end
+        end
+    )
 
-    local eyeCorner = Instance.new("UICorner")
-    eyeCorner.CornerRadius = UDim.new(0, 6)
-    eyeCorner.Parent = eyeBtn
+    createSectionHeader(clickerPage, "RITME & VISUAL PIN TARGET")
 
-    eyeBtn.MouseButton1Click:Connect(function()
-        State:Set("IsPinVisible", not State.IsPinVisible)
-    end)
+    -- 3. Human Rhythm Toggle
+    createToggleCard(
+        clickerPage,
+        "Human Rhythm & Timing Jitter",
+        "Variasi acak alami (±32ms) dan stamina micro-pause agar aman.",
+        State.IsHumanize,
+        function(val)
+            State:Set("IsHumanize", val)
+        end
+    )
 
-    State:OnChange("IsPinVisible", function(visible)
-        eyeBtn.TextColor3 = visible and theme.Text or theme.TextSubtle
-        eyeBtn.BackgroundColor3 = visible and theme.CardBg or Color3.fromRGB(18, 20, 26)
-    end)
-
-    -- 4. Tombol Close (✕)
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Name = "CloseButton"
-    closeBtn.Size = UDim2.new(0, 32, 0, 32)
-    closeBtn.BackgroundColor3 = theme.CardBg
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = theme.Danger
-    closeBtn.TextSize = 12
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.ZIndex = 62
-    closeBtn.Parent = btnContainer
-
-    local clsCorner = Instance.new("UICorner")
-    clsCorner.CornerRadius = UDim.new(0, 6)
-    clsCorner.Parent = closeBtn
-
-    closeBtn.MouseButton1Click:Connect(function()
-        self:Destroy()
-    end)
+    -- 4. Pin Visibility Toggle
+    createToggleCard(
+        clickerPage,
+        "Tampilkan Pin Target di Layar",
+        "Sembunyikan lingkaran target (#1) jika ingin layar lebih bersih.",
+        State.IsPinVisible,
+        function(val)
+            State:Set("IsPinVisible", val)
+        end
+    )
 
     -- ========================================================
-    -- C. SETTINGS MODAL (RESPONSIVE MOBILE SCALING)
+    -- TAB 2: 🏃 LOCAL PLAYER (FRONTEND READY UNTUK EKSPANSI)
     -- ========================================================
-    local baseModalW = 340
-    local baseModalH = 430
+    local movementPage = self.Tabs["Movement"]
 
-    local setModal = Instance.new("Frame")
-    setModal.Name = "SettingsModal"
-    setModal.BackgroundColor3 = theme.Background
-    setModal.BorderSizePixel = 0
-    setModal.Visible = false
-    setModal.Active = true
-    setModal.ZIndex = 100
-    setModal.Parent = screenGui
+    createSectionHeader(movementPage, "KECEPATAN & PERGERAKAN KARAKTER")
+    createToggleCard(movementPage, "Infinite Jump", "Lompat bebas di udara tanpa menyentuh tanah.", false, function(v) end)
+    createToggleCard(movementPage, "Water Walk (Jesus Walk)", "Berjalan di atas permukaan air tanpa tenggelam.", false, function(v) end)
+    createInputCard(movementPage, "Kustom WalkSpeed", "Kecepatan jalan karakter (Default Roblox: 16).", "16", "Contoh: 32", function(t) end)
+    createInputCard(movementPage, "Kustom JumpPower", "Tinggi lompatan karakter (Default Roblox: 50).", "50", "Contoh: 80", function(t) end)
 
-    local function updateModalBounds()
-        local currentVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-        local modalW = math.min(baseModalW, currentVp.X - 24)
-        local modalH = math.min(baseModalH, currentVp.Y - 24)
-        setModal.Size = UDim2.new(0, modalW, 0, modalH)
-        setModal.Position = UDim2.new(0.5, -math.floor(modalW / 2), 0.5, -math.floor(modalH / 2))
-    end
-    updateModalBounds()
+    -- ========================================================
+    -- TAB 3: 💰 AUTO SELLING (FRONTEND READY UNTUK EKSPANSI)
+    -- ========================================================
+    local sellingPage = self.Tabs["Selling"]
 
-    local connVp = CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateModalBounds)
-    table.insert(self.Connections, connVp)
+    createSectionHeader(sellingPage, "OTOMASI PENJUALAN ITEM")
+    createToggleCard(sellingPage, "Enable Auto Selling", "Menjual item/ikan otomatis saat tas penuh.", false, function(v) end)
+    createInputCard(sellingPage, "Batas Threshold Tas", "Jual otomatis saat jumlah item di tas mencapai nilai ini.", "1000", "Default: 1000", function(t) end)
+    createActionButton(sellingPage, "Mode Penjualan", "Pilihan metode penjualan saat siklus berlangsung.", "With Limit", function() end)
+    createActionButton(sellingPage, "Amankan Kelangkaan Minimal", "Ikan dengan rarity ini ke atas tidak akan dijual.", "Legendary", function() end)
 
-    local smCorner = Instance.new("UICorner")
-    smCorner.CornerRadius = UDim.new(0, 10)
-    smCorner.Parent = setModal
+    -- ========================================================
+    -- TAB 4: 📍 TELEPORTASI (FRONTEND READY UNTUK EKSPANSI)
+    -- ========================================================
+    local teleportPage = self.Tabs["Teleport"]
 
-    local smStroke = Instance.new("UIStroke")
-    smStroke.Color = theme.Border
-    smStroke.Thickness = 1.5
-    smStroke.Parent = setModal
+    createSectionHeader(teleportPage, "LOKASI TELEPORT CEPAT")
+    createActionButton(teleportPage, "Safe Island / Hub Utama", "Teleportasi ke dermaga utama pulau aman.", "Teleport", function() end)
+    createActionButton(teleportPage, "Merchant & Pasar", "Teleportasi ke area pedagang joran & umpan.", "Teleport", function() end)
+    createActionButton(teleportPage, "Laut Dalam (Deep Ocean)", "Teleportasi ke area pemancingan laut lepas.", "Teleport", function() end)
+    createActionButton(teleportPage, "Gua Tersembunyi", "Teleportasi ke spot mancing rahasia.", "Teleport", function() end)
 
-    -- Modal Header
-    local mHeader = Instance.new("Frame")
-    mHeader.Size = UDim2.new(1, 0, 0, 46)
-    mHeader.BackgroundColor3 = theme.Sidebar
-    mHeader.BorderSizePixel = 0
-    mHeader.ZIndex = 101
-    mHeader.Parent = setModal
+    -- ========================================================
+    -- TAB 5: 📊 STATUS & SESI SCRIPT
+    -- ========================================================
+    local statusPage = self.Tabs["Status"]
 
-    local mhCorner = Instance.new("UICorner")
-    mhCorner.CornerRadius = UDim.new(0, 10)
-    mhCorner.Parent = mHeader
-
-    local mhFix = Instance.new("Frame")
-    mhFix.Size = UDim2.new(1, 0, 0, 10)
-    mhFix.Position = UDim2.new(0, 0, 1, -10)
-    mhFix.BackgroundColor3 = theme.Sidebar
-    mhFix.BorderSizePixel = 0
-    mhFix.ZIndex = 101
-    mhFix.Parent = mHeader
-
-    local mTitle = Instance.new("TextLabel")
-    mTitle.Size = UDim2.new(1, -50, 0, 22)
-    mTitle.Position = UDim2.new(0, 14, 0, 4)
-    mTitle.BackgroundTransparency = 1
-    mTitle.Text = Config.UI.Title
-    mTitle.TextColor3 = theme.Accent
-    mTitle.TextSize = 14
-    mTitle.Font = Enum.Font.GothamBold
-    mTitle.TextXAlignment = Enum.TextXAlignment.Left
-    mTitle.ZIndex = 102
-    mTitle.Parent = mHeader
-
-    local mSub = Instance.new("TextLabel")
-    mSub.Size = UDim2.new(1, -50, 0, 16)
-    mSub.Position = UDim2.new(0, 14, 0, 24)
-    mSub.BackgroundTransparency = 1
-    mSub.Text = Config.UI.Subtitle
-    mSub.TextColor3 = theme.TextSubtle
-    mSub.TextSize = 10
-    mSub.Font = Enum.Font.Gotham
-    mSub.TextXAlignment = Enum.TextXAlignment.Left
-    mSub.ZIndex = 102
-    mSub.Parent = mHeader
-
-    local mCloseBtn = Instance.new("TextButton")
-    mCloseBtn.Size = UDim2.new(0, 28, 0, 28)
-    mCloseBtn.Position = UDim2.new(1, -36, 0, 9)
-    mCloseBtn.BackgroundColor3 = theme.CardBg
-    mCloseBtn.Text = "✕"
-    mCloseBtn.TextColor3 = theme.TextSubtle
-    mCloseBtn.TextSize = 12
-    mCloseBtn.Font = Enum.Font.GothamBold
-    mCloseBtn.ZIndex = 102
-    mCloseBtn.Parent = mHeader
-
-    local mcCorner = Instance.new("UICorner")
-    mcCorner.CornerRadius = UDim.new(0, 6)
-    mcCorner.Parent = mCloseBtn
-
-    mCloseBtn.MouseButton1Click:Connect(function()
-        setModal.Visible = false
-        State.IsSettingsOpen = false
-    end)
-
-    setBtn.MouseButton1Click:Connect(function()
-        State.IsSettingsOpen = not State.IsSettingsOpen
-        updateModalBounds()
-        setModal.Visible = State.IsSettingsOpen
-    end)
-
-    -- Modal Scroll Content
-    local mScroll = Instance.new("ScrollingFrame")
-    mScroll.Size = UDim2.new(1, -20, 1, -56)
-    mScroll.Position = UDim2.new(0, 10, 0, 50)
-    mScroll.BackgroundTransparency = 1
-    mScroll.BorderSizePixel = 0
-    mScroll.ScrollBarThickness = 3
-    mScroll.ScrollBarImageColor3 = theme.Accent
-    mScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    mScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    mScroll.ZIndex = 101
-    mScroll.Parent = setModal
-
-    local mLayout = Instance.new("UIListLayout")
-    mLayout.Padding = UDim.new(0, 8)
-    mLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    mLayout.Parent = mScroll
-
-    local function createSectionHeader(title: string)
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, 0, 0, 20)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = title
-        lbl.TextColor3 = theme.Accent
-        lbl.TextSize = 11
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.ZIndex = 102
-        lbl.Parent = mScroll
-    end
-
-    -- 1. SECTION: INTERVAL SETTINGS
-    createSectionHeader("PENGATURAN INTERVAL KLIK")
-
-    local intervalCard = Instance.new("Frame")
-    intervalCard.Size = UDim2.new(1, 0, 0, 68)
-    intervalCard.BackgroundColor3 = theme.CardBg
-    intervalCard.BorderSizePixel = 0
-    intervalCard.ZIndex = 102
-    intervalCard.Parent = mScroll
-
-    local icCorner = Instance.new("UICorner")
-    icCorner.CornerRadius = UDim.new(0, 8)
-    icCorner.Parent = intervalCard
-
-    local icLabel = Instance.new("TextLabel")
-    icLabel.Size = UDim2.new(1, -16, 0, 18)
-    icLabel.Position = UDim2.new(0, 10, 0, 8)
-    icLabel.BackgroundTransparency = 1
-    icLabel.Text = "Interval Klik (Milidetik / ms):"
-    icLabel.TextColor3 = theme.Text
-    icLabel.TextSize = 11
-    icLabel.Font = Enum.Font.GothamMedium
-    icLabel.TextXAlignment = Enum.TextXAlignment.Left
-    icLabel.ZIndex = 103
-    icLabel.Parent = intervalCard
-
-    local intervalInput = Instance.new("TextBox")
-    intervalInput.Size = UDim2.new(1, -20, 0, 30)
-    intervalInput.Position = UDim2.new(0, 10, 0, 28)
-    intervalInput.BackgroundColor3 = theme.Sidebar
-    intervalInput.Text = tostring(State.IntervalMs)
-    intervalInput.PlaceholderText = "Default: 1000 (1000ms = 1 Detik)"
-    intervalInput.TextColor3 = theme.Text
-    intervalInput.PlaceholderColor3 = theme.TextSubtle
-    intervalInput.TextSize = 12
-    intervalInput.Font = Enum.Font.GothamBold
-    intervalInput.ClearTextOnFocus = false
-    intervalInput.ZIndex = 103
-    intervalInput.Parent = intervalCard
-
-    local iiCorner = Instance.new("UICorner")
-    iiCorner.CornerRadius = UDim.new(0, 6)
-    iiCorner.Parent = intervalInput
-
-    local iiStroke = Instance.new("UIStroke")
-    iiStroke.Color = theme.Border
-    iiStroke.Thickness = 1
-    iiStroke.Parent = intervalInput
-
-    local function applyCustomInterval(text: string)
-        local num = tonumber(text)
-        if num and num >= 10 then
-            State:Set("IntervalMs", math.floor(num))
-        else
-            intervalInput.Text = tostring(State.IntervalMs)
-        end
-    end
-
-    intervalInput.FocusLost:Connect(function()
-        applyCustomInterval(intervalInput.Text)
-    end)
-
-    -- 2. SECTION: HOLD DURATION (WAKTU TEKAN)
-    createSectionHeader("DURASI TEKAN KLIK (HOLD TIME)")
-
-    local holdCard = Instance.new("Frame")
-    holdCard.Size = UDim2.new(1, 0, 0, 68)
-    holdCard.BackgroundColor3 = theme.CardBg
-    holdCard.BorderSizePixel = 0
-    holdCard.ZIndex = 102
-    holdCard.Parent = mScroll
-
-    local hdCorner = Instance.new("UICorner")
-    hdCorner.CornerRadius = UDim.new(0, 8)
-    hdCorner.Parent = holdCard
-
-    local hdLabel = Instance.new("TextLabel")
-    hdLabel.Size = UDim2.new(1, -16, 0, 18)
-    hdLabel.Position = UDim2.new(0, 10, 0, 8)
-    hdLabel.BackgroundTransparency = 1
-    hdLabel.Text = "Durasi Tahan / Press (ms):"
-    hdLabel.TextColor3 = theme.Text
-    hdLabel.TextSize = 11
-    hdLabel.Font = Enum.Font.GothamMedium
-    hdLabel.TextXAlignment = Enum.TextXAlignment.Left
-    hdLabel.ZIndex = 103
-    hdLabel.Parent = holdCard
-
-    local holdInput = Instance.new("TextBox")
-    holdInput.Size = UDim2.new(1, -20, 0, 30)
-    holdInput.Position = UDim2.new(0, 10, 0, 28)
-    holdInput.BackgroundColor3 = theme.Sidebar
-    holdInput.Text = tostring(State.HoldDurationMs)
-    holdInput.PlaceholderText = "Default: 22"
-    holdInput.TextColor3 = theme.Text
-    holdInput.PlaceholderColor3 = theme.TextSubtle
-    holdInput.TextSize = 12
-    holdInput.Font = Enum.Font.GothamBold
-    holdInput.ClearTextOnFocus = false
-    holdInput.ZIndex = 103
-    holdInput.Parent = holdCard
-
-    local hiCorner = Instance.new("UICorner")
-    hiCorner.CornerRadius = UDim.new(0, 6)
-    hiCorner.Parent = holdInput
-
-    local hiStroke = Instance.new("UIStroke")
-    hiStroke.Color = theme.Border
-    hiStroke.Thickness = 1
-    hiStroke.Parent = holdInput
-
-    holdInput.FocusLost:Connect(function()
-        local num = tonumber(holdInput.Text)
-        if num and num >= 5 then
-            State:Set("HoldDurationMs", num)
-        else
-            holdInput.Text = tostring(State.HoldDurationMs)
-        end
-    end)
-
-    -- 3. SECTION: HUMAN RHYTHM SIMULATION
-    createSectionHeader("SIMULASI RITME ALAMI (HUMAN JITTER)")
-
-    local jitterCard = Instance.new("Frame")
-    jitterCard.Size = UDim2.new(1, 0, 0, 52)
-    jitterCard.BackgroundColor3 = theme.CardBg
-    jitterCard.BorderSizePixel = 0
-    jitterCard.ZIndex = 102
-    jitterCard.Parent = mScroll
-
-    local jcCorner = Instance.new("UICorner")
-    jcCorner.CornerRadius = UDim.new(0, 8)
-    jcCorner.Parent = jitterCard
-
-    local jtTitle = Instance.new("TextLabel")
-    jtTitle.Size = UDim2.new(1, -70, 0, 18)
-    jtTitle.Position = UDim2.new(0, 10, 0, 6)
-    jtTitle.BackgroundTransparency = 1
-    jtTitle.Text = "Human Rhythm & Jitter"
-    jtTitle.TextColor3 = theme.Text
-    jtTitle.TextSize = 11
-    jtTitle.Font = Enum.Font.GothamBold
-    jtTitle.TextXAlignment = Enum.TextXAlignment.Left
-    jtTitle.ZIndex = 103
-    jtTitle.Parent = jitterCard
-
-    local jtDesc = Instance.new("TextLabel")
-    jtDesc.Size = UDim2.new(1, -70, 0, 18)
-    jtDesc.Position = UDim2.new(0, 10, 0, 24)
-    jtDesc.BackgroundTransparency = 1
-    jtDesc.Text = "Variasi acak timing (±32ms) & micro-pause"
-    jtDesc.TextColor3 = theme.TextSubtle
-    jtDesc.TextSize = 9
-    jtDesc.Font = Enum.Font.Gotham
-    jtDesc.TextXAlignment = Enum.TextXAlignment.Left
-    jtDesc.ZIndex = 103
-    jtDesc.Parent = jitterCard
-
-    local jitterToggle = Instance.new("TextButton")
-    jitterToggle.Size = UDim2.new(0, 48, 0, 26)
-    jitterToggle.Position = UDim2.new(1, -56, 0.5, -13)
-    jitterToggle.BackgroundColor3 = State.IsHumanize and theme.Success or Color3.fromRGB(48, 52, 68)
-    jitterToggle.Text = State.IsHumanize and "ON" or "OFF"
-    jitterToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    jitterToggle.TextSize = 10
-    jitterToggle.Font = Enum.Font.GothamBold
-    jitterToggle.ZIndex = 103
-    jitterToggle.Parent = jitterCard
-
-    local jtgCorner = Instance.new("UICorner")
-    jtgCorner.CornerRadius = UDim.new(0, 13)
-    jtgCorner.Parent = jitterToggle
-
-    jitterToggle.MouseButton1Click:Connect(function()
-        State:Set("IsHumanize", not State.IsHumanize)
-        jitterToggle.Text = State.IsHumanize and "ON" or "OFF"
-        jitterToggle.BackgroundColor3 = State.IsHumanize and theme.Success or Color3.fromRGB(48, 52, 68)
-    end)
-
-    -- 4. SECTION: STATISTIK & INFORMASI TARGET
-    createSectionHeader("STATUS & STATISTIK SESI")
+    createSectionHeader(statusPage, "INFORMASI SESI & HARDWARE")
 
     local statBox = Instance.new("Frame")
-    statBox.Size = UDim2.new(1, 0, 0, 136)
+    statBox.Size = UDim2.new(1, -4, 0, 160)
     statBox.BackgroundColor3 = theme.CardBg
     statBox.BorderSizePixel = 0
-    statBox.ZIndex = 102
-    statBox.Parent = mScroll
+    statBox.ZIndex = 63
+    statBox.Parent = statusPage
 
     local sbCorner = Instance.new("UICorner")
     sbCorner.CornerRadius = UDim.new(0, 8)
@@ -1059,7 +1252,7 @@ function BeRebelGui:Create()
     statText.TextXAlignment = Enum.TextXAlignment.Left
     statText.TextYAlignment = Enum.TextYAlignment.Top
     statText.RichText = true
-    statText.ZIndex = 103
+    statText.ZIndex = 64
     statText.Parent = statBox
 
     -- Live Status Updater Loop
@@ -1068,30 +1261,44 @@ function BeRebelGui:Create()
             local elapsed = State:GetElapsedTime()
             local statusColor = State.IsRunning and "#2ecc71" or "#f1c40f"
             local pos = State.TargetPosition
-            local jitterStr = State.IsHumanize and "<font color='#2ecc71'>Aktif (Human Rhythm & Micro-Pause)</font>" or "<font color='#e74c3c'>Nonaktif (Beresiko)</font>"
+            local jitterStr = State.IsHumanize and "<font color='#2ecc71'>Aktif (±32ms Jitter & Micro-Pause)</font>" or "<font color='#e74c3c'>Nonaktif</font>"
 
             statText.Text = string.format(
-                "• <b>Status:</b> <font color='%s'>%s</font>\n" ..
+                "• <b>Status Clicker:</b> <font color='%s'>%s</font>\n" ..
                 "• <b>Total Klik Terkirim:</b> <font color='#00d2ff'>%d</font>\n" ..
-                "• <b>Interval:</b> <font color='#00d2ff'>%d ms%s</font> (Hold: %d ms)\n" ..
-                "• <b>Ritme Alami:</b> %s\n" ..
-                "• <b>Posisi Target:</b> X: %d, Y: %d\n" ..
-                "• <b>Durasi Sesi:</b> %s",
+                "• <b>Interval Aktif:</b> <font color='#00d2ff'>%d ms</font> (Hold: %d ms)\n" ..
+                "• <b>Ritme Manusia:</b> %s\n" ..
+                "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
+                "• <b>Durasi Sesi Script:</b> %s\n" ..
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>Bodoamat UI/UX Engine v3.0</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
-                State.IntervalMs == 1000 and " [1s]" or "", State.HoldDurationMs,
-                jitterStr, math.floor(pos.X), math.floor(pos.Y), elapsed
+                State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y), elapsed
             )
             task.wait(0.5)
         end
     end)
 
-    -- Shortcut Keyboard Toggle (F8)
+    -- Shortcut Keyboard Toggle (Default: RightShift)
     local connKey = UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == Config.UI.ToggleKey then
-            ClickEngine:Toggle()
+            mainFrame.Visible = not mainFrame.Visible
         end
     end)
     table.insert(self.Connections, connKey)
+
+    -- Aktifkan tab pertama secara default
+    self:SwitchTab("Clicker")
+end
+
+function BeRebelGui:SwitchTab(tabId: string)
+    self.CurrentTab = tabId
+    for id, page in pairs(self.Tabs) do
+        page.Visible = (id == tabId)
+    end
+    for id, btn in pairs(self.TabButtons) do
+        btn.BackgroundColor3 = (id == tabId) and Config.UI.Theme.CardBg or Color3.fromRGB(20, 22, 30)
+        btn.TextColor3 = (id == tabId) and Config.UI.Theme.Accent or Config.UI.Theme.TextSubtle
+    end
 end
 
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
