@@ -1,10 +1,12 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.4.1 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.4.2 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-7229/9223/5228/5227/6228) ║
+    ║       BAC Stealth Immunity (Bebas BAC-3226/7229/9223/5228/6228) ║
+    ║       Pure Integer VIM Simulation (math.floor safeX/safeY)      ║
+    ║       Default Human Rhythm: OFF / Mati (Sesuai Preferensi User) ║
     ║       Humanoid State Guard: Safe Jump Buffer (Anti BAC-7229)    ║
     ║       Hardware Input Lifecycle: Down (count=0) -> Up (count=0)  ║
     ║       Zero Camera/CoreGui Tamper: Clean Viewport & gethui()     ║
@@ -65,7 +67,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.1",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.2",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -86,7 +88,7 @@ local Config = {
     Clicker = {
         DefaultInterval = 1000,   -- 1000 ms (1 Detik per klik)
         DefaultHold = 45,         -- 45 ms press duration (natural human multi-frame tap)
-        Humanize = true,          -- Anti-bot timing & coordinate jitter
+        Humanize = false,         -- Default: OFF (Mati secara default saat aplikasi dibuka)
         JitterMs = 45,            -- ±45 ms
         JitterPx = 10,            -- ±10 pixel natural touch dispersion
     }
@@ -342,15 +344,15 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local holdSec = math.clamp(holdDurationMs / 1000, 0.045, 0.085)
     local executed = false
 
-    -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225: Di luar area Topbar Y<65 & Navigasi Sistem)
+    -- 1. Validasi & Clamping Koordinat Layar Nyata (Anti BAC-6225 & BAC-3226: Integer pixel murni & di luar Topbar Y<65)
     local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
     local minX, maxX = 50, math.max(100, camVp.X - 50)
     local minY, maxY = 65, math.max(120, camVp.Y - 50)
-    local safeX = math.clamp(x, minX, maxX)
-    local safeY = math.clamp(y, minY, maxY)
+    local safeX = math.floor(math.clamp(x, minX, maxX))
+    local safeY = math.floor(math.clamp(y, minY, maxY))
 
-    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-6226 & Anti BAC-9223)
-    -- Transisi Resmi Standar C++ Engine: Down (clickCount=0) -> Hold -> Up (clickCount=0)
+    -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-6226, BAC-9223 & BAC-3226)
+    -- Transisi Resmi Standar C++ Engine: Down (count=0) -> Hold -> Up (count=0)
     if VirtualInputManager then
         local ok = pcall(function()
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
@@ -744,6 +746,7 @@ function BeRebelGui:Create()
     centerDot.Position = UDim2.new(0.5, 0, 0.5, 0)
     centerDot.BackgroundColor3 = theme.AccentGlow
     centerDot.BorderSizePixel = 0
+    centerDot.Active = false
     centerDot.ZIndex = 52
     centerDot.Parent = targetPin
 
@@ -758,6 +761,7 @@ function BeRebelGui:Create()
     pinLabel.TextColor3 = theme.Text
     pinLabel.TextSize = 13
     pinLabel.Font = Enum.Font.GothamBold
+    pinLabel.Active = false
     pinLabel.ZIndex = 51
     pinLabel.Parent = targetPin
 
@@ -768,6 +772,7 @@ function BeRebelGui:Create()
     chH.BackgroundColor3 = theme.Accent
     chH.BackgroundTransparency = 0.5
     chH.BorderSizePixel = 0
+    chH.Active = false
     chH.ZIndex = 49
     chH.Parent = targetPin
 
@@ -778,6 +783,7 @@ function BeRebelGui:Create()
     chV.BackgroundColor3 = theme.Accent
     chV.BackgroundTransparency = 0.5
     chV.BorderSizePixel = 0
+    chV.Active = false
     chV.ZIndex = 49
     chV.Parent = targetPin
 
@@ -934,7 +940,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.4.1"
+    titleLabel.Text = Config.UI.Title .. " v3.4.2"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1590,7 +1596,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.1</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.2</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
