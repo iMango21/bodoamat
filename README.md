@@ -138,7 +138,6 @@ d:/PROGRAM/LuaRebel/
 │   │   ├── Network.luau        -- Pengelola remote sleitnick_net, Black Market, & Cuaca
 │   │   └── State.luau          -- Manajemen status runtime, Totem, & counter sesi
 │   ├── Modules/
-│   │   ├── AutoFish.luau       -- Mesin memancing alami (Siklus Alami Pemain) dengan BAC-8228 Guard
 │   │   ├── AutoSell.luau       -- Otomasi penjualan, auto-favorite, & Merchant Safe TP
 │   │   ├── Teleport.luau       -- Navigasi 30+ lokasi pulau, TP player, & custom waypoint
 │   │   ├── Totem.luau          -- Pasang 1 totem, formasi 5 totem (+), & auto loop

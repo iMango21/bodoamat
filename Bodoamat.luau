@@ -16,8 +16,7 @@
     - Sistem Totem Otomatis: Pasang 1 Totem, Formasi 5 Totem (+), dan Auto-Deploy Loop
     - Remote Merchant & Black Market: Buka Pasar Gelap & Traveling Merchant jarak jauh
     - Eksplorasi Laut Dalam & Radar: Tabung Oksigen Anti-Tenggelam & Radar Ikan
-    - Pengontrol Cuaca Server: Beli Storm, Thunderstorm, Cloudy, Wind langsung
-    - Mode Auto-Fishing Alami (Natural Human Play): Siklus realistis 7-9 detik/ekor, bebas anomali BAC-3211
+    - Pemancingan Manual Murni: 100% bebas dari risiko deteksi BAC remote joran/kail
     - Safe Execution: Semua otomasi default NONAKTIF untuk mencegah kesalahan eksekusi
     - BAC-6219 Guard: Fishing State Isolation & Anti-Crash Auto-Sell Safe TP
 ]]
@@ -233,22 +232,17 @@ function Network:Init(): boolean
                 return r
             end
 
-            self.Remotes["ChargeRod"]       = resolveRF("ChargeFishingRod")
-            self.Remotes["RequestGame"]     = resolveRF("RequestFishingMinigameStarted")
-            self.Remotes["CompleteGame"]    = resolveRE("FishingCompleted") or resolveRE("CatchFishCompleted")
-            self.Remotes["CancelInput"]     = resolveRF("CancelFishingInputs") or resolveRE("CancelFishingInputs")
             self.Remotes["SellAll"]         = resolveRF("SellAllItems")
             self.Remotes["EquipHotbar"]     = resolveRE("EquipToolFromHotbar")
             self.Remotes["UnequipHotbar"]   = resolveRE("UnequipToolFromHotbar")
             self.Remotes["Favorite"]        = resolveRE("FavoriteItem")
-            self.Remotes["AutoFishState"]   = resolveRF("UpdateAutoFishingState")
             self.Remotes["EquipTank"]       = resolveRF("EquipOxygenTank")
             self.Remotes["UpdateRadar"]     = resolveRF("UpdateFishingRadar")
             self.Remotes["BuyWeather"]      = resolveRF("PurchaseWeatherEvent")
             self.Remotes["BuyItem"]         = resolveRF("BuyItem")
             self.Remotes["RefreshMerchant"] = resolveRF("RefreshMerchant")
 
-            if self.Remotes["ChargeRod"] and self.Remotes["CompleteGame"] then
+            if self.Remotes["SellAll"] or self.Remotes["BuyWeather"] then
                 self.HasRemotes = true
                 return
             end
@@ -269,22 +263,17 @@ function Network:Init(): boolean
 
         if not netFolder then return end
 
-        self.Remotes["ChargeRod"]       = netFolder:FindFirstChild("RF/ChargeFishingRod")
-        self.Remotes["RequestGame"]     = netFolder:FindFirstChild("RF/RequestFishingMinigameStarted")
-        self.Remotes["CompleteGame"]    = netFolder:FindFirstChild("RE/FishingCompleted") or netFolder:FindFirstChild("RE/CatchFishCompleted")
-        self.Remotes["CancelInput"]     = netFolder:FindFirstChild("RF/CancelFishingInputs") or netFolder:FindFirstChild("RE/CancelFishingInputs")
         self.Remotes["SellAll"]         = netFolder:FindFirstChild("RF/SellAllItems")
         self.Remotes["EquipHotbar"]     = netFolder:FindFirstChild("RE/EquipToolFromHotbar")
         self.Remotes["UnequipHotbar"]   = netFolder:FindFirstChild("RE/UnequipToolFromHotbar")
         self.Remotes["Favorite"]        = netFolder:FindFirstChild("RE/FavoriteItem")
-        self.Remotes["AutoFishState"]   = netFolder:FindFirstChild("RF/UpdateAutoFishingState")
         self.Remotes["EquipTank"]       = netFolder:FindFirstChild("RF/EquipOxygenTank")
         self.Remotes["UpdateRadar"]     = netFolder:FindFirstChild("RF/UpdateFishingRadar")
         self.Remotes["BuyWeather"]      = netFolder:FindFirstChild("RF/PurchaseWeatherEvent")
         self.Remotes["BuyItem"]         = netFolder:FindFirstChild("RF/BuyItem")
         self.Remotes["RefreshMerchant"] = netFolder:FindFirstChild("RF/RefreshMerchant")
 
-        self.HasRemotes = (self.Remotes["ChargeRod"] ~= nil and self.Remotes["CompleteGame"] ~= nil)
+        self.HasRemotes = (self.Remotes["SellAll"] ~= nil or self.Remotes["BuyWeather"] ~= nil)
     end)
 
     if self.HasRemotes then
@@ -294,74 +283,6 @@ function Network:Init(): boolean
     end
 
     return self.HasRemotes
-end
-
--- Wrapper: Lempar Kail (Charge) - Anti BAC-7213 & Anti BAC-4218
-function Network:ChargeRod(power: number?): boolean
-    local remote = self.Remotes["ChargeRod"]
-    if remote and remote:IsA("RemoteFunction") then
-        local now = workspace:GetServerTimeNow()
-        local safePower = power or 1
-        local ok, _ = pcall(function()
-            remote:InvokeServer(safePower, nil, now, nil)
-        end)
-        if not ok then
-            pcall(function()
-                remote:InvokeServer(safePower)
-            end)
-        end
-        return true
-    end
-    return false
-end
-
--- Wrapper: Permintaan Minigame - Dynamic Live Timestamp (Anti BAC-6217 & Anti BAC-52110)
-function Network:RequestMinigame(diff: number?, luck: number?): boolean
-    local remote = self.Remotes["RequestGame"]
-    if remote and remote:IsA("RemoteFunction") then
-        local now = workspace:GetServerTimeNow()
-        local safeDiff = diff or 0
-        local safeLuck = luck or 1
-        local ok, _ = pcall(function()
-            remote:InvokeServer(safeDiff, safeLuck, now)
-        end)
-        if not ok then
-            pcall(function()
-                remote:InvokeServer(0, 1, now)
-            end)
-        end
-        return true
-    end
-    return false
-end
-
--- Wrapper: Selesaikan Tangkapan (Reel) - RemoteEvent FishingCompleted Standar Pemain
-function Network:CompleteFishing(): boolean
-    local remote = self.Remotes["CompleteGame"]
-    if remote then
-        local ok, _ = pcall(function()
-            if remote:IsA("RemoteEvent") then
-                remote:FireServer()
-            elseif remote:IsA("RemoteFunction") then
-                remote:InvokeServer()
-            end
-        end)
-        -- BAC-5215 Guard: Jangan panggil CancelInput setelah CompleteGame
-        return ok
-    end
-    return false
-end
-
--- Wrapper: Batalkan Input Kail
-function Network:CancelInput(): boolean
-    local remote = self.Remotes["CancelInput"]
-    if remote and remote:IsA("RemoteFunction") then
-        local ok, _ = pcall(function()
-            remote:InvokeServer()
-        end)
-        return ok
-    end
-    return false
 end
 
 local lastSellTime = 0
