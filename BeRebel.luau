@@ -1,12 +1,14 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.4.4 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.4.5 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-3225/2223/3226/7229/9223) ║
+    ║       BAC Stealth Immunity (Bebas BAC-8223/3225/2223/3226/7229) ║
     ║       Dynamic Viewport Resolver (Zero Stale Camera Viewport)    ║
-    ║       Zero-Interference TargetPin (Passive Drag via UIS)        ║
+    ║       Multi-Tier Resilient VIM Dispatcher (Anti BAC-8223)       ║
+    ║       Universal Touch & Mouse Dragging (FloatBar & TargetPin)   ║
+    ║       Zero-Interference TargetPin (Dynamic Hitbox & PassThru)   ║
     ║       Pure VIM Native C++ Lifecycle (Zero Synthetic TouchMoved) ║
     ║       Pure Integer Coordinates (math.floor safeX/safeY)         ║
     ║       Default Human Rhythm: OFF / Mati (Sesuai Preferensi User) ║
@@ -15,7 +17,7 @@
     ║       Zero Camera/CoreGui Tamper: Clean Viewport & gethui()     ║
     ║       DisplayOrder Normalization: Standard UI Layer (Order=10)  ║
     ║       Safe Inset Guard: Dynamic Clamping di Bawah Topbar (Y≥70) ║
-    ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
+    ║       Floating Quick-Bar: [⋮⋮] + [MENU] + [▶ PLAY / ⏸ PAUSE]     ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
     ║       Pixel-Perfect Pin & Screen Inset Synchronization          ║
@@ -96,7 +98,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.4",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.4.5",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -368,7 +370,7 @@ local ClickEngine = {
     PulseCallback = nil :: (() -> ())?,
 }
 
--- Eksekusi 1 Ketukan Hardware Layar (Prioritas: VirtualInputManager Target=game clickCount=0)
+-- Eksekusi 1 Ketukan Hardware Layar (Multi-Tier Resilient VIM Dispatcher - Anti BAC-8223/9223/3225/3226)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
     local holdSec = math.clamp(holdDurationMs / 1000, 0.045, 0.085)
     local executed = false
@@ -378,14 +380,34 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     local safeX = math.floor(math.clamp(x, minX, maxX))
     local safeY = math.floor(math.clamp(y, minY, maxY))
 
-    -- ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-2223, BAC-3225, BAC-3226, BAC-6226 & BAC-9223)
-    -- Transisi Resmi Standar C++ Engine: Down (count=0) -> Hold -> Up (count=0)
+    -- ROBLOX ENGINE VIRTUAL INPUT (Anti BAC-8223, BAC-9223, BAC-3225, BAC-3226, BAC-6226)
+    -- Multi-Tier Resilient Target Dispatcher: Tier 1 (game) -> Tier 2 (workspace) -> Tier 3 (nil)
     if VirtualInputManager then
+        -- Tier 1: Standar C++ Engine DataModel Bridge (game, clickCount=0)
         local ok = pcall(function()
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
             task.wait(holdSec)
             VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
         end)
+
+        -- Tier 2: Workspace Target Bridge Fallback (Anti BAC-8223 Target Signature Mismatch)
+        if not ok then
+            ok = pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, workspace, 0)
+                task.wait(holdSec)
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, workspace, 0)
+            end)
+        end
+
+        -- Tier 3: Omitted/Nil Target Bridge Fallback
+        if not ok then
+            ok = pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, (nil :: any), 0)
+                task.wait(holdSec)
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, (nil :: any), 0)
+            end)
+        end
+
         if ok then
             executed = true
         end
@@ -568,11 +590,11 @@ function BeRebelGui:Create()
     State.TargetPosition = Vector2.new(defaultTargetX, defaultTargetY)
 
     -- ========================================================
-    -- A. FLOATING DOCK BAR: [ MENU ] + [ ▶ PLAY / ⏸ PAUSE ]
+    -- A. FLOATING DOCK BAR: [ ⋮⋮ ] + [ MENU ] + [ ▶ PLAY / ⏸ PAUSE ]
     -- ========================================================
     local floatBar = Instance.new("Frame")
     floatBar.Name = "AppFloatingBar"
-    floatBar.Size = UDim2.new(0, 142, 0, 32)
+    floatBar.Size = UDim2.new(0, 166, 0, 32)
     floatBar.Position = UDim2.new(0, 20, 0.5, -16)
     floatBar.BackgroundTransparency = 1
     floatBar.Active = true
@@ -584,14 +606,38 @@ function BeRebelGui:Create()
     floatLayout.FillDirection = Enum.FillDirection.Horizontal
     floatLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
     floatLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    floatLayout.Padding = UDim.new(0, 6)
+    floatLayout.Padding = UDim.new(0, 5)
     floatLayout.SortOrder = Enum.SortOrder.LayoutOrder
     floatLayout.Parent = floatBar
+
+    -- 0. Drag Grip Handle (Area Khusus Drag Bar)
+    local dragGrip = Instance.new("TextButton")
+    dragGrip.Name = "AppDragGrip"
+    dragGrip.Size = UDim2.new(0, 22, 0, 32)
+    dragGrip.BackgroundColor3 = theme.Sidebar
+    dragGrip.Text = "⋮⋮"
+    dragGrip.TextColor3 = theme.TextSubtle
+    dragGrip.TextSize = 13
+    dragGrip.Font = Enum.Font.GothamBold
+    dragGrip.AutoButtonColor = false
+    dragGrip.Active = true
+    dragGrip.ZIndex = 81
+    dragGrip.LayoutOrder = 0
+    dragGrip.Parent = floatBar
+
+    local dgCorner = Instance.new("UICorner")
+    dgCorner.CornerRadius = UDim.new(0, 8)
+    dgCorner.Parent = dragGrip
+
+    local dgStroke = Instance.new("UIStroke")
+    dgStroke.Color = theme.Border
+    dgStroke.Thickness = 1
+    dgStroke.Parent = dragGrip
 
     -- 1. Tombol MENU
     local menuBtn = Instance.new("TextButton")
     menuBtn.Name = "AppMenuBtn"
-    menuBtn.Size = UDim2.new(0, 58, 0, 32)
+    menuBtn.Size = UDim2.new(0, 56, 0, 32)
     menuBtn.BackgroundColor3 = theme.CardBg
     menuBtn.Text = "MENU"
     menuBtn.TextColor3 = theme.Text
@@ -636,12 +682,14 @@ function BeRebelGui:Create()
     pbStroke.Thickness = 1.2
     pbStroke.Parent = playBtn
 
-    -- Logika Dragging Seluruh Floating Dock Bar (Sentuh & Geser)
-    local fbDragging, fbDragInput, fbDragStart, fbStartPos
+    -- Logika Dragging Universal Floating Dock Bar (Mouse & Mobile Touch)
+    local fbDragging = false
+    local fbDragStart = Vector3.zero
+    local fbStartPos = UDim2.new()
     local fbHasMoved = false
 
-    local function setupDockDrag(btnInstance: GuiButton)
-        local connStart = btnInstance.InputBegan:Connect(function(input)
+    local function setupDockDrag(guiObj: GuiObject)
+        local conn = guiObj.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 fbDragging = true
                 fbHasMoved = false
@@ -654,36 +702,36 @@ function BeRebelGui:Create()
                 end)
             end
         end)
-        table.insert(self.Connections, connStart)
-
-        local connChange = btnInstance.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                fbDragInput = input
-            end
-        end)
-        table.insert(self.Connections, connChange)
+        table.insert(self.Connections, conn)
     end
 
+    setupDockDrag(dragGrip)
+    setupDockDrag(floatBar)
     setupDockDrag(menuBtn)
     setupDockDrag(playBtn)
 
     local connDockMove = UserInputService.InputChanged:Connect(function(input)
-        if input == fbDragInput and fbDragging then
+        if fbDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - fbDragStart
-            if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
+            if delta.Magnitude > 4 then
                 fbHasMoved = true
             end
-            floatBar.Position = UDim2.new(
-                fbStartPos.X.Scale,
-                fbStartPos.X.Offset + delta.X,
-                fbStartPos.Y.Scale,
-                fbStartPos.Y.Offset + delta.Y
-            )
+            local vp = getLiveViewportSize()
+            local newX = math.clamp(fbStartPos.X.Offset + delta.X, 10, math.max(10, vp.X - 175))
+            local newY = math.clamp(fbStartPos.Y.Offset + delta.Y, 10, math.max(10, vp.Y - 45))
+            floatBar.Position = UDim2.new(fbStartPos.X.Scale, newX, fbStartPos.Y.Scale, newY)
         end
     end)
     table.insert(self.Connections, connDockMove)
 
-    -- Handler Klik Tombol Floating Bar
+    local connDockEnd = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            fbDragging = false
+        end
+    end)
+    table.insert(self.Connections, connDockEnd)
+
+    -- Handler Klik Tombol Floating Bar (Dengan Proteksi Anti-Drag Misfire)
     menuBtn.MouseButton1Click:Connect(function()
         if not fbHasMoved and self.MainFrame then
             local willBeVisible = not self.MainFrame.Visible
@@ -735,7 +783,7 @@ function BeRebelGui:Create()
     targetPin.BackgroundColor3 = theme.Background
     targetPin.BackgroundTransparency = 0.35
     targetPin.BorderSizePixel = 0
-    targetPin.Active = false -- Clicks pass through directly to 3D game tools (Anti BAC-10229 & BAC-3225)
+    targetPin.Active = false -- Clicks pass through directly to 3D game tools when running (Anti BAC-10229 & BAC-3225)
     pcall(function() (targetPin :: any).Interactable = false end)
     pcall(function() (targetPin :: any).Selectable = false end)
     targetPin.ZIndex = 50
@@ -804,44 +852,74 @@ function BeRebelGui:Create()
     chV.ZIndex = 49
     chV.Parent = targetPin
 
-    -- Dragging Target Pin via UserInputService (Anti BAC-3225 / BAC-3226: Zero TargetPin.InputBegan Event Leak)
-    local pinDragging = false
-    local pinDragInput = nil
+    -- Dynamic Hitbox untuk Dragging Responsif (Active saat Pause, Inactive saat Running - Anti BAC-10229)
+    local pinHitbox = Instance.new("ImageButton")
+    pinHitbox.Name = "PinHitbox"
+    pinHitbox.Size = UDim2.new(0, 60, 0, 60)
+    pinHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
+    pinHitbox.Position = UDim2.new(0.5, 0, 0.5, 0)
+    pinHitbox.BackgroundTransparency = 1
+    pinHitbox.Active = not State.IsRunning
+    pinHitbox.ZIndex = 55
+    pinHitbox.Parent = targetPin
 
-    local connPinInput = UserInputService.InputBegan:Connect(function(input, processed)
-        -- Jangan geser pin jika auto-clicker sedang aktif atau processed oleh UI modal
+    -- Logika Dragging Target Pin Universal
+    local pinDragging = false
+    local pinDragStart = Vector3.zero
+    local pinStartPos = Vector2.zero
+
+    local function startPinDrag(input: InputObject)
+        if State.IsRunning or not State.IsPinVisible then return end
+        pinDragging = true
+        pinDragStart = input.Position
+        pinStartPos = State.TargetPosition
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                pinDragging = false
+            end
+        end)
+    end
+
+    local connHitboxStart = pinHitbox.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            startPinDrag(input)
+        end
+    end)
+    table.insert(self.Connections, connHitboxStart)
+
+    -- Fallback UIS Gesture Radius Detection
+    local connPinUis = UserInputService.InputBegan:Connect(function(input, processed)
         if State.IsRunning or not State.IsPinVisible then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local touchPos = Vector2.new(input.Position.X, input.Position.Y)
-            local currentPinPos = State.TargetPosition
-            local dist = (touchPos - currentPinPos).Magnitude
-            if dist <= 32 then
-                pinDragging = true
-                pinDragInput = input
+            local dist = (touchPos - State.TargetPosition).Magnitude
+            if dist <= 48 then
+                startPinDrag(input)
             end
         end
     end)
-    table.insert(self.Connections, connPinInput)
-
-    local connDragEnd = UserInputService.InputEnded:Connect(function(input)
-        if input == pinDragInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            pinDragging = false
-            pinDragInput = nil
-        end
-    end)
-    table.insert(self.Connections, connDragEnd)
+    table.insert(self.Connections, connPinUis)
 
     local connDragPin = UserInputService.InputChanged:Connect(function(input)
         if pinDragging and not State.IsRunning and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - pinDragStart
             local minX, maxX, minY, maxY = getSafeScreenBounds()
-            local newX = math.floor(math.clamp(input.Position.X, minX, maxX))
-            local newY = math.floor(math.clamp(input.Position.Y, minY, maxY))
+            local newX = math.floor(math.clamp(pinStartPos.X + delta.X, minX, maxX))
+            local newY = math.floor(math.clamp(pinStartPos.Y + delta.Y, minY, maxY))
 
             targetPin.Position = UDim2.new(0, newX, 0, newY)
             State.TargetPosition = Vector2.new(newX, newY)
         end
     end)
     table.insert(self.Connections, connDragPin)
+
+    local connPinEnd = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            pinDragging = false
+        end
+    end)
+    table.insert(self.Connections, connPinEnd)
 
     -- Visual Pulse Feedback
     ClickEngine.PulseCallback = function()
@@ -858,9 +936,16 @@ function BeRebelGui:Create()
 
     State:OnChange("IsRunning", function(running)
         if running then
+            pinHitbox.Active = false
+            targetPin.Active = false
+            pcall(function() (pinHitbox :: any).Interactable = false end)
+            pcall(function() (targetPin :: any).Interactable = false end)
+            pinDragging = false
             pinStroke.Color = theme.AccentGlow
             pinLabel.TextColor3 = theme.Success
         else
+            pinHitbox.Active = true
+            pcall(function() (pinHitbox :: any).Interactable = true end)
             pinStroke.Color = theme.Accent
             pinLabel.TextColor3 = theme.Text
         end
@@ -1623,7 +1708,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.4</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.4.5</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
