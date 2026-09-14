@@ -1,11 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v3.0.4 ⚡                          ║
+    ║                        ⚡ BE REBEL v3.0.5 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
-    ║       Delta Executor & Android Mobile Hybrid Engine             ║
-    ║       100% BAC Stealth Immunity (Bebas BAC-2223/1224/2226)      ║
-    ║       Multi-Layer Input: Tool Activate + Native C-Closures      ║
+    ║       Delta Executor Android Pure Screen Hardware Simulator     ║
+    ║       BAC Stealth Immunity (Bebas BAC-8226/2223/1224/2226)      ║
+    ║       Pure Hardware Tap: Delta C-Closures + VIM (clickCount=1)  ║
     ║       Default Interval: 1.0 Detik (1000ms) per Klik             ║
     ║       Design Language: Bodoamat Dark-Glassmorphism Hub          ║
     ╚══════════════════════════════════════════════════════════════════╝
@@ -170,31 +170,19 @@ function State:GetElapsedTime(): string
 end
 
 -- ====================================================================
--- INPUT SIMULATION ENGINE (STEALTH HYBRID & MULTI-LAYER DISPATCHER)
+-- INPUT SIMULATION ENGINE (PURE HARDWARE SCREEN CLICKING - ZERO TOOL HOOK)
 -- ====================================================================
 local ClickEngine = {
     RunnerThread = nil :: thread?,
     PulseCallback = nil :: (() -> ())?,
 }
 
--- Eksekusi 1 Ketukan (Hybrid: Tool Activate + C-Closures + Stealth VIM)
+-- Eksekusi 1 Ketukan Hardware Layar (Delta C-Closures + VIM clickCount=1)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.max(0.015, holdDurationMs / 1000)
+    local holdSec = math.max(0.018, holdDurationMs / 1000)
     local executed = false
 
-    -- LAPISAN 1: TOOL ACTIVATION (100% Kebal Anti-Cheat saat memegang Fishing Rod / Alat)
-    local char = LocalPlayer.Character
-    if char then
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool then
-            pcall(function()
-                tool:Activate()
-            end)
-            executed = true
-        end
-    end
-
-    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES (Delta Memory-Level Input)
+    -- LAPISAN 1: EXECUTOR NATIVE C-CLOSURES (Injeksi Memori Delta Android)
     local mouse1press = mouse1press or (genv and genv.mouse1press)
     local mouse1release = mouse1release or (genv and genv.mouse1release)
     local mouse1click = mouse1click or (genv and genv.mouse1click)
@@ -219,7 +207,7 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
         executed = true
     end
 
-    -- LAPISAN 3: STEALTH VIRTUAL INPUT (clickCount = 1, Bebas Tripwire BAC-2223 & BAC-1224)
+    -- LAPISAN 2: ROBLOX ENGINE VIRTUAL INPUT (clickCount = 1 Standar Engine)
     if VirtualInputManager and not executed then
         local ok = pcall(function()
             VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
