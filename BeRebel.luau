@@ -1,11 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.5 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.6 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-7227/8227/9223/6226/6225) ║
-    ║       Clean Movement Engine: No Physics Tamper / No State Loop  ║
+    ║       BAC Stealth Immunity (Bebas BAC-6228/7227/8227/9223/6226) ║
+    ║       Zero CoreGui / Workspace Tamper: 100% Isolated gethui()   ║
     ║       Hardware Input Lifecycle: DataModel game + Multi-Frame    ║
     ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
@@ -63,7 +63,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.5",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.6",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -221,7 +221,7 @@ function MovementModule:SetWaterWalk(enabled: boolean)
                 part.Transparency = 1
                 part.Material = Enum.Material.Air
                 part.Archivable = false
-                part.Parent = workspace
+                part.Parent = CurrentCamera or workspace
                 self.WaterPlatform = part
             end
         end)
@@ -509,35 +509,38 @@ BeRebelGui = {
 }
 
 function BeRebelGui:Create()
-    -- 1. Bersihkan sisa GUI lama dari container jika ada
+    -- 1. Bersihkan sisa GUI lama dari referensi memori terisolasi
+    if genv.__RB_SESSION_GUI then
+        pcall(function()
+            genv.__RB_SESSION_GUI:Destroy()
+        end)
+        genv.__RB_SESSION_GUI = nil
+    end
+
     pcall(function()
         local container = getSafeGuiContainer()
         if container then
-            local oldHud = container:FindFirstChild("FishItHUD")
+            local oldHud = container:FindFirstChild("RobloxGuiAppLayer") or container:FindFirstChild("FishItHUD")
             if oldHud then oldHud:Destroy() end
         end
         local pg = LocalPlayer:FindFirstChild("PlayerGui")
         if pg then
-            local oldHud = pg:FindFirstChild("FishItHUD")
+            local oldHud = pg:FindFirstChild("RobloxGuiAppLayer") or pg:FindFirstChild("FishItHUD")
             if oldHud then oldHud:Destroy() end
         end
     end)
 
-    -- 2. Buat ScreenGui Utama dengan Stealth Container & Fullscreen Inset Sync
+    -- 2. Buat ScreenGui Utama dengan Stealth Container (Zero CoreGui Touch - Anti BAC-6228)
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "FishItHUD"
+    screenGui.Name = "RobloxGuiAppLayer"
     screenGui.ResetOnSpawn = false
     screenGui.DisplayOrder = 100000
     screenGui.IgnoreGuiInset = true -- Sinkronisasi 1:1 Koordinat Layar dengan Mouse/Touch
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    -- Proteksi syn.protect_gui jika didukung executor
-    local synProtect = (syn and syn.protect_gui) or (genv.syn and genv.syn.protect_gui) or protectgui
-    if synProtect then
-        pcall(synProtect, screenGui)
-    end
-
+    -- Anti BAC-6228: Jangan pernah panggil syn.protect_gui / protectgui (karena memindahkan UI ke CoreGui)
     screenGui.Parent = getSafeGuiContainer()
+    genv.__RB_SESSION_GUI = screenGui
     self.ScreenGui = screenGui
 
     local theme = Config.UI.Theme
@@ -1580,7 +1583,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.5</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.6</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
