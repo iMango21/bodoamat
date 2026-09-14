@@ -235,7 +235,23 @@ local MovementModule = {
     WaterPlatform = nil :: Part?,
     HeartbeatConn = nil :: RBXScriptConnection?,
     JumpConn = nil :: RBXScriptConnection?,
+    CharConn = nil :: RBXScriptConnection?,
 }
+
+-- Auto-Reapply Speed & Jump upon Character Respawn
+MovementModule.CharConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.wait(0.4)
+    local hum = newChar:WaitForChild("Humanoid", 4) :: Humanoid?
+    if hum then
+        if MovementModule.WalkSpeed > 16 then
+            hum.WalkSpeed = MovementModule.WalkSpeed
+        end
+        if MovementModule.JumpPower > 50 then
+            hum.UseJumpPower = true
+            hum.JumpPower = MovementModule.JumpPower
+        end
+    end
+end)
 
 -- 1. Walk on Water (Jesus Walk)
 function MovementModule:SetWaterWalk(enabled: boolean)
@@ -351,6 +367,10 @@ function MovementModule:Cleanup()
     if self.JumpConn then
         self.JumpConn:Disconnect()
         self.JumpConn = nil
+    end
+    if self.CharConn then
+        self.CharConn:Disconnect()
+        self.CharConn = nil
     end
     local char = LocalPlayer.Character
     if char then
@@ -991,41 +1011,27 @@ function BeRebelGui:Create()
     end)
     table.insert(self.Connections, connVisChange)
 
-    -- Logika Dragging MainWindow (Header & Frame Drag)
-    local winDragging, winDragInput, winDragStart, winStartPos
-    local connWinStart = mainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            winDragging = true
-            winDragStart = input.Position
-            winStartPos = mainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    winDragging = false
-                end
-            end)
-        end
-    end)
-    table.insert(self.Connections, connWinStart)
+    -- Logika Dragging Universal MainWindow (Header & Frame Drag)
+    local winDragging = false
+    local winDragStart = Vector3.zero
+    local winStartPos = UDim2.new()
 
-    local connWinChange = mainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            winDragInput = input
-        end
-    end)
-    table.insert(self.Connections, connWinChange)
+    local function setupWinDrag(targetObj: GuiObject)
+        local conn = targetObj.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                winDragging = true
+                winDragStart = input.Position
+                winStartPos = mainFrame.Position
 
-    local connWinMove = UserInputService.InputChanged:Connect(function(input)
-        if input == winDragInput and winDragging then
-            local delta = input.Position - winDragStart
-            mainFrame.Position = UDim2.new(
-                winStartPos.X.Scale,
-                winStartPos.X.Offset + delta.X,
-                winStartPos.Y.Scale,
-                winStartPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-    table.insert(self.Connections, connWinMove)
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        winDragging = false
+                    end
+                end)
+            end
+        end)
+        table.insert(self.Connections, conn)
+    end
 
     -- Header Bar
     local header = Instance.new("Frame")
@@ -1048,11 +1054,34 @@ function BeRebelGui:Create()
     headerPatch.ZIndex = 61
     headerPatch.Parent = header
 
+    setupWinDrag(header)
+    setupWinDrag(mainFrame)
+
+    local connWinMove = UserInputService.InputChanged:Connect(function(input)
+        if winDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - winDragStart
+            local vp = getLiveViewportSize()
+            local curW = mainFrame.AbsoluteSize.X
+            local curH = mainFrame.AbsoluteSize.Y
+            local newX = math.clamp(winStartPos.X.Offset + delta.X, -math.floor(curW / 2) + 20, math.floor(vp.X - curW / 2) - 20)
+            local newY = math.clamp(winStartPos.Y.Offset + delta.Y, -math.floor(curH / 2) + 20, math.floor(vp.Y - curH / 2) - 20)
+            mainFrame.Position = UDim2.new(winStartPos.X.Scale, newX, winStartPos.Y.Scale, newY)
+        end
+    end)
+    table.insert(self.Connections, connWinMove)
+
+    local connWinEnd = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            winDragging = false
+        end
+    end)
+    table.insert(self.Connections, connWinEnd)
+
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.4.3"
+    titleLabel.Text = Config.UI.Title .. " v3.4.5"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1096,8 +1125,7 @@ function BeRebelGui:Create()
     local isMaximized = false
     maxBtn.MouseButton1Click:Connect(function()
         isMaximized = not isMaximized
-        local currentCam = Workspace.CurrentCamera
-        local currentVp = (currentCam and currentCam.ViewportSize) or Vector2.new(1280, 720)
+        local currentVp = getLiveViewportSize()
         if isMaximized then
             local targetW = math.min(840, currentVp.X - 30)
             local targetH = math.min(580, currentVp.Y - 30)
@@ -1549,9 +1577,9 @@ function BeRebelGui:Create()
     createInputCard(
         clickerPage,
         "Durasi Tekan / Hold Time (ms)",
-        "Berapa lama layar ditekan sebelum dilepas (Default: 28 ms).",
+        "Berapa lama layar ditekan sebelum dilepas (Default: 45 ms).",
         tostring(State.HoldDurationMs),
-        "Default: 28",
+        "Default: 45",
         function(text)
             local num = tonumber(text)
             if num and num >= 5 then
