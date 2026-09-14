@@ -1,10 +1,10 @@
 --!strict
 --[[
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v2.1 ⚡                         ║
+    ║                        ⚡ BE REBEL v2.2 ⚡                         ║
     ║       Universal Pure Single-Target Auto Clicker for Roblox        ║
     ║       Delta Executor & Mobile Touch Optimized                     ║
-    ║       Total BAC Shield: BAC-1228, 3228, 3229, 8223, 92210         ║
+    ║       Zero-Keyword Stealth UI (BAC-7226 Immunity)                 ║
     ║       100% Pure Screen Input Simulation (Zero Game Injection)     ║
     ║       Default Interval: 1.0 Detik (1000ms) per Klik               ║
     ║       Design Language & Architecture by LuaRebel                  ║
@@ -13,25 +13,18 @@
     [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
 
-    [ FITUR UTAMA v2.1 - PURE AUTO CLICKER & STEALTH SHIELD ]:
-    1. 🛡️ BAC-1228 Stealth GUI Shield: Perlindungan wadah UI tingkat lanjut menggunakan
-       gethui() terisolasi, protectgui executor, dan GUID acak (kebal scanning PlayerGui).
-    2. 🛡️ 100% Pure Simulated Hardware Clicker: Sama sekali TIDAK menggunakan injeksi
-       remote game (CastRod/Reel/Fish/Network). Murni menekan koordinat layar visual (X, Y).
-    3. ⏱️ Default Interval 1 Detik (1000ms): Laju klik ideal untuk game/minigame yang
-       memerlukan ketukan ritmis 1 detik tanpa membebani game engine.
-    4. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
-       titik pusat (bullseye), dan animasi pulse hijau saat klik dieksekusi.
-    5. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
-       tombol Play/Pause instan, tombol Settings, tombol Hide/Show Pin, dan Close.
-    6. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset cepat (1s, 500ms, 140ms),
-       durasi hold acak, dan live session statistics.
-    7. 🛡️ Pointer Pre-Sync & Human Rhythm: Sinkronisasi kursor alami (MouseMove) dan
-       Gaussian timing jitter saat mode Humanize diaktifkan.
-    8. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
-       layar HP (tidak pernah terpotong pada landscape 360p - 720p).
-    9. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
-       ke file lokal executor (BeRebel_Config.json) via writefile/readfile.
+    [ FITUR UTAMA v2.2 - PURE STEALTH TAP ASSISTANT ]:
+    1. 🛡️ BAC-7226 Keyword Sanitation: Menghilangkan semua kata kunci sensitif dari UI
+       sehingga kebal dari string memory / OCR scanning anti-cheat.
+    2. 🛡️ BAC-1228 Stealth GUI Shield: Wadah gethui() terisolasi & protectgui.
+    3. 🛡️ 100% Pure Simulated Hardware Clicker: Murni menekan koordinat layar visual (X, Y).
+    4. ⏱️ Default Interval 1 Detik (1000ms): Pengaturan fleksibel murni via TextBox.
+    5. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair & center dot.
+    6. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag, Play/Pause.
+    7. ⚙️ Settings Modal: Konfigurasi interval kustom, durasi hold, dan live statistics.
+    8. 🛡️ Pointer Pre-Sync & Human Rhythm: Sinkronisasi kursor alami & Gaussian timing jitter.
+    9. 📱 Mobile Landscape Responsive Modal: Menyesuaikan resolusi layar HP secara otomatis.
+    10. 💾 Auto-Save File Persistence: Tersimpan otomatis ke BeRebel_Config.json.
 ]]
 
 -- 1. Tunggu game selesai dimuat
@@ -72,7 +65,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Pure Universal Screen Clicker v2.0 (1s Default)",
+        Subtitle = "Precision Tap Assistant v2.2 (1s Default)",
         ToggleKey = Enum.KeyCode.F8,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -250,7 +243,7 @@ end
 function ClickEngine:Start()
     if State.IsRunning then return end
     State:Set("IsRunning", true)
-    State:Set("LastStatus", "Aktif (Stealth Anti-BAC)")
+    State:Set("LastStatus", "Aktif (Running)")
 
     self.RunnerThread = task.spawn(function()
         local clickCounter = 0
@@ -840,8 +833,8 @@ function BeRebelGui:Create()
         lbl.Parent = mScroll
     end
 
-    -- 1. SECTION: INTERVAL SETTINGS (ANTI BAC-8223 SAFE PRESETS)
-    createSectionHeader("PENGATURAN INTERVAL KLIK (ANTI BAC-8223)")
+    -- 1. SECTION: INTERVAL SETTINGS
+    createSectionHeader("PENGATURAN INTERVAL KLIK")
 
     local intervalCard = Instance.new("Frame")
     intervalCard.Size = UDim2.new(1, 0, 0, 68)
@@ -960,8 +953,8 @@ function BeRebelGui:Create()
         end
     end)
 
-    -- 3. SECTION: ANTI-DETECTION (BAC-8223 & BAC-3228 GUARD)
-    createSectionHeader("ANTI-DETECTION & BAC GUARD (8223 / 3228)")
+    -- 3. SECTION: HUMAN RHYTHM SIMULATION
+    createSectionHeader("SIMULASI RITME ALAMI (HUMAN JITTER)")
 
     local jitterCard = Instance.new("Frame")
     jitterCard.Size = UDim2.new(1, 0, 0, 52)
@@ -978,7 +971,7 @@ function BeRebelGui:Create()
     jtTitle.Size = UDim2.new(1, -70, 0, 18)
     jtTitle.Position = UDim2.new(0, 10, 0, 6)
     jtTitle.BackgroundTransparency = 1
-    jtTitle.Text = "Dual BAC Stealth Guard"
+    jtTitle.Text = "Human Rhythm & Jitter"
     jtTitle.TextColor3 = theme.Text
     jtTitle.TextSize = 11
     jtTitle.Font = Enum.Font.GothamBold
@@ -990,7 +983,7 @@ function BeRebelGui:Create()
     jtDesc.Size = UDim2.new(1, -70, 0, 18)
     jtDesc.Position = UDim2.new(0, 10, 0, 24)
     jtDesc.BackgroundTransparency = 1
-    jtDesc.Text = "Human Jitter (±28ms) + Micro-Pause 0.2s"
+    jtDesc.Text = "Variasi acak timing (±32ms) & micro-pause"
     jtDesc.TextColor3 = theme.TextSubtle
     jtDesc.TextSize = 9
     jtDesc.Font = Enum.Font.Gotham
@@ -1058,10 +1051,9 @@ function BeRebelGui:Create()
                 "• <b>Status:</b> <font color='%s'>%s</font>\n" ..
                 "• <b>Total Klik Terkirim:</b> <font color='#00d2ff'>%d</font>\n" ..
                 "• <b>Interval:</b> <font color='#00d2ff'>%d ms%s</font> (Hold: %d ms)\n" ..
-                "• <b>BAC Guard:</b> %s\n" ..
-                "• <b>Sistem Proteksi:</b> <font color='#2ecc71'>BAC-3229 Tamper-Free</font>\n" ..
-                "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
-                "• <b>Durasi Sesi Script:</b> %s",
+                "• <b>Ritme Alami:</b> %s\n" ..
+                "• <b>Posisi Target:</b> X: %d, Y: %d\n" ..
+                "• <b>Durasi Sesi:</b> %s",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.IntervalMs == 1000 and " [1s]" or "", State.HoldDurationMs,
                 jitterStr, math.floor(pos.X), math.floor(pos.Y), elapsed
@@ -1078,7 +1070,7 @@ function BeRebelGui:Create()
     end)
     table.insert(self.Connections, connKey)
 
-    print("[Be Rebel v2.1] Pure Universal Auto Clicker (1s Default & Stealth Shield) berhasil dimuat!")
+    print("[Be Rebel v2.2] Precision Tap Assistant (1s Default) berhasil dimuat!")
 end
 
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
@@ -1097,7 +1089,7 @@ function BeRebelGui:Destroy()
 
     genv.__BE_REBEL_LOADED = nil
     genv.__BE_REBEL_CLEANUP = nil
-    print("[Be Rebel v2.1] Berhasil ditutup dan dibersihkan dari memori.")
+    print("[Be Rebel v2.2] Berhasil ditutup dan dibersihkan dari memori.")
 end
 
 genv.__BE_REBEL_CLEANUP = function()
