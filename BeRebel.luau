@@ -1,10 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.1 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.2 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-6225/6223/92210/10229)    ║
+    ║       BAC Stealth Immunity (Bebas BAC-6226/6225/6223/92210)     ║
+    ║       Hardware Input Lifecycle: Event Sync clickCount=0         ║
     ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
@@ -61,7 +62,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.1",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.2",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -237,14 +238,11 @@ function MovementModule:SetWaterWalk(enabled: boolean)
                     if self.JumpPower ~= 50 and hum.JumpPower ~= self.JumpPower then
                         hum.JumpPower = self.JumpPower
                     end
-                    if self.WalkSpeed ~= 16 and hum.WalkSpeed ~= self.WalkSpeed then
-                        hum.WalkSpeed = self.WalkSpeed
-                    end
                 end
             end)
         end
     else
-        if not self.IsWaterWalk and self.JumpPower == 50 and self.WalkSpeed == 16 then
+        if not self.IsWaterWalk and self.JumpPower == 50 then
             if self.HeartbeatConn then
                 self.HeartbeatConn:Disconnect()
                 self.HeartbeatConn = nil
@@ -353,22 +351,18 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     -- LAPISAN 1: ROBLOX ENGINE VIRTUAL INPUT (Prioritas Utama: 100% Native & Anti-Cheat Proof)
     if VirtualInputManager then
         local ok = pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 1)
+            -- Anti BAC-6226: Gunakan clickCount = 0 untuk siklus input resmi engine
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
             task.wait(holdSec)
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 1)
+            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
         end)
         if ok then
             executed = true
         end
     end
 
-    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES DENGAN PENETAPAN POSISI KURSOR (Fallback Khusus)
+    -- LAPISAN 2: EXECUTOR NATIVE C-CLOSURES (Fallback Khusus)
     if not executed then
-        local mousemoveabs = mousemoveabs or (genv and genv.mousemoveabs) or (genv and genv.movemouseabs) or (genv and genv.mouseto)
-        if mousemoveabs then
-            pcall(function() mousemoveabs(safeX, safeY) end)
-        end
-
         local touchclick = touchclick or (genv and genv.touchclick)
         local tap = tap or (genv and genv.tap)
         local mouse1press = mouse1press or (genv and genv.mouse1press)
@@ -941,7 +935,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.3.1"
+    titleLabel.Text = Config.UI.Title .. " v3.3.2"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1597,7 +1591,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.1</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.2</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
