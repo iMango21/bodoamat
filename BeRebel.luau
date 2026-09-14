@@ -1,12 +1,12 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.4 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.5 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-8227/9223/6226/6225/92210)║
+    ║       BAC Stealth Immunity (Bebas BAC-7227/8227/9223/6226/6225) ║
+    ║       Clean Movement Engine: No Physics Tamper / No State Loop  ║
     ║       Hardware Input Lifecycle: DataModel game + Multi-Frame    ║
-    ║       Physics Infinite Jump: AssemblyLinearVelocity (No State)  ║
     ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
     ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
@@ -63,7 +63,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.4",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.5",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -212,11 +212,11 @@ function MovementModule:SetWaterWalk(enabled: boolean)
         pcall(function()
             if not self.WaterPlatform then
                 local part = Instance.new("Part")
-                part.Name = "Terrain" -- Nama native map agar lolos part tampering scan (Anti BAC-6228)
+                part.Name = "TerrainWaterPlate"
                 part.Size = Vector3.new(24, 1.2, 24)
                 part.Anchored = true
                 part.CanCollide = true
-                part.CanQuery = false -- Anti-Cheat raycast lolos tembus ke air alami
+                part.CanQuery = false -- Mencegah raycast scan game mendeteksi part buatan
                 part.CanTouch = false
                 part.Transparency = 1
                 part.Material = Enum.Material.Air
@@ -235,21 +235,12 @@ function MovementModule:SetWaterWalk(enabled: boolean)
                     -- Platform sejajar di bawah kaki karakter di permukaan air laut (-0.6)
                     self.WaterPlatform.CFrame = CFrame.new(hrp.Position.X, -0.6, hrp.Position.Z)
                 end
-
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    if self.JumpPower ~= 50 and hum.JumpPower ~= self.JumpPower then
-                        hum.JumpPower = self.JumpPower
-                    end
-                end
             end)
         end
     else
-        if not self.IsWaterWalk and self.JumpPower == 50 then
-            if self.HeartbeatConn then
-                self.HeartbeatConn:Disconnect()
-                self.HeartbeatConn = nil
-            end
+        if self.HeartbeatConn then
+            self.HeartbeatConn:Disconnect()
+            self.HeartbeatConn = nil
         end
 
         if self.WaterPlatform then
@@ -259,7 +250,7 @@ function MovementModule:SetWaterWalk(enabled: boolean)
     end
 end
 
--- 2. Infinite Jump (Physics-Based AssemblyLinearVelocity - Bebas Mutasi HumanoidState BAC-8227)
+-- 2. Infinite Jump (Bodoamat Clean Implementation - Bebas BAC-7227 Physics Flag)
 function MovementModule:SetInfiniteJump(enabled: boolean)
     if self.IsInfJump == enabled then return end
     self.IsInfJump = enabled
@@ -272,13 +263,9 @@ function MovementModule:SetInfiniteJump(enabled: boolean)
                 pcall(function()
                     local char = LocalPlayer.Character
                     if char then
-                        local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
                         local hum = char:FindFirstChildOfClass("Humanoid")
-                        if hrp and hum and hum.Health > 0 then
-                            -- Anti BAC-8227: Gunakan impulse fisika murni tanpa memicu HumanoidState Jumping ilegal di udara
-                            local currentVel = hrp.AssemblyLinearVelocity
-                            local jumpVelocity = math.max(50, hum.JumpPower)
-                            hrp.AssemblyLinearVelocity = Vector3.new(currentVel.X, jumpVelocity, currentVel.Z)
+                        if hum and hum.Health > 0 then
+                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
                         end
                     end
                 end)
@@ -1593,7 +1580,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.4</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.5</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
