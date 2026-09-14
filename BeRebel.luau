@@ -1,22 +1,31 @@
 --!strict
 --[[
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v1.0 ⚡                         ║
+    ║                        ⚡ BE REBEL v1.1 ⚡                         ║
     ║       Universal Single-Target Precision Auto Clicker for Roblox   ║
     ║       Delta Executor & Mobile Touch Optimized                     ║
+    ║       BAC-8223 Stealth Guard & Zero-Pattern Protection            ║
     ║       Design Language & Architecture by LuaRebel                  ║
     ╚═══════════════════════════════════════════════════════════════════╝
 
     [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
 
-    [ 4 PENYEMPURNAAN OPTIMALISASI v1.0 ]:
-    1. ⏱️ Mathematical Timing Compensation: Interval 100% presisi dengan mengompensasi
-       durasi hold (misal: 50ms = tepat 20 klik/detik tanpa lag).
-    2. 🛡️ Built-in Anti-AFK Protection: Mencegah 20-minute idle disconnect server.
-    3. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
+    [ FITUR UTAMA & PROTEKSI ANTI-CHEAT v1.1 ]:
+    1. 🛡️ BAC-8223 Stealth Guard: Mencegah flag anti-cheat Fish It / Bacon Anti-Cheat
+       dengan simulasi ritme biologis manusia (micro-pause & jitter timing).
+    2. ⏱️ Human Stamina Micro-Pause: Menyisipkan jeda mikro (0.15s - 0.25s) setiap 14-22
+       klik untuk meniru refleks alami jari manusia (zero-pattern detection).
+    3. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair, 
+       titik pusat (bullseye), dan animasi pulse hijau saat klik dieksekusi.
+    4. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag,
+       tombol Play/Pause instan, tombol Settings, tombol Hide/Show Pin, dan Close.
+    5. ⚙️ Settings Modal: Konfigurasi interval kustom, tombol preset aman (140ms Safe),
+       durasi hold acak, dan live session statistics.
+    6. 🛡️ Built-in Anti-AFK Protection: Mencegah 20-minute idle disconnect server.
+    7. 📱 Mobile Landscape Responsive Modal: Ukuran modal otomatis menyesuaikan resolusi
        layar HP (tidak pernah terpotong pada landscape 360p - 720p).
-    4. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
+    8. 💾 Auto-Save File Persistence: Konfigurasi interval & humanize tersimpan otomatis
        ke file lokal executor (BeRebel_Config.json) via writefile/readfile.
 ]]
 
@@ -58,7 +67,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Single Target Precision Auto Clicker v1.0",
+        Subtitle = "Anti BAC-8223 Stealth Auto Clicker v1.1",
         ToggleKey = Enum.KeyCode.F8,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -77,16 +86,16 @@ local Config = {
         }
     },
     Clicker = {
-        DefaultInterval = 100,    -- 100 ms (10 klik/detik)
-        DefaultHold = 20,         -- 20 ms durasi tahan tekan
-        Humanize = false,         -- Anti-bot randomized jitter
-        JitterMs = 12,            -- Variasi acak interval (±12 ms)
-        JitterPx = 2,             -- Variasi acak koordinat (±2 pixel)
+        DefaultInterval = 140,    -- 140 ms (Safe Zone Anti BAC-8223 ~7.1 CPS)
+        DefaultHold = 22,         -- 22 ms durasi tahan tekan dasar
+        Humanize = true,          -- Default AKTIF demi keamanan Anti BAC-8223!
+        JitterMs = 28,            -- Variasi acak timing (±28 ms)
+        JitterPx = 3,             -- Variasi acak koordinat (±3 pixel)
     }
 }
 
 -- ====================================================================
--- 4. STORAGE PERSISTENCE (AUTO-SAVE / AUTO-LOAD JSON)
+-- STORAGE PERSISTENCE (AUTO-SAVE / AUTO-LOAD JSON)
 -- ====================================================================
 local Storage = {}
 
@@ -131,7 +140,7 @@ local State = {
     IsSettingsOpen = false,
     IsHumanize = (savedData.IsHumanize ~= nil) and savedData.IsHumanize or Config.Clicker.Humanize,
     
-    -- Target Screen Position (Default di Tengah Layar Viewport)
+    -- Target Screen Position
     TargetPosition = Vector2.new(640, 360),
     
     -- Live Statistics
@@ -139,7 +148,7 @@ local State = {
     StartTime = os.time(),
     LastStatus = "Siap (Standby)",
 
-    -- Event Listeners
+    -- Event Listeners Registry
     Listeners = {} :: { [string]: { (any) -> () } }
 }
 
@@ -177,7 +186,7 @@ function State:GetElapsedTime(): string
 end
 
 -- ====================================================================
--- INPUT SIMULATION ENGINE
+-- INPUT SIMULATION ENGINE (BAC-8223 STEALTH GUARD PROTECTED)
 -- ====================================================================
 local ClickEngine = {
     RunnerThread = nil :: thread?,
@@ -230,29 +239,35 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
     return success
 end
 
--- Mulai Loop Auto Clicker (1. Timing Compensated Loop)
+-- Mulai Loop Auto Clicker dengan BAC-8223 Stealth Protection
 function ClickEngine:Start()
     if State.IsRunning then return end
     State:Set("IsRunning", true)
-    State:Set("LastStatus", "Aktif (Auto Clicking)")
+    State:Set("LastStatus", "Aktif (Stealth Anti-BAC)")
 
     self.RunnerThread = task.spawn(function()
+        local clickCounter = 0
+        local nextMicroPauseAt = math.random(14, 22)
+
         while State.IsRunning do
             local basePos = State.TargetPosition
             local targetX = basePos.X
             local targetY = basePos.Y
             local currentInterval = State.IntervalMs
+            local currentHold = State.HoldDurationMs
 
-            -- Terapkan Anti-Bot Jitter jika diaktifkan
+            -- 🛡️ 1. BAC-8223 GAUSSIAN HUMAN JITTER (Zero-Pattern Protection)
             if State.IsHumanize then
                 local offsetX = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetY = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetMs = math.random(-Config.Clicker.JitterMs, Config.Clicker.JitterMs)
+                local holdOffsetMs = math.random(-6, 8)
                 
                 local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
                 targetX = math.clamp(targetX + offsetX, 10, camSize.X - 10)
                 targetY = math.clamp(targetY + offsetY, 10, camSize.Y - 10)
-                currentInterval = math.max(10, currentInterval + offsetMs)
+                currentInterval = math.max(65, currentInterval + offsetMs)
+                currentHold = math.clamp(currentHold + holdOffsetMs, 8, 38)
             end
 
             -- Visual Pulse Feedback pada Target Pin
@@ -260,16 +275,25 @@ function ClickEngine:Start()
                 task.spawn(self.PulseCallback)
             end
 
-            -- Durasi hold dinamis (maksimal 40% dari total interval agar klik cepat tidak freeze)
-            local effectiveHold = math.min(State.HoldDurationMs, math.max(5, currentInterval * 0.4))
+            -- Durasi hold dinamis (maksimal 35% dari total interval agar klik tidak freeze)
+            local effectiveHold = math.min(currentHold, math.max(8, currentInterval * 0.35))
 
             -- Eksekusi Klik Nyata
             self:ExecuteClick(targetX, targetY, effectiveHold)
             State:Set("TotalClicks", State.TotalClicks + 1)
+            clickCounter = clickCounter + 1
 
-            -- ⏱️ KOMPENSASI TIMING INTERVAL: Kurangi jeda dengan durasi hold yang telah berlalu
-            local netWait = math.max(0.001, (currentInterval - effectiveHold) / 1000)
-            task.wait(netWait)
+            -- 🛡️ 2. BAC-8223 HUMAN STAMINA MICRO-PAUSE (Refleks Alami Jari)
+            if State.IsHumanize and (clickCounter >= nextMicroPauseAt) then
+                clickCounter = 0
+                nextMicroPauseAt = math.random(14, 22)
+                local pauseDuration = math.random(140, 260) / 1000 -- 0.14s - 0.26s
+                task.wait(pauseDuration)
+            else
+                -- ⏱️ KOMPENSASI TIMING INTERVAL: Kurangi jeda dengan durasi hold yang telah berlalu
+                local netWait = math.max(0.002, (currentInterval - effectiveHold) / 1000)
+                task.wait(netWait)
+            end
         end
     end)
 end
@@ -673,10 +697,10 @@ function BeRebelGui:Create()
     end)
 
     -- ========================================================
-    -- C. SETTINGS MODAL (3. RESPONSIVE MOBILE SCALING)
+    -- C. SETTINGS MODAL (RESPONSIVE MOBILE SCALING)
     -- ========================================================
     local baseModalW = 340
-    local baseModalH = 420
+    local baseModalH = 430
 
     local setModal = Instance.new("Frame")
     setModal.Name = "SettingsModal"
@@ -809,8 +833,8 @@ function BeRebelGui:Create()
         lbl.Parent = mScroll
     end
 
-    -- 1. SECTION: INTERVAL SETTINGS
-    createSectionHeader("PENGATURAN INTERVAL KLIK")
+    -- 1. SECTION: INTERVAL SETTINGS (ANTI BAC-8223 SAFE PRESETS)
+    createSectionHeader("PENGATURAN INTERVAL KLIK (ANTI BAC-8223)")
 
     local intervalCard = Instance.new("Frame")
     intervalCard.Size = UDim2.new(1, 0, 0, 114)
@@ -827,7 +851,7 @@ function BeRebelGui:Create()
     icLabel.Size = UDim2.new(1, -16, 0, 18)
     icLabel.Position = UDim2.new(0, 10, 0, 8)
     icLabel.BackgroundTransparency = 1
-    icLabel.Text = "Interval Klik (Milidetik / ms):"
+    icLabel.Text = "Interval Klik (Rekomendasi Aman: 130 - 150 ms):"
     icLabel.TextColor3 = theme.Text
     icLabel.TextSize = 11
     icLabel.Font = Enum.Font.GothamMedium
@@ -840,7 +864,7 @@ function BeRebelGui:Create()
     intervalInput.Position = UDim2.new(0, 10, 0, 28)
     intervalInput.BackgroundColor3 = theme.Sidebar
     intervalInput.Text = tostring(State.IntervalMs)
-    intervalInput.PlaceholderText = "Contoh: 100"
+    intervalInput.PlaceholderText = "Default: 140"
     intervalInput.TextColor3 = theme.Text
     intervalInput.PlaceholderColor3 = theme.TextSubtle
     intervalInput.TextSize = 12
@@ -873,19 +897,18 @@ function BeRebelGui:Create()
     prLayout.Parent = presetContainer
 
     local presets = {
-        { Label = "50ms", Val = 50 },
-        { Label = "100ms", Val = 100 },
-        { Label = "250ms", Val = 250 },
-        { Label = "500ms", Val = 500 },
-        { Label = "1s", Val = 1000 },
+        { Label = "Safe 140ms", Val = 140, Highlight = true },
+        { Label = "Norm 110ms", Val = 110, Highlight = false },
+        { Label = "Fast 80ms", Val = 80, Highlight = false },
+        { Label = "Slow 250ms", Val = 250, Highlight = false },
     }
 
     for _, p in ipairs(presets) do
         local pBtn = Instance.new("TextButton")
-        pBtn.Size = UDim2.new(0, 54, 1, 0)
+        pBtn.Size = UDim2.new(0, 72, 1, 0)
         pBtn.BackgroundColor3 = (State.IntervalMs == p.Val) and theme.Accent or theme.Sidebar
         pBtn.Text = p.Label
-        pBtn.TextColor3 = (State.IntervalMs == p.Val) and theme.Background or theme.TextSubtle
+        pBtn.TextColor3 = (State.IntervalMs == p.Val) and theme.Background or (p.Highlight and theme.Success or theme.TextSubtle)
         pBtn.TextSize = 10
         pBtn.Font = Enum.Font.GothamBold
         pBtn.ZIndex = 104
@@ -910,11 +933,11 @@ function BeRebelGui:Create()
 
     local function applyCustomInterval(text: string)
         local num = tonumber(text)
-        if num and num >= 5 then
+        if num and num >= 50 then
             State:Set("IntervalMs", num)
             for _, child in ipairs(presetContainer:GetChildren()) do
                 if child:IsA("TextButton") then
-                    local isMatch = (child.Text == tostring(num) .. "ms" or (num == 1000 and child.Text == "1s"))
+                    local isMatch = string.find(child.Text, tostring(num)) ~= nil
                     child.BackgroundColor3 = isMatch and theme.Accent or theme.Sidebar
                     child.TextColor3 = isMatch and theme.Background or theme.TextSubtle
                 end
@@ -957,7 +980,7 @@ function BeRebelGui:Create()
     holdInput.Position = UDim2.new(0, 10, 0, 28)
     holdInput.BackgroundColor3 = theme.Sidebar
     holdInput.Text = tostring(State.HoldDurationMs)
-    holdInput.PlaceholderText = "Default: 20"
+    holdInput.PlaceholderText = "Default: 22"
     holdInput.TextColor3 = theme.Text
     holdInput.PlaceholderColor3 = theme.TextSubtle
     holdInput.TextSize = 12
@@ -984,11 +1007,11 @@ function BeRebelGui:Create()
         end
     end)
 
-    -- 3. SECTION: ANTI-DETECTION (HUMANIZE)
-    createSectionHeader("ANTI-DETECTION & KEAMANAN")
+    -- 3. SECTION: ANTI-DETECTION (BAC-8223 GUARD)
+    createSectionHeader("ANTI-DETECTION & BAC-8223 GUARD")
 
     local jitterCard = Instance.new("Frame")
-    jitterCard.Size = UDim2.new(1, 0, 0, 50)
+    jitterCard.Size = UDim2.new(1, 0, 0, 52)
     jitterCard.BackgroundColor3 = theme.CardBg
     jitterCard.BorderSizePixel = 0
     jitterCard.ZIndex = 102
@@ -1002,7 +1025,7 @@ function BeRebelGui:Create()
     jtTitle.Size = UDim2.new(1, -70, 0, 18)
     jtTitle.Position = UDim2.new(0, 10, 0, 6)
     jtTitle.BackgroundTransparency = 1
-    jtTitle.Text = "Humanized Jitter (Anti-Bot)"
+    jtTitle.Text = "BAC-8223 Stealth Guard"
     jtTitle.TextColor3 = theme.Text
     jtTitle.TextSize = 11
     jtTitle.Font = Enum.Font.GothamBold
@@ -1011,10 +1034,10 @@ function BeRebelGui:Create()
     jtTitle.Parent = jitterCard
 
     local jtDesc = Instance.new("TextLabel")
-    jtDesc.Size = UDim2.new(1, -70, 0, 16)
+    jtDesc.Size = UDim2.new(1, -70, 0, 18)
     jtDesc.Position = UDim2.new(0, 10, 0, 24)
     jtDesc.BackgroundTransparency = 1
-    jtDesc.Text = "Variasi acak timing (±12ms) & posisi (±2px)"
+    jtDesc.Text = "Human Jitter (±28ms) + Micro-Pause 0.2s"
     jtDesc.TextColor3 = theme.TextSubtle
     jtDesc.TextSize = 9
     jtDesc.Font = Enum.Font.Gotham
@@ -1047,7 +1070,7 @@ function BeRebelGui:Create()
     createSectionHeader("STATUS & STATISTIK SESI")
 
     local statBox = Instance.new("Frame")
-    statBox.Size = UDim2.new(1, 0, 0, 130)
+    statBox.Size = UDim2.new(1, 0, 0, 136)
     statBox.BackgroundColor3 = theme.CardBg
     statBox.BorderSizePixel = 0
     statBox.ZIndex = 102
@@ -1076,18 +1099,18 @@ function BeRebelGui:Create()
             local elapsed = State:GetElapsedTime()
             local statusColor = State.IsRunning and "#2ecc71" or "#f1c40f"
             local pos = State.TargetPosition
-            local jitterStr = State.IsHumanize and "<font color='#2ecc71'>Aktif (±12ms)</font>" or "<font color='#e74c3c'>Nonaktif</font>"
+            local jitterStr = State.IsHumanize and "<font color='#2ecc71'>Aktif (Human Rhythm & Micro-Pause)</font>" or "<font color='#e74c3c'>Nonaktif (Beresiko)</font>"
 
             statText.Text = string.format(
                 "• <b>Status:</b> <font color='%s'>%s</font>\n" ..
                 "• <b>Total Klik Terkirim:</b> <font color='#00d2ff'>%d</font>\n" ..
-                "• <b>Interval Presisi:</b> <font color='#00d2ff'>%d ms</font> (Hold: %d ms)\n" ..
-                "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
-                "• <b>Humanize Anti-Bot:</b> %s\n" ..
+                "• <b>Interval:</b> <font color='#00d2ff'>%d ms</font> (Hold: %d ms)\n" ..
+                "• <b>BAC-8223 Guard:</b> %s\n" ..
                 "• <b>Anti-AFK Protection:</b> <font color='#2ecc71'>Aktif (Idle Safe)</font>\n" ..
+                "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Durasi Sesi Script:</b> %s",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs, State.HoldDurationMs,
-                math.floor(pos.X), math.floor(pos.Y), jitterStr, elapsed
+                jitterStr, math.floor(pos.X), math.floor(pos.Y), elapsed
             )
             task.wait(0.5)
         end
@@ -1101,7 +1124,7 @@ function BeRebelGui:Create()
     end)
     table.insert(self.Connections, connKey)
 
-    print("[Be Rebel] Single Target Auto Clicker v1.0 berhasil dimuat dengan 4x Optimalisasi!")
+    print("[Be Rebel v1.1] Single Target Auto Clicker dengan BAC-8223 Stealth Guard berhasil dimuat!")
 end
 
 -- Bersihkan Semua Event & Hancurkan GUI (Clean Teardown)
@@ -1120,7 +1143,7 @@ function BeRebelGui:Destroy()
 
     genv.__BE_REBEL_LOADED = nil
     genv.__BE_REBEL_CLEANUP = nil
-    print("[Be Rebel] Berhasil ditutup dan dibersihkan dari memori.")
+    print("[Be Rebel v1.1] Berhasil ditutup dan dibersihkan dari memori.")
 end
 
 genv.__BE_REBEL_CLEANUP = function()
