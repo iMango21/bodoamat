@@ -78,6 +78,11 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
 - **BAC-7214 Guard (Zero WalkSpeed Tampering & Risky Remote Protection)**:
   - Seluruh manipulasi WalkSpeed dihapus secara permanen untuk mencegah flag kecepatan server BAC-7214.
   - Remote pembelian Bait & Crates dihapus dari antarmuka untuk mencegah validasi anomali vendor jarak jauh.
+- **BAC-6219 Guard (Fishing State Isolation & Anti-Conflict Inventory Protection)**:
+  - Mengisolasi pemanggilan transaksi inventaris (`RF/SellAllItems` dan `RE/FavoriteItem`) agar tidak pernah dieksekusi saat pemain sedang memancing aktif (joran melempar kail dengan bobber di air atau minigame UI sedang berlangsung), yang merupakan pemicu utama kode anti-cheat `BAC-6219`.
+  - Dilengkapi verifikasi status memancing multi-layer (`isFishingActive`) dengan mekanisme auto-wait hingga 5 detik sebelum mengeksekusi penjualan otomatis, memastikan siklus tangkapan selesai terlebih dahulu.
+  - Mengintegrasikan opsi **Mode Aman Dekat Pedagang TP (MerchantSafeTp)** secara penuh: menteleportasikan karakter ke hadapan pedagang secara instan saat menjual lalu mengembalikannya ke posisi memancing semula.
+  - Meningkatkan debounce transaksi penjualan menjadi 2.5 detik untuk mencegah flood remote function.
 - **BAC-8228 Guard (Safe Selling & Fishing Isolation)**:
   - Mengunci status `IsSelling` saat proses jual berlangsung.
   - Memberi jeda buffer sebelum memanggil `RF/SellAllItems` secara bersih tanpa mengganggu alat yang dipegang karakter.
@@ -89,24 +94,30 @@ Dukungan penuh untuk seluruh zona peta, elemental doors, throne rooms, dan area 
   - Mengurangi beban GPU dan CPU hingga 80-90% dengan membatasi framerate AFK ke 15 FPS (`setfpscap(15)`) dan menurunkan shader ke level terendah, tanpa mematikan render 3D ataupun membuat layar hitam permanen.
   - Saat dinonaktifkan, kualitas grafis dan FPS langsung kembali normal 100% secara instan.
 
-### 6. 🎣 Memancing Manual Murni & Auto-Sell Cerdas (Bebas BAC)
+### 6. Memancing Manual Murni & Auto-Sell Cerdas (Bebas BAC)
 - **100% Manual Human Play**: Fitur otomatisasi joran/pancingan (Auto Fishing & Auto Equip Rod) dihapus sepenuhnya dari script.
 - Pemain memancing secara mandiri dan wajar layaknya pemain asli, menjamin 0% risiko deteksi timing lemparan kail server.
-- **Auto-Sell Batas Kapasitas Ikan (Threshold Input)**: Dilengkapi kolom input/textbox angka jumlah ikan pada tab *Toko & Jual* (misal diisi 100, maka saat ikan ke-101 tertangkap, script langsung otomatis mengeksekusi penjualan tanpa harus menunggu timer).
+- **Auto-Sell Batas Kapasitas Ikan (Threshold Input)**: Dilengkapi kolom input/textbox angka jumlah ikan pada tab *Selling* (misal diisi 100, maka saat ikan ke-101 tertangkap, script langsung otomatis mengeksekusi penjualan tanpa harus menunggu timer).
 - **Auto Favorite Ikan Langka**: Mengamankan otomatis ikan bernilai tinggi (*Legendary, Mitos, Secret*) sebelum siklus jual massal saat fitur ini diaktifkan.
 
-### 7. 🎨 Antarmuka Modern 6-Tab Standalone UI
-- Tampilan elegan bernuansa *Dark-Glassmorphism* tanpa dependency library eksternal (No Rayfield/WindUI) sehingga **100% stabil, tidak bergantung CDN, dan tidak akan gagal load**.
-- **Ukuran Lega & Tombol Maximize (`[□]` / `[❐]`)**: Ukuran jendela default diperbesar menjadi 640x480 (responsif terhadap layar), dan dilengkapi tombol Maximize di **sebelah kanan tombol keluar `(X)`** untuk memperbesar tampilan secara instan hingga 880x620.
-- **6 Tab Kontrol**:
-  1. 💰 *Toko & Jual*
-  2. 🗿 *Totem & Laut*
-  3. 🗺️ *Teleportasi*
-  4. 🏃 *Mobilitas*
-  5. ⚡ *Performa*
-  6. 📊 *Statistik Live*
-- **Tombol Floating Mobile (🐟)**: Mempermudah pemain Android/iOS membuka dan menutup menu di layar sentuh.
+### 7. Antarmuka Minimalis Elegan & Clean Typography (Bebas Icon / Emoji)
+- Tampilan modern bernuansa *Dark-Glassmorphism* tanpa icon/emoji yang mengalihkan perhatian, dirancang simpel namun tetap elegan dengan tipografi bersih (*clean typography*) dan aksen warna tematik.
+- **Ukuran Lega & Tombol Maximize (`[□]` / `[❐]`)**: Ukuran jendela default diperbesar menjadi 640x480 (responsif terhadap layar), dan dilengkapi tombol Maximize di sebelah tombol keluar `(X)` untuk memperbesar tampilan secara instan hingga 880x620.
+- **6 Tab Kontrol Bersih (Local Player Pertama)**:
+  1. *Local Player* (Id: `Movement` - Walk On Water, Infinite Jump, Jump Power)
+  2. *Selling* (Toko, Black Market, Auto-Sell & Auto-Favorite)
+  3. *Totem* (Deploy Totem, Oksigen Laut Dalam, Radar, & Cuaca)
+  4. *Teleport* (Scanner Pemain & 59 Lokasi Terurut A-Z)
+  5. *Optimasi* (GPU Saver & FPS Booster)
+  6. *Status* (Statistik Live Sesi & Status Keamanan Anti-BAC)
+- **Tombol Floating Mobile (`MENU`)**: Badge tombol minimalis elegan bertuliskan `MENU` yang dapat digeser bebas (*touch draggable*) di layar perangkat Android/iOS untuk membuka/menutup antarmuka.
 - **Keybind PC**: Tekan tombol `RightShift` pada keyboard.
+
+### 8. Tab Local Player & Movement (Desain Atomic Hub)
+- Tab pertama di sidebar **Local Player** (Id: `Movement`) mengusung kartu section **MOVEMENT**:
+  - `Walk On Water (Jesus Walk)`: Berjalan di atas permukaan air laut tanpa jatuh.
+  - `Infinite Jump`: Lompat bebas di udara tanpa batas.
+  - `Set Jump Power`: Input box numerik (50 - 250) aman dari tripwire anti-cheat *BAC-7214*.
 
 ---
 
@@ -131,7 +142,7 @@ d:/PROGRAM/LuaRebel/
 │   │   ├── FpsBooster.luau     -- Pembersih visual aman anti-BAC & GPU Saver
 │   │   └── AntiAfk.luau        -- Proteksi disconnect 20 menit & auto-rejoin
 │   └── UI/
-│       └── BodoamatGui.luau    -- Tampilan GUI native 7-tab modern
+│       └── BodoamatGui.luau    -- Tampilan GUI native 6-tab modern (Local Player di posisi pertama)
 ```
 
 ---

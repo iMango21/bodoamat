@@ -7,18 +7,19 @@
     ╚═══════════════════════════════════════════════════════════════╝
     
     Changelog v3.0 (Stealth Anti-BAC & Delta Executor):
-    - 🛡️ BAC Stealth Mode: UI murni gethui() tanpa menyentuh CoreGui (100% bebas tripwire BAC-6228)
-    - ⚡ Talon Anti-Remote Bypass: Resolusi resmi via Packages.Net & fallback non-blocking
-    - 🛡️ Netralisasi Pelaporan BAC: Nonaktifkan listener client pada AC-Response & Punishment
-    - 🚫 Zero Startup Footprint: Tidak menyentuh _G/CoreGui, 100% aman dan bersih
-    - 📱 Mobile Touch Draggable: Tombol 🐟 dapat digeser bebas di layar perangkat Android/Delta
-    - 🗺️ 30+ Lokasi Teleportasi Baru: Copper Canyon, Sewers, Mariana Trench, Crystal Depths, dll.
-    - 🗿 Sistem Totem Otomatis: Pasang 1 Totem, Formasi 5 Totem (+), dan Auto-Deploy Loop
-    - 🛒 Remote Merchant & Black Market: Buka Pasar Gelap & Traveling Merchant jarak jauh
-    - 🤿 Eksplorasi Laut Dalam & Radar: Tabung Oksigen Anti-Tenggelam & Radar Ikan
-    - ⛈️ Pengontrol Cuaca Server: Beli Storm, Thunderstorm, Cloudy, Wind langsung
-    - 🎣 Mode Auto-Fishing Alami (Natural Human Play): Siklus realistis 7-9 detik/ekor, bebas anomali BAC-3211
-    - 🛡️ Safe Execution: Semua otomasi default NONAKTIF untuk mencegah kesalahan eksekusi
+    - BAC Stealth Mode: UI murni gethui() tanpa menyentuh CoreGui (100% bebas tripwire BAC-6228)
+    - Talon Anti-Remote Bypass: Resolusi resmi via Packages.Net & fallback non-blocking
+    - Netralisasi Pelaporan BAC: Nonaktifkan listener client pada AC-Response & Punishment
+    - Zero Startup Footprint: Tidak menyentuh _G/CoreGui, 100% aman dan bersih
+    - Mobile Touch Draggable: Tombol MENU dapat digeser bebas di layar perangkat Android/Delta
+    - 30+ Lokasi Teleportasi Baru: Copper Canyon, Sewers, Mariana Trench, Crystal Depths, dll.
+    - Sistem Totem Otomatis: Pasang 1 Totem, Formasi 5 Totem (+), dan Auto-Deploy Loop
+    - Remote Merchant & Black Market: Buka Pasar Gelap & Traveling Merchant jarak jauh
+    - Eksplorasi Laut Dalam & Radar: Tabung Oksigen Anti-Tenggelam & Radar Ikan
+    - Pengontrol Cuaca Server: Beli Storm, Thunderstorm, Cloudy, Wind langsung
+    - Mode Auto-Fishing Alami (Natural Human Play): Siklus realistis 7-9 detik/ekor, bebas anomali BAC-3211
+    - Safe Execution: Semua otomasi default NONAKTIF untuk mencegah kesalahan eksekusi
+    - BAC-6219 Guard: Fishing State Isolation & Anti-Crash Auto-Sell Safe TP
 ]]
 
 -- ============================================================
@@ -38,7 +39,7 @@ local FISH_IT_IDS = {
 if not (FISH_IT_IDS.Universes[game.GameId] or FISH_IT_IDS.Places[game.PlaceId]) then
     pcall(function()
         game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "⚠️ Akses Dibatalkan",
+            Title = "Akses Dibatalkan",
             Text = "Script Bodoamat HANYA untuk game Fish It!",
             Duration = 5
         })
@@ -360,12 +361,38 @@ end
 
 local lastSellTime = 0
 
--- Wrapper: Jual Semua Ikan (Anti BAC Debounce Protected)
+-- Wrapper: Jual Semua Ikan (Anti BAC Debounce Protected & BAC-6219 Guard)
 function Network:SellAll(): boolean
     local now = os.clock()
-    if now - lastSellTime < 1.5 then
+    if now - lastSellTime < 2.5 then
         return false
     end
+
+    -- BAC-6219 Guard: Pastikan karakter tidak sedang dalam kondisi memancing aktif
+    local LocalPlayer = Players.LocalPlayer
+    local char = LocalPlayer and LocalPlayer.Character
+    if char then
+        -- Cek jika ada tool joran yang sedang aktif memancing
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool and string.find(string.lower(tool.Name), "rod") then
+            local hasBobber = tool:FindFirstChild("Bobber") or tool:FindFirstChild("Hook") or char:FindFirstChild("Bobber")
+            if hasBobber then
+                warn("[Bodoamat | Network] [BAC-6219 Guard] Penjualan ditunda: Joran sedang melempar kail di air.")
+                return false
+            end
+        end
+
+        -- Cek apakah antarmuka minigame sedang aktif di PlayerGui
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg then
+            local mg = pg:FindFirstChild("FishingMinigame") or pg:FindFirstChild("FishingPrompt") or pg:FindFirstChild("ReelGui")
+            if mg and mg:IsA("ScreenGui") and mg.Enabled then
+                warn("[Bodoamat | Network] [BAC-6219 Guard] Penjualan ditunda: Minigame memancing sedang berlangsung.")
+                return false
+            end
+        end
+    end
+
     lastSellTime = now
 
     local remote = self.Remotes["SellAll"]
@@ -490,7 +517,7 @@ function Network:BuyItem(itemName: string): boolean
             end
         end
         if not nearShop then
-            warn("[Bodoamat | Network] ⚠️ Remote BuyItem dibatalkan (Anti BAC-4212: Karakter berada di luar jangkauan toko).")
+            warn("[Bodoamat | Network] Remote BuyItem dibatalkan (Anti BAC-4212: Karakter berada di luar jangkauan toko).")
             return false
         end
     end
@@ -810,8 +837,39 @@ function AutoSell:SetThreshold(count: number)
     print(string.format("[Bodoamat | AutoSell] Batas kapasitas ikan diset: %d (otomatis jual saat mencapai %d)", val, val + 1))
 end
 
--- Scan Backpack & Beri Bintang Favorit ke Seluruh Ikan Langka (Anti-BAC 4214 Rate-Limit Protected)
+-- Deteksi status memancing aktif (Anti BAC-6219 Guard)
+local function isFishingActive(): boolean
+    local char = Players.LocalPlayer and Players.LocalPlayer.Character
+    if not char then return false end
+
+    -- 1. Cek joran di karakter
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and string.find(string.lower(tool.Name), "rod") then
+        local hasBobber = tool:FindFirstChild("Bobber") or tool:FindFirstChild("Hook") or char:FindFirstChild("Bobber")
+        if hasBobber then return true end
+        if tool:GetAttribute("Fishing") == true or tool:GetAttribute("Casting") == true then
+            return true
+        end
+    end
+
+    -- 2. Cek antarmuka minigame di PlayerGui
+    local pg = Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        local mg = pg:FindFirstChild("FishingMinigame") or pg:FindFirstChild("FishingPrompt") or pg:FindFirstChild("ReelGui")
+        if mg and mg:IsA("ScreenGui") and mg.Enabled then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Scan Backpack & Beri Bintang Favorit ke Seluruh Ikan Langka (Anti-BAC 4214 & BAC-6219 Protected)
 function AutoSell:ProtectAndFavorite(network: any): number
+    if isFishingActive() then
+        return 0
+    end
+
     local protectedCount = 0
     pcall(function()
         if not PlayerData or not ItemUtility then
@@ -842,7 +900,7 @@ function AutoSell:ProtectAndFavorite(network: any): number
                     network:FavoriteItem(item.UUID)
                     self.FavoritedCache[item.UUID] = true
                     protectedCount = protectedCount + 1
-                    print("[Bodoamat | Proteksi] ⭐ Berhasil Mengunci: " .. tostring((data and data.Name) or "Ikan") .. " [" .. rarity .. "]")
+                    print("[Bodoamat | Proteksi] Berhasil Mengunci: " .. tostring((data and data.Name) or "Ikan") .. " [" .. rarity .. "]")
                     task.wait(0.35) -- Anti BAC-4214 Guard: Jeda aman antar paket ke server (Mencegah rate limit)
                     if protectedCount >= 4 then
                         break -- Batasi maksimal 4 item per siklus agar tidak flooding remote
@@ -877,7 +935,7 @@ function AutoSell:SetAutoFavorite(enabled: boolean, network: any)
     end
 end
 
--- Eksekusi penjualan tunggal yang aman (WAJIB SWEEP PROTEKSI SEBELUM JUAL)
+-- Eksekusi penjualan tunggal yang aman (WAJIB SWEEP PROTEKSI SEBELUM JUAL & ISOLASI BAC-6219)
 function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boolean
     if self.IsExecuting then return false end
     self.IsExecuting = true
@@ -886,8 +944,22 @@ function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boole
 
     local success = false
     pcall(function()
-        -- LANGKAH 1 (PENTING): Kunci semua ikan Legendary/Mitos/Secret sebelum remote jual dipanggil!
-        -- Ini menjamin 100% ikan langka tidak akan pernah terhapus/terjual!
+        -- BAC-6219 Guard: Tunggu sampai karakter tidak sedang dalam kondisi memancing aktif
+        local waitCount = 0
+        while isFishingActive() and waitCount < 10 do
+            if state then
+                state.LastStatusMessage = "[BAC-6219 Guard] Menunda jual: Menunggu pancing selesai..."
+            end
+            task.wait(0.5)
+            waitCount = waitCount + 1
+        end
+
+        if isFishingActive() then
+            warn("[Bodoamat | AutoSell] [BAC-6219 Guard] Penjualan dibatalkan karena joran masih melempar kail.")
+            return
+        end
+
+        -- LANGKAH 1: Kunci semua ikan Legendary/Mitos/Secret sebelum remote jual dipanggil
         local locked = 0
         if self.AutoFavoriteEnabled then
             locked = self:ProtectAndFavorite(network)
@@ -896,20 +968,42 @@ function AutoSell:ExecuteSell(network: any, state: any, teleportMod: any): boole
             end
         end
 
-        -- Jeda singkat sebelum memanggil penjualan bersih
         task.wait(0.2)
+
+        -- LANGKAH 2 (MerchantSafeTp Guard - Anti BAC-8228 & BAC-6219):
+        -- Jika opsi aktif, teleportasi singkat ke hadapan pedagang terdekat sebelum mengeksekusi remote
+        local originalCFrame = nil
+        local char = Players.LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+
+        if state and state.MerchantSafeTp and teleportMod and hrp then
+            originalCFrame = hrp.CFrame
+            pcall(function()
+                -- Spot Fisherman Island Merchant
+                teleportMod:TeleportCFrame(CFrame.new(34.2, 15.1, 255.4))
+            end)
+            task.wait(0.5)
+        end
 
         -- Panggil remote penjualan bersih (Hanya ikan Common/Uncommon yang tidak berbintang yang terjual)
         if network and network.Remotes["SellAll"] then
             success = network:SellAll()
         end
-        task.wait(0.3)
+        task.wait(0.4)
+
+        -- Kembalikan posisi karakter ke spot memancing semula jika tadi menggunakan Safe TP
+        if originalCFrame and teleportMod then
+            pcall(function()
+                teleportMod:TeleportCFrame(originalCFrame)
+            end)
+            task.wait(0.3)
+        end
     end)
 
     if state then
         state.IsSelling = false
         if success then
-            state.LastStatusMessage = "💰 Berhasil menjual ikan biasa (Ikan langka tetap aman!)"
+            state.LastStatusMessage = "Berhasil menjual ikan biasa (Ikan langka tetap aman)"
         end
     end
 
@@ -1157,7 +1251,7 @@ function Teleport:ScanPlayers(): { { Name: string, DisplayName: string, UserId: 
     table.sort(playerList, function(a, b)
         return a.DisplayName:lower() < b.DisplayName:lower()
     end)
-    print(string.format("[Bodoamat | Teleport] 👥 Berhasil memindai %d pemain di server.", #playerList))
+    print(string.format("[Bodoamat | Teleport] Berhasil memindai %d pemain di server.", #playerList))
     return playerList
 end
 
@@ -1185,7 +1279,7 @@ function Teleport:SaveCurrentPosition(name: string): boolean
 
     local cleanName = (name and #name > 0) and name or ("Spot #" .. tostring(os.date("%H:%M:%S")))
     self.CustomWaypoints[cleanName] = hrp.CFrame
-    print("[Bodoamat | Teleport] 📌 Berhasil menyimpan waypoint kustom: " .. cleanName)
+    print("[Bodoamat | Teleport] Berhasil menyimpan waypoint kustom: " .. cleanName)
     return true
 end
 
@@ -1242,7 +1336,7 @@ function Totem:DeploySingle(specificType: string?): boolean
 
     local totemTool = self:FindTotemTool(specificType)
     if not totemTool then
-        print("[Bodoamat | Totem] ⚠️ Totem tidak ditemukan di inventory atau tas!")
+        print("[Bodoamat | Totem] Totem tidak ditemukan di inventory atau tas!")
         return false
     end
 
@@ -1265,7 +1359,7 @@ function Totem:DeploySingle(specificType: string?): boolean
 
         task.wait(0.2)
         success = true
-        print("[Bodoamat | Totem] 🍀 Berhasil menempatkan totem: " .. totemTool.Name)
+        print("[Bodoamat | Totem] Berhasil menempatkan totem: " .. totemTool.Name)
     end)
 
     return success
@@ -1315,7 +1409,7 @@ function Totem:DeployFormation5(specificType: string?): boolean
         hrp.CFrame = originalPos
     end)
 
-    print("[Bodoamat | Totem] 🌟 Selesai formasi 5 Totem. Total terpasang: " .. tostring(deployedCount))
+    print("[Bodoamat | Totem] Selesai formasi 5 Totem. Total terpasang: " .. tostring(deployedCount))
     return deployedCount > 0
 end
 
@@ -1374,7 +1468,7 @@ function Merchant:OpenRemoteShop(keyword: string?, network: any?): boolean
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
     if not hrp then
-        print("[Bodoamat | Merchant] ⚠️ Karakter tidak ditemukan.")
+        print("[Bodoamat | Merchant] Karakter tidak ditemukan.")
         return false
     end
 
@@ -1408,7 +1502,7 @@ function Merchant:OpenRemoteShop(keyword: string?, network: any?): boolean
         shopName = "Traveling Merchant (Pedagang Keliling)"
     end
 
-    print("[Bodoamat | Merchant] 🚀 Membuka " .. shopName .. "...")
+    print("[Bodoamat | Merchant] Membuka " .. shopName .. "...")
 
     -- 1. Pindah ke lokasi toko secara aman (PivotTo + velocity reset anti-BAC)
     pcall(function()
@@ -1468,7 +1562,7 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
     titleLbl.Size = UDim2.new(1, -20, 0, 20)
     titleLbl.Position = UDim2.new(0, 10, 0, 6)
     titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = "🛒 " .. shopTitle .. " (Sedang Dikunjungi)"
+    titleLbl.Text = shopTitle .. " (Sedang Dikunjungi)"
     titleLbl.TextColor3 = Color3.fromRGB(0, 215, 255)
     titleLbl.TextSize = 12
     titleLbl.Font = Enum.Font.GothamBold
@@ -1491,7 +1585,7 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
     returnBtn.Size = UDim2.new(0.68, -12, 0, 30)
     returnBtn.Position = UDim2.new(0, 10, 0, 46)
     returnBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 220)
-    returnBtn.Text = "🔙 Selesai (Kembali ke Spot Mancing)"
+    returnBtn.Text = "Selesai (Kembali ke Spot Mancing)"
     returnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     returnBtn.TextSize = 11
     returnBtn.Font = Enum.Font.GothamBold
@@ -1513,7 +1607,7 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
         end)
         gui:Destroy()
         self.ReturnGui = nil
-        print("[Bodoamat | Merchant] 🔙 Berhasil kembali ke spot memancing semula.")
+        print("[Bodoamat | Merchant] Berhasil kembali ke spot memancing semula.")
     end)
 
     -- Tombol Tetap Disini (Close Banner)
@@ -1521,7 +1615,7 @@ function Merchant:ShowReturnWidget(shopTitle: string, returnCFrame: CFrame)
     stayBtn.Size = UDim2.new(0.32, -12, 0, 30)
     stayBtn.Position = UDim2.new(0.68, 4, 0, 46)
     stayBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 62)
-    stayBtn.Text = "✕ Tetap Disini"
+    stayBtn.Text = "Tetap Disini"
     stayBtn.TextColor3 = Color3.fromRGB(200, 205, 220)
     stayBtn.TextSize = 11
     stayBtn.Font = Enum.Font.GothamMedium
@@ -1559,15 +1653,15 @@ function Merchant:BuyItem(itemName: string, network: any): boolean
     end
 
     if not nearShop then
-        print("[Bodoamat | Merchant] ⚠️ Pembelian remote dicegah demi keamanan Anti BAC-4212. Buka toko langsung untuk belanja!")
+        print("[Bodoamat | Merchant] Pembelian remote dicegah demi keamanan Anti BAC-4212. Buka toko langsung untuk belanja!")
         return false
     end
 
     local success = network:BuyItem(itemName)
     if success then
-        print("[Bodoamat | Merchant] ✅ Berhasil membeli item: " .. itemName)
+        print("[Bodoamat | Merchant] Berhasil membeli item: " .. itemName)
     else
-        print("[Bodoamat | Merchant] ⚠️ Pembelian gagal atau koin tidak mencukupi: " .. itemName)
+        print("[Bodoamat | Merchant] Pembelian gagal atau koin tidak mencukupi: " .. itemName)
     end
     return success
 end
@@ -1592,7 +1686,7 @@ function Merchant:RefreshStock(network: any): boolean
     end
 
     if not nearShop then
-        print("[Bodoamat | Merchant] ⚠️ Refresh stok remote dicegah demi keamanan Anti BAC-4212.")
+        print("[Bodoamat | Merchant] Refresh stok remote dicegah demi keamanan Anti BAC-4212.")
         return false
     end
 
@@ -1625,7 +1719,7 @@ function Merchant:EquipOxygen(network: any): boolean
 
     -- 3. Aktifkan Sistem Proteksi Anti-Tenggelam (Anti-Drown)
     self:StartAntiDrown()
-    print("[Bodoamat | Laut Dalam] 🤿 Tabung Oksigen & Anti-Tenggelam Aktif! Karakter aman dari kehabisan nafas.")
+    print("[Bodoamat | Laut Dalam] Tabung Oksigen & Anti-Tenggelam Aktif! Karakter aman dari kehabisan nafas.")
     return true
 end
 
@@ -1647,7 +1741,7 @@ function Merchant:UnequipOxygen(): boolean
     end)
 
     self:StopAntiDrown()
-    print("[Bodoamat | Laut Dalam] 🤿 Tabung Oksigen & Anti-Tenggelam Dinonaktifkan.")
+    print("[Bodoamat | Laut Dalam] Tabung Oksigen & Anti-Tenggelam Dinonaktifkan.")
     return true
 end
 
@@ -1700,10 +1794,10 @@ function Merchant:ToggleRadar(arg1: any, arg2: any): boolean
 
     if enabled then
         self:StartRadar()
-        print("[Bodoamat | Radar] 📡 Radar Ikan Visual Klien Aktif (Bebas BAC-5212).")
+        print("[Bodoamat | Radar] Radar Ikan Visual Klien Aktif (Bebas BAC-5212).")
     else
         self:StopRadar()
-        print("[Bodoamat | Radar] 📡 Radar Ikan: Nonaktif.")
+        print("[Bodoamat | Radar] Radar Ikan: Nonaktif.")
     end
     return true
 end
@@ -1730,12 +1824,12 @@ function Merchant:StartRadar()
 
     -- Daftar Spot Mancing Utama untuk Radar
     local keyFishingSpots = {
-        { Name = "🌊 Coral Reef (Karang Tropis)", Pos = Vector3.new(-1200, 5, 800) },
-        { Name = "🔱 Sunken Ship (Kapal Karam)", Pos = Vector3.new(1800, -80, 2400) },
-        { Name = "🏛️ Atlantis Ruins", Pos = Vector3.new(-3200, -350, -1800) },
-        { Name = "🕳️ Mariana Trench (Palung Dalam)", Pos = Vector3.new(-9255, -255, -1) },
-        { Name = "🌋 Volcanic Island", Pos = Vector3.new(4500, 15, -3100) },
-        { Name = "🏝️ Lost Isle", Pos = Vector3.new(-6500, 10, 5200) },
+        { Name = "Coral Reef (Karang Tropis)", Pos = Vector3.new(-1200, 5, 800) },
+        { Name = "Sunken Ship (Kapal Karam)", Pos = Vector3.new(1800, -80, 2400) },
+        { Name = "Atlantis Ruins", Pos = Vector3.new(-3200, -350, -1800) },
+        { Name = "Mariana Trench (Palung Dalam)", Pos = Vector3.new(-9255, -255, -1) },
+        { Name = "Volcanic Island", Pos = Vector3.new(4500, 15, -3100) },
+        { Name = "Lost Isle", Pos = Vector3.new(-6500, 10, 5200) },
     }
 
     self.RadarThread = task.spawn(function()
@@ -1781,7 +1875,7 @@ function Merchant:StartRadar()
                                     lbl.TextColor3 = Color3.fromRGB(255, 215, 0)
                                     lbl.TextSize = 11
                                     lbl.Font = Enum.Font.GothamBold
-                                    lbl.Text = string.format("⭐ %s\n[%dm]", prop.Name, dist)
+                                    lbl.Text = string.format("%s\n[%dm]", prop.Name, dist)
                                     lbl.Parent = bb
 
                                     local c = Instance.new("UICorner")
@@ -1790,7 +1884,7 @@ function Merchant:StartRadar()
                                 else
                                     local lbl = existing:FindFirstChild("DistLabel")
                                     if lbl and lbl:IsA("TextLabel") then
-                                        lbl.Text = string.format("⭐ %s\n[%dm]", prop.Name, dist)
+                                        lbl.Text = string.format("%s\n[%dm]", prop.Name, dist)
                                     end
                                 end
                             end
@@ -1872,7 +1966,7 @@ function Merchant:SetWeather(weatherName: string, network: any): boolean
     if not network then return false end
     local success = network:PurchaseWeather(weatherName)
     if success then
-        print("[Bodoamat | Cuaca] ⛈️ Berhasil memicu event cuaca: " .. weatherName)
+        print("[Bodoamat | Cuaca] Berhasil memicu event cuaca: " .. weatherName)
     end
     return success
 end
@@ -1883,7 +1977,7 @@ end
 local BodoamatGui = {
     ScreenGui = nil :: ScreenGui?,
     MainFrame = nil :: Frame?,
-    CurrentTab = "Selling",
+    CurrentTab = "Movement",
     Tabs = {} :: { [string]: ScrollingFrame },
     TabButtons = {} :: { [string]: TextButton },
 }
@@ -2057,7 +2151,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     titleLabel.Size = UDim2.new(0, 240, 0, 24)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "🐟 " .. config.UI.Title .. " v3.0"
+    titleLabel.Text = config.UI.Title .. " v3.0"
     titleLabel.TextColor3 = config.UI.Theme.Accent
     titleLabel.TextSize = 16
     titleLabel.Font = Enum.Font.GothamBold
@@ -2122,7 +2216,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
             mainFrame.Position = UDim2.new(0.5, -math.floor(targetW / 2), 0.5, -math.floor(targetH / 2))
             maxBtn.Text = "❐"
             maxBtn.TextColor3 = Color3.fromRGB(255, 180, 50)
-            state.LastStatusMessage = "🗖 GUI diperbesar (Maximized)"
+            state.LastStatusMessage = "GUI diperbesar (Maximized)"
         else
             local targetW = math.min(640, math.max(560, currentVp.X - 40))
             local targetH = math.min(480, math.max(420, currentVp.Y - 40))
@@ -2130,7 +2224,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
             mainFrame.Position = UDim2.new(0.5, -math.floor(targetW / 2), 0.5, -math.floor(targetH / 2))
             maxBtn.Text = "□"
             maxBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
-            state.LastStatusMessage = "▫ GUI ukuran normal"
+            state.LastStatusMessage = "GUI ukuran normal"
         end
     end)
 
@@ -2178,12 +2272,12 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     end
 
     local tabList = {
-        { Id = "Selling",  Label = "💰 Toko & Jual" },
-        { Id = "Totem",    Label = "🗿 Totem & Laut" },
-        { Id = "Teleport", Label = "🗺️ Teleportasi" },
-        { Id = "Movement", Label = "🏃 Mobilitas" },
-        { Id = "Optimasi", Label = "⚡ Performa" },
-        { Id = "Status",   Label = "📊 Statistik" },
+        { Id = "Movement", Label = "Local Player" },
+        { Id = "Selling",  Label = "Selling" },
+        { Id = "Totem",    Label = "Totem" },
+        { Id = "Teleport", Label = "Teleport" },
+        { Id = "Optimasi", Label = "Optimasi" },
+        { Id = "Status",   Label = "Status" },
     }
 
     local tabLayout = Instance.new("UIListLayout")
@@ -2545,7 +2639,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end)
     end
 
-    createActionButton(sellPage, "⭐ Kunci / Amankan Ikan Langka Sekarang", "Scan isi tas & kunci ikan sesuai tier yang dipilih (Legendary/Mitos/Secret)", function()
+    createActionButton(sellPage, "Kunci / Amankan Ikan Langka Sekarang", "Scan isi tas & kunci ikan sesuai tier yang dipilih (Legendary/Mitos/Secret)", function()
         local count = modules.AutoSell:ProtectAndFavorite(modules.Network)
         print("[Bodoamat | Proteksi] Selesai scan: " .. tostring(count) .. " ikan baru diamankan.")
     end)
@@ -2554,12 +2648,12 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     createActionButton(sellPage, "Jual Semua Ikan Sekarang (Aman Ikan Langka)", "Otomatis mengunci ikan sesuai tier yang dipilih sebelum menjual", function()
         if sellDebounce then return end
         sellDebounce = true
-        modules.AutoSell:ExecuteSell(modules.Network, state)
+        modules.AutoSell:ExecuteSell(modules.Network, state, modules.Teleport)
         task.wait(2.5)
         sellDebounce = false
     end)
 
-    createSectionHeader(sellPage, "🛒 TOKO & BLACK MARKET (KUNJUNGAN AMAN)")
+    createSectionHeader(sellPage, "TOKO & BLACK MARKET (KUNJUNGAN AMAN)")
 
     createActionButton(sellPage, "Buka Black Market (Mariana Trench)", "Kunjungi Black Market di Mariana Trench secara aman, auto pakai O2 & kembali dengan 1 klik", function()
         modules.Merchant:OpenRemoteShop("blackmarket", modules.Network)
@@ -2574,7 +2668,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     -- ==========================================
     local totemPage = self.Tabs["Totem"]
 
-    createSectionHeader(totemPage, "🗿 KELOLA & PASANG TOTEM")
+    createSectionHeader(totemPage, "KELOLA & PASANG TOTEM")
 
     -- Selector Tipe Totem
     local tTypeCard = Instance.new("Frame")
@@ -2654,7 +2748,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
     end)
 
-    createSectionHeader(totemPage, "🤿 EKSPLORASI LAUT DALAM & RADAR")
+    createSectionHeader(totemPage, "EKSPLORASI LAUT DALAM & RADAR")
 
     createToggle(totemPage, "Tabung Oksigen Laut Dalam", "Aktifkan O2 tank agar tidak tenggelam di Mariana Trench & Lost Isle", state.IsOxygenEquipped, function(val)
         state:Set("IsOxygenEquipped", val)
@@ -2670,7 +2764,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         modules.Merchant:ToggleRadar(val, modules.Network)
     end)
 
-    createSectionHeader(totemPage, "⛈️ KONTROL CUACA SERVER")
+    createSectionHeader(totemPage, "KONTROL CUACA SERVER")
 
     local weatherCard = Instance.new("Frame")
     weatherCard.Size = UDim2.new(1, -4, 0, 64)
@@ -2729,7 +2823,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     -- ==========================================
     local tpPage = self.Tabs["Teleport"]
 
-    createSectionHeader(tpPage, "👥 TELEPORT KE PEMAIN LAIN")
+    createSectionHeader(tpPage, "TELEPORT KE PEMAIN LAIN")
 
     -- Scanner Pemain & Dropdown Teleport
     local playerScanCard = Instance.new("Frame")
@@ -2776,7 +2870,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     scanBtn.Size = UDim2.new(0, 100, 1, 0)
     scanBtn.Position = UDim2.new(1, -100, 0, 0)
     scanBtn.BackgroundColor3 = config.UI.Theme.Accent
-    scanBtn.Text = "🔍 Scan Player"
+    scanBtn.Text = "Scan Player"
     scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     scanBtn.TextSize = 10
     scanBtn.Font = Enum.Font.GothamBold
@@ -2805,7 +2899,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     local dropdownBtn = Instance.new("TextButton")
     dropdownBtn.Size = UDim2.new(1, 0, 0, 30)
     dropdownBtn.BackgroundColor3 = Color3.fromRGB(32, 36, 48)
-    dropdownBtn.Text = "  👤 Pilih Pemain (Klik Scan)..."
+    dropdownBtn.Text = "  Pilih Pemain (Klik Scan)..."
     dropdownBtn.TextColor3 = Color3.fromRGB(200, 205, 220)
     dropdownBtn.TextSize = 11
     dropdownBtn.Font = Enum.Font.GothamMedium
@@ -2860,7 +2954,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     local tpExecBtn = Instance.new("TextButton")
     tpExecBtn.Size = UDim2.new(1, 0, 0, 30)
     tpExecBtn.BackgroundColor3 = config.UI.Theme.Success
-    tpExecBtn.Text = "🚀 Teleport ke Pemain Terpilih"
+    tpExecBtn.Text = "Teleport ke Pemain Terpilih"
     tpExecBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     tpExecBtn.TextSize = 11
     tpExecBtn.Font = Enum.Font.GothamBold
@@ -2888,14 +2982,14 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         end
 
         if #playersList == 0 then
-            scanStatusLbl.Text = "⚠️ Tidak ada pemain lain di server."
+            scanStatusLbl.Text = "Tidak ada pemain lain di server."
             scanStatusLbl.TextColor3 = Color3.fromRGB(240, 160, 60)
             dropdownBtn.Text = "  (Server Kosong)"
             selectedPlayerName = ""
             return
         end
 
-        scanStatusLbl.Text = string.format("✅ Ditemukan %d pemain aktif di server.", #playersList)
+        scanStatusLbl.Text = string.format("Ditemukan %d pemain aktif di server.", #playersList)
         scanStatusLbl.TextColor3 = config.UI.Theme.Success
 
         for _, pInfo in ipairs(playersList) do
@@ -2915,7 +3009,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
 
             pBtn.MouseButton1Click:Connect(function()
                 selectedPlayerName = pInfo.Name
-                dropdownBtn.Text = "  👤 " .. pInfo.DisplayName .. " (@" .. pInfo.Name .. ")"
+                dropdownBtn.Text = "  " .. pInfo.DisplayName .. " (@" .. pInfo.Name .. ")"
                 isDropdownOpen = false
                 dropdownList.Visible = false
                 arrowLbl.Text = "▼"
@@ -2925,37 +3019,37 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         -- Otomatis set pemain pertama jika belum memilih
         if selectedPlayerName == "" and #playersList > 0 then
             selectedPlayerName = playersList[1].Name
-            dropdownBtn.Text = "  👤 " .. playersList[1].DisplayName .. " (@" .. playersList[1].Name .. ")"
+            dropdownBtn.Text = "  " .. playersList[1].DisplayName .. " (@" .. playersList[1].Name .. ")"
         end
     end)
 
     -- Handler Tombol Teleport
     tpExecBtn.MouseButton1Click:Connect(function()
         if selectedPlayerName == "" then
-            scanStatusLbl.Text = "⚠️ Silakan klik 'Scan Player' dan pilih pemain!"
+            scanStatusLbl.Text = "Silakan klik 'Scan Player' dan pilih pemain!"
             scanStatusLbl.TextColor3 = Color3.fromRGB(240, 80, 80)
             return
         end
 
         local ok = modules.Teleport:ToPlayer(selectedPlayerName)
         if ok then
-            state.LastStatusMessage = "📍 TP ke pemain: " .. selectedPlayerName
-            scanStatusLbl.Text = "🚀 Berhasil teleport ke @" .. selectedPlayerName
+            state.LastStatusMessage = "TP ke pemain: " .. selectedPlayerName
+            scanStatusLbl.Text = "Berhasil teleport ke @" .. selectedPlayerName
             scanStatusLbl.TextColor3 = config.UI.Theme.Success
         else
-            scanStatusLbl.Text = "❌ Gagal TP: Pemain @" .. selectedPlayerName .. " tidak ditemukan/mati"
+            scanStatusLbl.Text = "Gagal TP: Pemain @" .. selectedPlayerName .. " tidak ditemukan/mati"
             scanStatusLbl.TextColor3 = Color3.fromRGB(240, 80, 80)
         end
     end)
 
 
-    createSectionHeader(tpPage, "📌 SIMPAN TITIK KUSTOM (WAYPOINT)")
+    createSectionHeader(tpPage, "SIMPAN TITIK KUSTOM (WAYPOINT)")
     createTextInput(tpPage, "Beri nama titik kustom...", "Simpan Posisi", function(wpName)
         modules.Teleport:SaveCurrentPosition(wpName)
-        state.LastStatusMessage = "📌 Waypoint tersimpan: " .. wpName
+        state.LastStatusMessage = "Waypoint tersimpan: " .. wpName
     end)
 
-    createSectionHeader(tpPage, "📍 DAFTAR LOKASI RESMI (SEMUA ZONA)")
+    createSectionHeader(tpPage, "DAFTAR LOKASI RESMI (SEMUA ZONA)")
 
     local locContainer = Instance.new("Frame")
     locContainer.Size = UDim2.new(1, 0, 0, 0)
@@ -2988,7 +3082,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         locLabel.Size = UDim2.new(1, -85, 1, 0)
         locLabel.Position = UDim2.new(0, 10, 0, 0)
         locLabel.BackgroundTransparency = 1
-        locLabel.Text = (loc.Category == "New" and "⭐ " or "📍 ") .. loc.Name
+        locLabel.Text = loc.Name
         locLabel.TextColor3 = (loc.Category == "New") and Color3.fromRGB(255, 215, 0) or config.UI.Theme.Text
         locLabel.TextSize = 11
         locLabel.Font = Enum.Font.GothamMedium
@@ -3012,15 +3106,17 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
         goBtn.MouseButton1Click:Connect(function()
             local success = modules.Teleport:To(loc.CFrame)
             if success then
-                state.LastStatusMessage = "📍 Teleport ke " .. loc.Name
+                state.LastStatusMessage = "Teleport ke " .. loc.Name
             end
         end)
     end
 
     -- ==========================================
-    -- ISI KONTEN TAB 5: MOBILITAS (MOVEMENT)
+    -- ISI KONTEN TAB: LOCAL PLAYER (MOVEMENT)
     -- ==========================================
     local movePage = self.Tabs["Movement"]
+
+    createSectionHeader(movePage, "MOVEMENT")
 
     createToggle(movePage, "Walk On Water (Jesus Walk)", "Berjalan di atas permukaan air laut tanpa jatuh", state.IsWaterWalk, function(val)
         state:Set("IsWaterWalk", val)
@@ -3030,6 +3126,14 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     createToggle(movePage, "Infinite Jump", "Lompat bebas di udara tanpa batas", state.IsInfJump, function(val)
         state:Set("IsInfJump", val)
         modules.Movement:SetInfiniteJump(val)
+    end)
+
+    createTextInput(movePage, "Kekuatan lompatan (50 - 250)...", "Set Jump Power", function(val)
+        local num = tonumber(val)
+        if num then
+            modules.Movement:SetJumpPower(num)
+            state.LastStatusMessage = "Jump Power diset: " .. tostring(num)
+        end
     end)
 
 
@@ -3086,15 +3190,16 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
             local posStr = hrp and string.format("%.1f, %.1f, %.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z) or "N/A"
 
             statText.Text = string.format(
-                "<b>📊 INFORMASI LIVE SESSION:</b>\n\n" ..
+                "<b>INFORMASI LIVE SESSION:</b>\n\n" ..
                 "• <b>Durasi Sesi:</b> <font color='#00d2ff'>%s</font>\n" ..
                 "• <b>Mode Memancing:</b> <font color='#2ecc71'>Manual Alami (Bebas BAC)</font>\n" ..
                 "• <b>Proteksi Ikan Langka:</b> <font color='#2ecc71'>Aktif (Tier %s+)</font>\n" ..
                 "• <b>Tabung Oksigen:</b> %s | <b>Radar:</b> %s\n" ..
                 "• <b>Posisi Karakter:</b> <font color='#9b59b6'>%s</font>\n" ..
                 "• <b>Status Sistem:</b> %s\n\n" ..
-                "<b>🛡️ STATUS KEAMANAN (ANTI-BAC):</b>\n" ..
+                "<b>STATUS KEAMANAN (ANTI-BAC):</b>\n" ..
                 "• <b>Fishing BAC Guard:</b> <font color='#2ecc71'>100%% Aman (Manual Murni)</font>\n" ..
+                "• <b>Fishing State Guard:</b> <font color='#2ecc71'>Aktif (BAC-6219 Guard)</font>\n" ..
                 "• <b>Safe Sell Guard:</b> <font color='#2ecc71'>Aktif (Auto-Favorite Sebelum Jual)</font>\n" ..
                 "• <b>Workspace Part Tamper:</b> <font color='#2ecc71'>Dihapus (BAC-6228 Guard)</font>\n" ..
                 "• <b>GPU Saver Mode:</b> <font color='#2ecc71'>Engine Raster Standby</font>",
@@ -3107,21 +3212,23 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     -- 6. Tombol Floating Buka/Tutup GUI untuk Mobile (Touch Draggable)
     local mobileBtn = Instance.new("TextButton")
     mobileBtn.Name = "AppFloatingBtn"
-    mobileBtn.Size = UDim2.new(0, 48, 0, 48)
-    mobileBtn.Position = UDim2.new(0, 20, 0.5, -24)
+    mobileBtn.Size = UDim2.new(0, 56, 0, 30)
+    mobileBtn.Position = UDim2.new(0, 20, 0.5, -15)
     mobileBtn.BackgroundColor3 = config.UI.Theme.CardBg
-    mobileBtn.Text = "🐟"
-    mobileBtn.TextSize = 22
+    mobileBtn.Text = "MENU"
+    mobileBtn.TextColor3 = config.UI.Theme.Text
+    mobileBtn.TextSize = 11
+    mobileBtn.Font = Enum.Font.GothamBold
     mobileBtn.Active = true
     mobileBtn.Parent = screenGui
 
     local mbCorner = Instance.new("UICorner")
-    mbCorner.CornerRadius = UDim.new(0, 24)
+    mbCorner.CornerRadius = UDim.new(0, 6)
     mbCorner.Parent = mobileBtn
 
     local mbStroke = Instance.new("UIStroke")
     mbStroke.Color = config.UI.Theme.Accent
-    mbStroke.Thickness = 1.5
+    mbStroke.Thickness = 1.2
     mbStroke.Parent = mobileBtn
 
     -- Logika Dragging Tombol Mobile
@@ -3169,7 +3276,7 @@ function BodoamatGui:Create(config: any, state: any, modules: any)
     end)
 
     -- Aktifkan tab pertama secara default
-    self:SwitchTab("Selling", config)
+    self:SwitchTab("Movement", config)
 
     print("[Bodoamat | UI] Standalone GUI v3.0 berhasil dibuat.")
 end
@@ -3201,7 +3308,7 @@ local Modules = {
 
 local function Init()
     print("================================================")
-    print("🚀 BODOAMAT v3.0 (Stealth Anti-BAC / Delta) - Memulai...")
+    print("BODOAMAT v3.0 (Stealth Anti-BAC / Delta) - Memulai...")
     print("================================================")
 
     -- Buat Tampilan GUI Secara Instan (0 Detik)
@@ -3212,7 +3319,7 @@ local function Init()
         Network:Init()
     end)
 
-    print("[Bodoamat v3.0] Berhasil dimuat! Tekan RightShift atau sentuh tombol 🐟 untuk membuka menu.")
+    print("[Bodoamat v3.0] Berhasil dimuat! Tekan RightShift atau sentuh tombol MENU untuk membuka menu.")
 end
 
 Init()
