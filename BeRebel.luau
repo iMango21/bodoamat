@@ -1,11 +1,12 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.1.1 ⚡                           ║
+    ║                       ⚡ BE REBEL v3.1.2 ⚡                           ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-2225/8226/2223/1224/2226) ║
+    ║       BAC Stealth Immunity (Bebas BAC-10221/2225/8226/2223)     ║
     ║       Floating Quick-Bar: [MENU] + [▶ PLAY / ⏸ PAUSE]            ║
+    ║       Auto-Pause Rule: Menu Dibuka -> Auto Clicker Pause        ║
     ║       Active Tab: Local Player Movement (WaterWalk & InfJump)   ║
     ║       Pixel-Perfect Pin & Screen Inset Synchronization          ║
     ║       Default Interval: 1.0 Detik (1000ms) per Klik             ║
@@ -48,6 +49,9 @@ end)
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local CurrentCamera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
 
+-- Forward Declaration untuk GUI Controller
+local BeRebelGui = nil :: any
+
 -- ====================================================================
 -- KONFIGURASI TEMA (BODOAMAT DARK-GLASSMORPHISM)
 -- ====================================================================
@@ -55,7 +59,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.1.1",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.1.2",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -392,6 +396,12 @@ end
 -- Mulai Loop Auto Clicker
 function ClickEngine:Start()
     if State.IsRunning then return end
+
+    -- ATURAN ANTI BAC-10221: Jika menu utama sedang terbuka, tutup otomatis sebelum mulai klik
+    if BeRebelGui and BeRebelGui.MainFrame and BeRebelGui.MainFrame.Visible then
+        BeRebelGui.MainFrame.Visible = false
+    end
+
     State:Set("IsRunning", true)
     State:Set("LastStatus", "Aktif (Running)")
 
@@ -496,7 +506,7 @@ local function getSafeGuiContainer(): Instance
     return LocalPlayer:WaitForChild("PlayerGui")
 end
 
-local BeRebelGui = {
+BeRebelGui = {
     ScreenGui = nil :: ScreenGui?,
     MainFrame = nil :: Frame?,
     FloatingBar = nil :: Frame?,
@@ -664,13 +674,26 @@ function BeRebelGui:Create()
     -- Handler Klik Tombol Floating Bar
     menuBtn.MouseButton1Click:Connect(function()
         if not fbHasMoved and self.MainFrame then
-            self.MainFrame.Visible = not self.MainFrame.Visible
+            local willBeVisible = not self.MainFrame.Visible
+            self.MainFrame.Visible = willBeVisible
+            -- ATURAN UTAMA (ANTI BAC-10221): Jika menu utama dibuka, auto-clicker WAJIB PAUSE
+            if willBeVisible and State.IsRunning then
+                ClickEngine:Stop()
+            end
         end
     end)
 
     playBtn.MouseButton1Click:Connect(function()
         if not fbHasMoved then
-            ClickEngine:Toggle()
+            if not State.IsRunning then
+                -- Saat tombol Play ditekan: Jika menu sedang terbuka, tutup dulu agar klik tidak terhalang (Anti BAC-10221)
+                if self.MainFrame and self.MainFrame.Visible then
+                    self.MainFrame.Visible = false
+                end
+                ClickEngine:Start()
+            else
+                ClickEngine:Stop()
+            end
         end
     end)
 
@@ -700,7 +723,7 @@ function BeRebelGui:Create()
     targetPin.BackgroundColor3 = theme.Background
     targetPin.BackgroundTransparency = 0.35
     targetPin.BorderSizePixel = 0
-    targetPin.Active = false -- Click Passthrough: Tidak menyerap klik, langsung tembus ke game
+    targetPin.Active = true
     targetPin.ZIndex = 50
     targetPin.Parent = screenGui
     self.TargetPin = targetPin
@@ -841,6 +864,14 @@ function BeRebelGui:Create()
     mainStroke.Thickness = 1.2
     mainStroke.Parent = mainFrame
 
+    -- RULE AUTO-PAUSE (ANTI BAC-10221): Jika MainWindow dibuka/terlihat, Auto-Clicker OTOMATIS PAUSE
+    local connVisChange = mainFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+        if mainFrame.Visible and State.IsRunning then
+            ClickEngine:Stop()
+        end
+    end)
+    table.insert(self.Connections, connVisChange)
+
     -- Logika Dragging MainWindow (Header & Frame Drag)
     local winDragging, winDragInput, winDragStart, winStartPos
     local connWinStart = mainFrame.InputBegan:Connect(function(input)
@@ -902,7 +933,7 @@ function BeRebelGui:Create()
     titleLabel.Size = UDim2.new(0, 240, 0, 22)
     titleLabel.Position = UDim2.new(0, 16, 0, 6)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = Config.UI.Title .. " v3.1"
+    titleLabel.Text = Config.UI.Title .. " v3.2"
     titleLabel.TextColor3 = theme.Accent
     titleLabel.TextSize = 15
     titleLabel.Font = Enum.Font.GothamBold
@@ -1349,7 +1380,15 @@ function BeRebelGui:Create()
     mpStroke.Parent = mainPlayBtn
 
     mainPlayBtn.MouseButton1Click:Connect(function()
-        ClickEngine:Toggle()
+        if not State.IsRunning then
+            -- Tutup MainFrame otomatis saat Play agar auto clicker langsung aktif tanpa tertutup UI (Anti BAC-10221)
+            if self.MainFrame then
+                self.MainFrame.Visible = false
+            end
+            ClickEngine:Start()
+        else
+            ClickEngine:Stop()
+        end
     end)
 
     State:OnChange("IsRunning", function(running)
@@ -1550,7 +1589,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.1</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.2</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
@@ -1564,7 +1603,11 @@ function BeRebelGui:Create()
     -- Shortcut Keyboard Toggle (Default: RightShift)
     local connKey = UserInputService.InputBegan:Connect(function(input, processed)
         if not processed and input.KeyCode == Config.UI.ToggleKey then
-            mainFrame.Visible = not mainFrame.Visible
+            local willBeVis = not mainFrame.Visible
+            mainFrame.Visible = willBeVis
+            if willBeVis and State.IsRunning then
+                ClickEngine:Stop()
+            end
         end
     end)
     table.insert(self.Connections, connKey)
