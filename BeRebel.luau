@@ -1,10 +1,11 @@
 --!strict
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║                       ⚡ BE REBEL v3.3.7 ⚡                          ║
+    ║                       ⚡ BE REBEL v3.3.8 ⚡                          ║
     ║       Universal Screen Assistant & Hub (Bodoamat UI/UX)         ║
     ║       Delta Executor Android Pure Screen Hardware Simulator     ║
-    ║       BAC Stealth Immunity (Bebas BAC-5227/6228/7227/8227/9223) ║
+    ║       BAC Stealth Immunity (Bebas BAC-5228/5227/6228/7227/8227) ║
+    ║       DisplayOrder Normalization: Standard Layer (DisplayOrder=10║
     ║       Zero Camera Tamper: Clean Viewport & Isolated gethui()    ║
     ║       Hardware Input Lifecycle: DataModel game + Multi-Frame    ║
     ║       CoreGui Inset Guard: Clamping Aman di Bawah Topbar (Y≥65) ║
@@ -63,7 +64,7 @@ local Config = {
     StorageFile = "BeRebel_Config.json",
     UI = {
         Title = "BE REBEL",
-        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.7",
+        Subtitle = "Universal Screen Assistant & QoL Hub v3.3.8",
         ToggleKey = Enum.KeyCode.RightShift,
         Theme = {
             Background  = Color3.fromRGB(16, 18, 26),
@@ -530,11 +531,11 @@ function BeRebelGui:Create()
         end
     end)
 
-    -- 2. Buat ScreenGui Utama dengan Stealth Container (Zero CoreGui Touch - Anti BAC-6228)
+    -- 2. Buat ScreenGui Utama dengan Stealth Container (Zero CoreGui Touch & Standard DisplayOrder)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "RobloxGuiAppLayer"
     screenGui.ResetOnSpawn = false
-    screenGui.DisplayOrder = 100000
+    screenGui.DisplayOrder = 10 -- Nilai standar wajar (Anti BAC-5228 Extreme DisplayOrder Overlay Flag)
     screenGui.IgnoreGuiInset = true -- Sinkronisasi 1:1 Koordinat Layar dengan Mouse/Touch
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -1583,7 +1584,7 @@ function BeRebelGui:Create()
                 "• <b>Posisi Target Screen:</b> X: %d, Y: %d\n" ..
                 "• <b>Water Walk:</b> %s | <b>Inf Jump:</b> %s\n" ..
                 "• <b>Durasi Sesi Script:</b> %s\n" ..
-                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.7</font>",
+                "• <b>Arsitektur:</b> <font color='#2ecc71'>BeRebel Mobile Hub v3.3.8</font>",
                 statusColor, State.LastStatus, State.TotalClicks, State.IntervalMs,
                 State.HoldDurationMs, jitterStr, math.floor(pos.X), math.floor(pos.Y),
                 MovementModule.IsWaterWalk and "<font color='#2ecc71'>ON</font>" or "<font color='#e74c3c'>OFF</font>",
