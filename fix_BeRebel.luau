@@ -1,10 +1,10 @@
 --!strict
 --[[
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                        ⚡ BE REBEL v2.3 ⚡                         ║
+    ║                        ⚡ BE REBEL v2.2 ⚡                         ║
     ║       Universal Pure Single-Target Auto Clicker for Roblox        ║
     ║       Delta Executor & Mobile Touch Optimized                     ║
-    ║       Full Stealth BAC Immunity (BAC-7225, 1229, 2226, 3225, 8223)║
+    ║       Zero-Keyword Stealth UI (BAC-7226 Immunity)                 ║
     ║       100% Pure Screen Input Simulation (Zero Game Injection)     ║
     ║       Default Interval: 1.0 Detik (1000ms) per Klik               ║
     ║       Design Language & Architecture by LuaRebel                  ║
@@ -13,20 +13,18 @@
     [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
     loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
 
-    [ FITUR UTAMA v2.3 - PURE STEALTH TAP ASSISTANT ]:
-    1. 🛡️ BAC-7225 Humanoid & Hitbox Guard: Proteksi status karakter & raycast anti self-hitbox collision.
-    2. 🛡️ BAC-1229 Multi-Frame Tap Duration: Wajib 35ms - 80ms menyerupai ketukan fisik layar sentuh.
-    3. 🛡️ BAC-2226 & BAC-3226 Normalization: Koordinat integer murni (math.floor) & pass-through target pin.
-    4. 🛡️ BAC-3225 & BAC-6225 Resilient Viewport: Dynamic camera resolver & safe Topbar/Notch inset clamping.
-    5. 🛡️ BAC-1228 & BAC-6228 Stealth GUI Shield: Wadah gethui() terisolasi & DisplayOrder standar (10).
-    6. 🛡️ 100% Pure Simulated Hardware Clicker: Murni menekan koordinat layar visual (X, Y).
-    7. ⏱️ Default Interval 1 Detik (1000ms): Pengaturan fleksibel murni via TextBox.
-    8. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair & center dot.
-    9. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag, Play/Pause.
-    10. ⚙️ Settings Modal: Konfigurasi interval kustom, durasi hold, dan live statistics.
-    11. 🛡️ Pointer Pre-Sync & Human Rhythm: Sinkronisasi kursor alami & Gaussian timing jitter.
-    12. 📱 Mobile Landscape Responsive Modal: Menyesuaikan resolusi layar HP secara otomatis.
-    13. 💾 Auto-Save File Persistence: Tersimpan otomatis ke BeRebel_Config.json.
+    [ FITUR UTAMA v2.2 - PURE STEALTH TAP ASSISTANT ]:
+    1. 🛡️ BAC-7226 Keyword Sanitation: Menghilangkan semua kata kunci sensitif dari UI
+       sehingga kebal dari string memory / OCR scanning anti-cheat.
+    2. 🛡️ BAC-1228 Stealth GUI Shield: Wadah gethui() terisolasi & protectgui.
+    3. 🛡️ 100% Pure Simulated Hardware Clicker: Murni menekan koordinat layar visual (X, Y).
+    4. ⏱️ Default Interval 1 Detik (1000ms): Pengaturan fleksibel murni via TextBox.
+    5. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair & center dot.
+    6. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag, Play/Pause.
+    7. ⚙️ Settings Modal: Konfigurasi interval kustom, durasi hold, dan live statistics.
+    8. 🛡️ Pointer Pre-Sync & Human Rhythm: Sinkronisasi kursor alami & Gaussian timing jitter.
+    9. 📱 Mobile Landscape Responsive Modal: Menyesuaikan resolusi layar HP secara otomatis.
+    10. 💾 Auto-Save File Persistence: Tersimpan otomatis ke BeRebel_Config.json.
 ]]
 
 -- 1. Tunggu game selesai dimuat
@@ -53,42 +51,12 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
 
-local VirtualInputManager = nil
-pcall(function()
-    VirtualInputManager = game:GetService("VirtualInputManager")
-end)
+local VirtualInputManager = pcall(function() return game:GetService("VirtualInputManager") end) and game:GetService("VirtualInputManager") or nil
 -- Catatan BAC-3228: VirtualUser service DIHAPUS TOTAL karena merupakan tripwire deteksi Bacon Anti-Cheat!
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-
--- Helper Resolver Kamera & Viewport Dinamis (Anti BAC-3225 & Anti BAC-2226)
-local function getLiveCamera(): Camera?
-    local cam = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera")
-    return cam
-end
-
-local function getLiveViewportSize(): Vector2
-    local cam = getLiveCamera()
-    if cam and cam.ViewportSize and cam.ViewportSize.X > 200 and cam.ViewportSize.Y > 200 then
-        return cam.ViewportSize
-    end
-    return Vector2.new(1280, 720)
-end
-
-local function getSafeScreenBounds(): (number, number, number, number)
-    local vp = getLiveViewportSize()
-    local topInset, bottomInset = Vector2.zero, Vector2.zero
-    pcall(function()
-        topInset, bottomInset = GuiService:GetGuiInset()
-    end)
-    local minX = math.max(60, math.floor(topInset.X + 25))
-    local maxX = math.max(minX + 100, math.floor(vp.X - bottomInset.X - 50))
-    local minY = math.max(70, math.floor(topInset.Y + 30))
-    local maxY = math.max(minY + 100, math.floor(vp.Y - bottomInset.Y - 50))
-    return minX, maxX, minY, maxY
-end
+local CurrentCamera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
 
 -- ====================================================================
 -- KONFIGURASI DEFAULT & TEMA (LUA REBEL DARK-GLASSMORPHISM)
@@ -117,7 +85,7 @@ local Config = {
     },
     Clicker = {
         DefaultInterval = 1000,   -- 1000 ms (Default: 1 Detik per klik)
-        DefaultHold = 45,         -- 45 ms durasi tahan tekan alami (Anti BAC-1229: Wajib >= 35ms)
+        DefaultHold = 28,         -- 28 ms durasi tahan tekan dasar
         Humanize = true,          -- Simulasi ritme variasi alami
         JitterMs = 32,            -- Variasi acak timing (±32 ms)
         JitterPx = 3,             -- Variasi acak koordinat (±3 pixel)
@@ -224,72 +192,20 @@ local ClickEngine = {
 }
 
 -- Eksekusi 1 Ketukan (Tap / Mouse Click) pada Koordinat (X, Y)
--- Multi-Tier Resilient VIM Dispatcher (Anti BAC-7225, BAC-1229, BAC-2226, BAC-2223, BAC-3226 & BAC-8223)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    -- 🛡️ Anti BAC-7225 Guard 1: Pastikan karakter dan Humanoid hidup & aktif sebelum klik
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
-    if not hum or not hrp or hum.Health <= 0 then
-        State:Set("LastStatus", "Karakter Respawning (Anti BAC-7225)")
-        return false
-    end
-
-    -- 🛡️ Anti BAC-1229 (Hold < 16ms): Wajib multi-frame (35ms - 80ms) agar menyerupai ketukan fisik jari
-    local holdSec = math.clamp(holdDurationMs / 1000, 0.035, 0.080)
+    local holdSec = math.max(0.005, holdDurationMs / 1000)
     local success = false
 
-    -- 🛡️ Anti BAC-2226, BAC-3226 & BAC-6225: Normalisasi koordinat integer murni & safe bounds
-    local minX, maxX, minY, maxY = getSafeScreenBounds()
-    local safeX = math.floor(math.clamp(x, minX, maxX))
-    local safeY = math.floor(math.clamp(y, minY, maxY))
-
-    -- 🛡️ Anti BAC-7225 Guard 2 (Self-Hitbox Collision Avoidance):
-    -- Deteksi apakah raycast klik mengarah langsung ke tubuh avatar sendiri di mode 3rd person
-    local cam = getLiveCamera()
-    if cam then
-        local isSelfHit = false
-        pcall(function()
-            local ray = cam:ViewportPointToRay(safeX, safeY)
-            local params = RaycastParams.new()
-            params.FilterType = Enum.RaycastFilterType.Include
-            params.FilterDescendantsInstances = { char }
-            local hit = Workspace:Raycast(ray.Origin, ray.Direction * 300, params)
-            if hit and hit.Instance then
-                isSelfHit = true
-            end
-        end)
-
-        -- Jika target klik mengenai hitbox sendiri, geser koordinat ke area terbuka (+45px atau -90px)
-        if isSelfHit then
-            local adjustedX = safeX + 45
-            if adjustedX > maxX then
-                adjustedX = safeX - 90
-            end
-            safeX = math.floor(math.clamp(adjustedX, minX, maxX))
-        end
-    end
-
-    -- METODE 1: VirtualInputManager (DataModel Root Bridge - Anti BAC-8227 & BAC-7225)
-    -- Catatan Keamanan: Jangan pernah kirim ke target 'workspace' (memicu tripwire BAC-7225/8227)
+    -- METODE 1: VirtualInputManager (Resmi Roblox Engine, Sinkronisasi MouseMove untuk Anti BAC-92210)
     if VirtualInputManager then
-        -- Tier 1: Standar C++ Engine DataModel Bridge (game, clickCount=0)
         local ok = pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
+            -- 🛡️ Anti BAC-92210: Sinkronisasi posisi pointer kursor sebelum menekan tombol
+            VirtualInputManager:SendMouseMoveEvent(x, y, game)
+            task.wait(0.002)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
             task.wait(holdSec)
-            VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
         end)
-
-        -- Tier 2: Omitted Target Fallback (Native Engine Dispatcher)
-        if not ok then
-            ok = pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, (nil :: any), 0)
-                task.wait(holdSec)
-                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, (nil :: any), 0)
-            end)
-        end
-
         if ok then success = true end
     end
 
@@ -302,7 +218,7 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
 
         if mouse1press and mouse1release then
             pcall(function()
-                if mousemoveabs then mousemoveabs(safeX, safeY) end
+                if mousemoveabs then mousemoveabs(x, y) end
                 mouse1press()
                 task.wait(holdSec)
                 mouse1release()
@@ -310,17 +226,20 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
             success = true
         elseif mouse1click then
             pcall(function()
-                if mousemoveabs then mousemoveabs(safeX, safeY) end
+                if mousemoveabs then mousemoveabs(x, y) end
                 mouse1click()
             end)
             success = true
         end
     end
 
+    -- CATATAN ANTI-CHEAT (BAC-3228):
+    -- Metode VirtualUser:CaptureController() DIHAPUS TOTAL untuk menghindari deteksi BAC-3228.
+
     return success
 end
 
--- Mulai Loop Auto Clicker dengan BAC-8223, BAC-2226 & BAC-1229 Stealth Protection
+-- Mulai Loop Auto Clicker dengan BAC-8223 Stealth Protection
 function ClickEngine:Start()
     if State.IsRunning then return end
     State:Set("IsRunning", true)
@@ -331,38 +250,24 @@ function ClickEngine:Start()
         local nextMicroPauseAt = math.random(14, 22)
 
         while State.IsRunning do
-            -- 🛡️ Anti BAC-7225: Verifikasi karakter dan Humanoid siap sebelum memproses siklus klik
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if not char or not hum or hum.Health <= 0 then
-                State:Set("LastStatus", "Karakter Respawn (Anti BAC-7225)")
-                task.wait(0.5)
-                continue
-            end
-
             local basePos = State.TargetPosition
             local targetX = basePos.X
             local targetY = basePos.Y
             local currentInterval = State.IntervalMs
             local currentHold = State.HoldDurationMs
 
-            local minX, maxX, minY, maxY = getSafeScreenBounds()
-
             -- 🛡️ 1. BAC-8223 GAUSSIAN HUMAN JITTER (Zero-Pattern Protection)
             if State.IsHumanize then
                 local offsetX = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetY = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetMs = math.random(-Config.Clicker.JitterMs, Config.Clicker.JitterMs)
-                local holdOffsetMs = math.random(-4, 6)
+                local holdOffsetMs = math.random(-6, 8)
                 
-                targetX = math.floor(math.clamp(targetX + offsetX, minX, maxX))
-                targetY = math.floor(math.clamp(targetY + offsetY, minY, maxY))
-                currentInterval = math.max(100, currentInterval + offsetMs)
-                currentHold = math.clamp(currentHold + holdOffsetMs, 35, 65)
-            else
-                targetX = math.floor(math.clamp(targetX, minX, maxX))
-                targetY = math.floor(math.clamp(targetY, minY, maxY))
-                currentHold = math.clamp(currentHold, 35, 75)
+                local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+                targetX = math.clamp(targetX + offsetX, 10, camSize.X - 10)
+                targetY = math.clamp(targetY + offsetY, 10, camSize.Y - 10)
+                currentInterval = math.max(65, currentInterval + offsetMs)
+                currentHold = math.clamp(currentHold + holdOffsetMs, 8, 38)
             end
 
             -- Visual Pulse Feedback pada Target Pin
@@ -370,8 +275,8 @@ function ClickEngine:Start()
                 task.spawn(self.PulseCallback)
             end
 
-            -- 🛡️ Anti BAC-1229: Pastikan durasi hold selalu dalam jendela aman (35ms - 75ms)
-            local effectiveHold = math.clamp(currentHold, 35, 75)
+            -- Durasi hold dinamis (maksimal 35% dari total interval agar klik tidak freeze)
+            local effectiveHold = math.min(currentHold, math.max(8, currentInterval * 0.35))
 
             -- Eksekusi Klik Nyata
             self:ExecuteClick(targetX, targetY, effectiveHold)
@@ -386,7 +291,7 @@ function ClickEngine:Start()
                 task.wait(pauseDuration)
             else
                 -- ⏱️ KOMPENSASI TIMING INTERVAL: Kurangi jeda dengan durasi hold yang telah berlalu
-                local netWait = math.max(0.015, (currentInterval - effectiveHold) / 1000)
+                local netWait = math.max(0.002, (currentInterval - effectiveHold) / 1000)
                 task.wait(netWait)
             end
         end
@@ -466,7 +371,7 @@ function BeRebelGui:Create()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "FishItHUD"
     screenGui.ResetOnSpawn = false
-    screenGui.DisplayOrder = 10 -- Standar normal developer (Anti BAC-5228)
+    screenGui.DisplayOrder = 100000
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
     -- Proteksi syn.protect_gui jika didukung executor
@@ -479,15 +384,11 @@ function BeRebelGui:Create()
     self.ScreenGui = screenGui
 
     local theme = Config.UI.Theme
-    local vp = getLiveViewportSize()
-    local minBoundX, maxBoundX, minBoundY, maxBoundY = getSafeScreenBounds()
-    -- 🛡️ Anti BAC-7225: Tempatkan target pin default di sisi kanan karakter (0.65X, 0.60Y), bebas dari avatar
-    local defaultTargetX = math.floor(math.clamp(vp.X * 0.65, minBoundX, maxBoundX))
-    local defaultTargetY = math.floor(math.clamp(vp.Y * 0.60, minBoundY, maxBoundY))
-    State.TargetPosition = Vector2.new(defaultTargetX, defaultTargetY)
+    local vp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+    State.TargetPosition = Vector2.new(math.floor(vp.X / 2), math.floor(vp.Y / 2))
 
     -- ========================================================
-    -- A. SINGLE TARGET PIN MARKER (DRAGGABLE & ZERO GUI COLLISION)
+    -- A. SINGLE TARGET PIN MARKER (DRAGGABLE)
     -- ========================================================
     local pinSize = 46
     local targetPin = Instance.new("Frame")
@@ -498,8 +399,7 @@ function BeRebelGui:Create()
     targetPin.BackgroundColor3 = theme.Background
     targetPin.BackgroundTransparency = 0.35
     targetPin.BorderSizePixel = 0
-    targetPin.Active = false -- Anti BAC-2226 / BAC-3226: Pass-through klik
-    pcall(function() (targetPin :: any).Interactable = false end)
+    targetPin.Active = true
     targetPin.ZIndex = 50
     targetPin.Parent = screenGui
 
@@ -521,8 +421,6 @@ function BeRebelGui:Create()
     centerDot.Position = UDim2.new(0.5, 0, 0.5, 0)
     centerDot.BackgroundColor3 = theme.AccentGlow
     centerDot.BorderSizePixel = 0
-    centerDot.Active = false
-    pcall(function() (centerDot :: any).Interactable = false end)
     centerDot.ZIndex = 52
     centerDot.Parent = targetPin
 
@@ -538,8 +436,6 @@ function BeRebelGui:Create()
     pinLabel.TextColor3 = theme.Text
     pinLabel.TextSize = 13
     pinLabel.Font = Enum.Font.GothamBold
-    pinLabel.Active = false
-    pcall(function() (pinLabel :: any).Interactable = false end)
     pinLabel.ZIndex = 51
     pinLabel.Parent = targetPin
 
@@ -551,8 +447,6 @@ function BeRebelGui:Create()
     chH.BackgroundColor3 = theme.Accent
     chH.BackgroundTransparency = 0.5
     chH.BorderSizePixel = 0
-    chH.Active = false
-    pcall(function() (chH :: any).Interactable = false end)
     chH.ZIndex = 49
     chH.Parent = targetPin
 
@@ -563,67 +457,43 @@ function BeRebelGui:Create()
     chV.BackgroundColor3 = theme.Accent
     chV.BackgroundTransparency = 0.5
     chV.BorderSizePixel = 0
-    chV.Active = false
-    pcall(function() (chV :: any).Interactable = false end)
     chV.ZIndex = 49
     chV.Parent = targetPin
 
-    -- Hitbox Dragging Khusus (Aktif saat Standby, Nonaktif saat Running - Anti BAC-2226 & BAC-10221)
-    local pinHitbox = Instance.new("ImageButton")
-    pinHitbox.Name = "PinHitbox"
-    pinHitbox.Size = UDim2.new(0, 56, 0, 56)
-    pinHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
-    pinHitbox.Position = UDim2.new(0.5, 0, 0.5, 0)
-    pinHitbox.BackgroundTransparency = 1
-    pinHitbox.Active = not State.IsRunning
-    pcall(function() (pinHitbox :: any).Interactable = not State.IsRunning end)
-    pinHitbox.ZIndex = 55
-    pinHitbox.Parent = targetPin
-
-    -- Logika Dragging Target Pin Universal (Touch & Mouse Support)
+    -- Logika Dragging Target Pin (Touch & Mouse Support)
     local pinDragging = false
     local pinDragStart = Vector3.zero
-    local pinStartPos = Vector2.zero
+    local pinStartPos = UDim2.new()
 
-    local function startPinDrag(input: InputObject)
-        if State.IsRunning or not State.IsPinVisible then return end
-        pinDragging = true
-        pinDragStart = input.Position
-        pinStartPos = State.TargetPosition
-
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                pinDragging = false
-            end
-        end)
-    end
-
-    local connHitboxStart = pinHitbox.InputBegan:Connect(function(input)
+    targetPin.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            startPinDrag(input)
+            pinDragging = true
+            pinDragStart = input.Position
+            pinStartPos = targetPin.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    pinDragging = false
+                end
+            end)
         end
     end)
-    table.insert(self.Connections, connHitboxStart)
 
     local connDragPin = UserInputService.InputChanged:Connect(function(input)
-        if pinDragging and not State.IsRunning and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if pinDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - pinDragStart
-            local minX, maxX, minY, maxY = getSafeScreenBounds()
-            local newX = math.floor(math.clamp(pinStartPos.X + delta.X, minX, maxX))
-            local newY = math.floor(math.clamp(pinStartPos.Y + delta.Y, minY, maxY))
+            local newX = pinStartPos.X.Offset + delta.X
+            local newY = pinStartPos.Y.Offset + delta.Y
+            
+            local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+            newX = math.clamp(newX, pinSize / 2, camVp.X - (pinSize / 2))
+            newY = math.clamp(newY, pinSize / 2, camVp.Y - (pinSize / 2))
 
             targetPin.Position = UDim2.new(0, newX, 0, newY)
             State.TargetPosition = Vector2.new(newX, newY)
         end
     end)
     table.insert(self.Connections, connDragPin)
-
-    local connPinEnd = UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            pinDragging = false
-        end
-    end)
-    table.insert(self.Connections, connPinEnd)
 
     -- Visual Pulse Feedback
     ClickEngine.PulseCallback = function()
@@ -640,14 +510,9 @@ function BeRebelGui:Create()
 
     State:OnChange("IsRunning", function(running)
         if running then
-            pinHitbox.Active = false
-            pcall(function() (pinHitbox :: any).Interactable = false end)
-            pinDragging = false
             pinStroke.Color = theme.AccentGlow
             pinLabel.TextColor3 = theme.Success
         else
-            pinHitbox.Active = true
-            pcall(function() (pinHitbox :: any).Interactable = true end)
             pinStroke.Color = theme.Accent
             pinLabel.TextColor3 = theme.Text
         end
@@ -658,17 +523,14 @@ function BeRebelGui:Create()
     end)
 
     -- ========================================================
-    -- B. FLOATING CONTROLLER BAR (TOOLBAR MELAYANG MODERN)
+    -- B. FLOATING CONTROLLER BAR (TOOLBAR MELAYANG)
     -- ========================================================
-    local barWidth = 246
+    local barWidth = 200
     local barHeight = 42
     local floatBar = Instance.new("Frame")
     floatBar.Name = "FloatingControllerBar"
     floatBar.Size = UDim2.new(0, barWidth, 0, barHeight)
-    local camVp = getLiveViewportSize()
-    local minBx, maxBx, minBy, maxBy = getSafeScreenBounds()
-    local initialBarY = math.floor(math.clamp(camVp.Y * 0.5 - barHeight / 2, minBy, maxBy))
-    floatBar.Position = UDim2.new(0, 30, 0, initialBarY)
+    floatBar.Position = UDim2.new(0, 30, 0.5, -barHeight / 2)
     floatBar.BackgroundColor3 = theme.Background
     floatBar.BorderSizePixel = 0
     floatBar.Active = true
@@ -684,13 +546,16 @@ function BeRebelGui:Create()
     barStroke.Thickness = 1.4
     barStroke.Parent = floatBar
 
-    -- Drag Handle Bar (Grip Modern Bebas Tofu Box)
+    -- Drag Handle Bar (Grip ⋮⋮)
     local dragHandle = Instance.new("TextButton")
     dragHandle.Name = "DragHandle"
-    dragHandle.Size = UDim2.new(0, 20, 1, 0)
+    dragHandle.Size = UDim2.new(0, 22, 1, 0)
     dragHandle.Position = UDim2.new(0, 0, 0, 0)
     dragHandle.BackgroundColor3 = theme.Sidebar
-    dragHandle.Text = ""
+    dragHandle.Text = "⋮⋮"
+    dragHandle.TextColor3 = theme.TextSubtle
+    dragHandle.TextSize = 13
+    dragHandle.Font = Enum.Font.GothamBold
     dragHandle.AutoButtonColor = false
     dragHandle.ZIndex = 61
     dragHandle.Parent = floatBar
@@ -699,38 +564,13 @@ function BeRebelGui:Create()
     dhCorner.CornerRadius = UDim.new(0, 8)
     dhCorner.Parent = dragHandle
 
-    -- 2 Garis Grip Minimalis Elegan
-    local grip1 = Instance.new("Frame")
-    grip1.Size = UDim2.new(0, 2, 0, 16)
-    grip1.AnchorPoint = Vector2.new(0.5, 0.5)
-    grip1.Position = UDim2.new(0.38, 0, 0.5, 0)
-    grip1.BackgroundColor3 = Color3.fromRGB(110, 120, 140)
-    grip1.BorderSizePixel = 0
-    grip1.ZIndex = 62
-    grip1.Parent = dragHandle
-    local g1c = Instance.new("UICorner")
-    g1c.CornerRadius = UDim.new(1, 0)
-    g1c.Parent = grip1
-
-    local grip2 = Instance.new("Frame")
-    grip2.Size = UDim2.new(0, 2, 0, 16)
-    grip2.AnchorPoint = Vector2.new(0.5, 0.5)
-    grip2.Position = UDim2.new(0.68, 0, 0.5, 0)
-    grip2.BackgroundColor3 = Color3.fromRGB(110, 120, 140)
-    grip2.BorderSizePixel = 0
-    grip2.ZIndex = 62
-    grip2.Parent = dragHandle
-    local g2c = Instance.new("UICorner")
-    g2c.CornerRadius = UDim.new(1, 0)
-    g2c.Parent = grip2
-
     -- Dragging Logic Toolbar (Delta Touch Support)
     local barDragging = false
     local barDragStart = Vector3.zero
     local barStartPos = UDim2.new()
 
     local function setupBarDrag(targetElement: GuiObject)
-        local conn = targetElement.InputBegan:Connect(function(input)
+        targetElement.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 barDragging = true
                 barDragStart = input.Position
@@ -743,7 +583,6 @@ function BeRebelGui:Create()
                 end)
             end
         end)
-        table.insert(self.Connections, conn)
     end
 
     setupBarDrag(dragHandle)
@@ -754,27 +593,19 @@ function BeRebelGui:Create()
             local delta = input.Position - barDragStart
             local newX = barStartPos.X.Offset + delta.X
             local newY = barStartPos.Y.Offset + delta.Y
-            local vp = getLiveViewportSize()
-            local minBx, maxBx, minBy, maxBy = getSafeScreenBounds()
-            newX = math.clamp(newX, 10, math.max(10, vp.X - barWidth - 10))
-            newY = math.clamp(newY, minBy, math.max(minBy, vp.Y - barHeight - 10))
+            local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+            newX = math.clamp(newX, 10, camVp.X - barWidth - 10)
+            newY = math.clamp(newY, 10, camVp.Y - barHeight - 10)
 
-            floatBar.Position = UDim2.new(0, newX, 0, newY)
+            floatBar.Position = UDim2.new(barStartPos.X.Scale, newX, barStartPos.Y.Scale, newY)
         end
     end)
     table.insert(self.Connections, connDragBar)
 
-    local connBarEnd = UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            barDragging = false
-        end
-    end)
-    table.insert(self.Connections, connBarEnd)
-
-    -- Container Tombol Aksi (Dengan Spacing dan LayoutOrder Terjamin)
+    -- Container Tombol Aksi
     local btnContainer = Instance.new("Frame")
-    btnContainer.Size = UDim2.new(1, -26, 1, -10)
-    btnContainer.Position = UDim2.new(0, 23, 0, 5)
+    btnContainer.Size = UDim2.new(1, -26, 1, -8)
+    btnContainer.Position = UDim2.new(0, 24, 0, 4)
     btnContainer.BackgroundTransparency = 1
     btnContainer.ZIndex = 61
     btnContainer.Parent = floatBar
@@ -783,15 +614,13 @@ function BeRebelGui:Create()
     btnLayout.FillDirection = Enum.FillDirection.Horizontal
     btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
     btnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    btnLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    btnLayout.Padding = UDim.new(0, 6)
+    btnLayout.Padding = UDim.new(0, 5)
     btnLayout.Parent = btnContainer
 
-    -- 1. Tombol Play / Pause (▶ PLAY / ⏸ PAUSE)
+    -- 1. Tombol Play / Pause (▶ / ⏸)
     local playBtn = Instance.new("TextButton")
     playBtn.Name = "PlayButton"
-    playBtn.LayoutOrder = 1
-    playBtn.Size = UDim2.new(0, 76, 0, 32)
+    playBtn.Size = UDim2.new(0, 62, 0, 32)
     playBtn.BackgroundColor3 = theme.CardBg
     playBtn.Text = "▶ PLAY"
     playBtn.TextColor3 = theme.Success
@@ -810,10 +639,6 @@ function BeRebelGui:Create()
     playStroke.Parent = playBtn
 
     playBtn.MouseButton1Click:Connect(function()
-        if setModal and setModal.Visible then
-            setModal.Visible = false
-            State.IsSettingsOpen = false
-        end
         ClickEngine:Toggle()
     end)
 
@@ -833,47 +658,14 @@ function BeRebelGui:Create()
         end
     end)
 
-    -- 2. Tombol Toggle Visibility Pin (PIN ON / PIN OFF - Clean Text)
-    local eyeBtn = Instance.new("TextButton")
-    eyeBtn.Name = "EyeButton"
-    eyeBtn.LayoutOrder = 2
-    eyeBtn.Size = UDim2.new(0, 42, 0, 32)
-    eyeBtn.BackgroundColor3 = theme.CardBg
-    eyeBtn.Text = "PIN"
-    eyeBtn.TextColor3 = theme.Text
-    eyeBtn.TextSize = 11
-    eyeBtn.Font = Enum.Font.GothamBold
-    eyeBtn.ZIndex = 62
-    eyeBtn.Parent = btnContainer
-
-    local eyeCorner = Instance.new("UICorner")
-    eyeCorner.CornerRadius = UDim.new(0, 6)
-    eyeCorner.Parent = eyeBtn
-
-    local eyeStroke = Instance.new("UIStroke")
-    eyeStroke.Color = theme.Border
-    eyeStroke.Thickness = 1
-    eyeStroke.Parent = eyeBtn
-
-    eyeBtn.MouseButton1Click:Connect(function()
-        State:Set("IsPinVisible", not State.IsPinVisible)
-    end)
-
-    State:OnChange("IsPinVisible", function(visible)
-        eyeBtn.TextColor3 = visible and theme.Text or theme.TextSubtle
-        eyeBtn.BackgroundColor3 = visible and theme.CardBg or Color3.fromRGB(18, 20, 26)
-        eyeStroke.Color = visible and theme.Accent or theme.Border
-    end)
-
-    -- 3. Tombol Settings (SET - Clean Text)
+    -- 2. Tombol Settings (⚙)
     local setBtn = Instance.new("TextButton")
     setBtn.Name = "SettingsButton"
-    setBtn.LayoutOrder = 3
-    setBtn.Size = UDim2.new(0, 42, 0, 32)
+    setBtn.Size = UDim2.new(0, 32, 0, 32)
     setBtn.BackgroundColor3 = theme.CardBg
-    setBtn.Text = "SET"
+    setBtn.Text = "⚙"
     setBtn.TextColor3 = theme.Accent
-    setBtn.TextSize = 11
+    setBtn.TextSize = 14
     setBtn.Font = Enum.Font.GothamBold
     setBtn.ZIndex = 62
     setBtn.Parent = btnContainer
@@ -882,20 +674,39 @@ function BeRebelGui:Create()
     setCorner.CornerRadius = UDim.new(0, 6)
     setCorner.Parent = setBtn
 
-    local setStroke = Instance.new("UIStroke")
-    setStroke.Color = theme.Border
-    setStroke.Thickness = 1
-    setStroke.Parent = setBtn
+    -- 3. Tombol Toggle Visibility Pin (👁)
+    local eyeBtn = Instance.new("TextButton")
+    eyeBtn.Name = "EyeButton"
+    eyeBtn.Size = UDim2.new(0, 32, 0, 32)
+    eyeBtn.BackgroundColor3 = theme.CardBg
+    eyeBtn.Text = "👁"
+    eyeBtn.TextColor3 = theme.Text
+    eyeBtn.TextSize = 13
+    eyeBtn.Font = Enum.Font.GothamBold
+    eyeBtn.ZIndex = 62
+    eyeBtn.Parent = btnContainer
 
-    -- 4. Tombol Close (X - Huruf Latin Bebas Tofu)
+    local eyeCorner = Instance.new("UICorner")
+    eyeCorner.CornerRadius = UDim.new(0, 6)
+    eyeCorner.Parent = eyeBtn
+
+    eyeBtn.MouseButton1Click:Connect(function()
+        State:Set("IsPinVisible", not State.IsPinVisible)
+    end)
+
+    State:OnChange("IsPinVisible", function(visible)
+        eyeBtn.TextColor3 = visible and theme.Text or theme.TextSubtle
+        eyeBtn.BackgroundColor3 = visible and theme.CardBg or Color3.fromRGB(18, 20, 26)
+    end)
+
+    -- 4. Tombol Close (✕)
     local closeBtn = Instance.new("TextButton")
     closeBtn.Name = "CloseButton"
-    closeBtn.LayoutOrder = 4
     closeBtn.Size = UDim2.new(0, 32, 0, 32)
     closeBtn.BackgroundColor3 = theme.CardBg
-    closeBtn.Text = "X"
+    closeBtn.Text = "✕"
     closeBtn.TextColor3 = theme.Danger
-    closeBtn.TextSize = 13
+    closeBtn.TextSize = 12
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.ZIndex = 62
     closeBtn.Parent = btnContainer
@@ -903,11 +714,6 @@ function BeRebelGui:Create()
     local clsCorner = Instance.new("UICorner")
     clsCorner.CornerRadius = UDim.new(0, 6)
     clsCorner.Parent = closeBtn
-
-    local clsStroke = Instance.new("UIStroke")
-    clsStroke.Color = theme.Border
-    clsStroke.Thickness = 1
-    clsStroke.Parent = closeBtn
 
     closeBtn.MouseButton1Click:Connect(function()
         self:Destroy()
@@ -929,7 +735,7 @@ function BeRebelGui:Create()
     setModal.Parent = screenGui
 
     local function updateModalBounds()
-        local currentVp = getLiveViewportSize()
+        local currentVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
         local modalW = math.min(baseModalW, currentVp.X - 24)
         local modalH = math.min(baseModalH, currentVp.Y - 24)
         setModal.Size = UDim2.new(0, modalW, 0, modalH)
@@ -937,27 +743,8 @@ function BeRebelGui:Create()
     end
     updateModalBounds()
 
-    -- 🛡️ Anti BAC-3225 & Resilient Viewport Resize Hook:
-    -- Gunakan ScreenGui.AbsoluteSize sebagai basis utama (100% tahan respawn, tanpa menyentuh Camera instance langsung)
-    local connAbsSize = screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateModalBounds)
-    table.insert(self.Connections, connAbsSize)
-
-    local function hookCamViewport()
-        local cam = getLiveCamera()
-        if cam then
-            pcall(function()
-                local cConn = cam:GetPropertyChangedSignal("ViewportSize"):Connect(updateModalBounds)
-                table.insert(self.Connections, cConn)
-            end)
-        end
-    end
-    hookCamViewport()
-
-    local connCamChange = Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-        updateModalBounds()
-        hookCamViewport()
-    end)
-    table.insert(self.Connections, connCamChange)
+    local connVp = CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateModalBounds)
+    table.insert(self.Connections, connVp)
 
     local smCorner = Instance.new("UICorner")
     smCorner.CornerRadius = UDim.new(0, 10)
@@ -1016,7 +803,7 @@ function BeRebelGui:Create()
     mCloseBtn.Size = UDim2.new(0, 28, 0, 28)
     mCloseBtn.Position = UDim2.new(1, -36, 0, 9)
     mCloseBtn.BackgroundColor3 = theme.CardBg
-    mCloseBtn.Text = "X"
+    mCloseBtn.Text = "✕"
     mCloseBtn.TextColor3 = theme.TextSubtle
     mCloseBtn.TextSize = 12
     mCloseBtn.Font = Enum.Font.GothamBold
@@ -1036,9 +823,6 @@ function BeRebelGui:Create()
         State.IsSettingsOpen = not State.IsSettingsOpen
         updateModalBounds()
         setModal.Visible = State.IsSettingsOpen
-        if State.IsSettingsOpen and State.IsRunning then
-            ClickEngine:Stop()
-        end
     end)
 
     -- Modal Scroll Content
