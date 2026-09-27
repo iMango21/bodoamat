@@ -510,9 +510,13 @@ function BeRebelGui:Create()
 
     State:OnChange("IsRunning", function(running)
         if running then
+            targetPin.Active = false
+            pcall(function() (targetPin :: any).Interactable = false end)
             pinStroke.Color = theme.AccentGlow
             pinLabel.TextColor3 = theme.Success
         else
+            targetPin.Active = true
+            pcall(function() (targetPin :: any).Interactable = true end)
             pinStroke.Color = theme.Accent
             pinLabel.TextColor3 = theme.Text
         end
@@ -530,7 +534,9 @@ function BeRebelGui:Create()
     local floatBar = Instance.new("Frame")
     floatBar.Name = "FloatingControllerBar"
     floatBar.Size = UDim2.new(0, barWidth, 0, barHeight)
-    floatBar.Position = UDim2.new(0, 30, 0.5, -barHeight / 2)
+    local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+    local initialBarY = math.floor(math.max(10, camVp.Y * 0.5 - barHeight / 2))
+    floatBar.Position = UDim2.new(0, 30, 0, initialBarY)
     floatBar.BackgroundColor3 = theme.Background
     floatBar.BorderSizePixel = 0
     floatBar.Active = true
@@ -570,7 +576,7 @@ function BeRebelGui:Create()
     local barStartPos = UDim2.new()
 
     local function setupBarDrag(targetElement: GuiObject)
-        targetElement.InputBegan:Connect(function(input)
+        local conn = targetElement.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 barDragging = true
                 barDragStart = input.Position
@@ -583,6 +589,7 @@ function BeRebelGui:Create()
                 end)
             end
         end)
+        table.insert(self.Connections, conn)
     end
 
     setupBarDrag(dragHandle)
@@ -593,14 +600,21 @@ function BeRebelGui:Create()
             local delta = input.Position - barDragStart
             local newX = barStartPos.X.Offset + delta.X
             local newY = barStartPos.Y.Offset + delta.Y
-            local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-            newX = math.clamp(newX, 10, camVp.X - barWidth - 10)
-            newY = math.clamp(newY, 10, camVp.Y - barHeight - 10)
+            local vp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+            newX = math.clamp(newX, 10, math.max(10, vp.X - barWidth - 10))
+            newY = math.clamp(newY, 10, math.max(10, vp.Y - barHeight - 10))
 
-            floatBar.Position = UDim2.new(barStartPos.X.Scale, newX, barStartPos.Y.Scale, newY)
+            floatBar.Position = UDim2.new(0, newX, 0, newY)
         end
     end)
     table.insert(self.Connections, connDragBar)
+
+    local connBarEnd = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            barDragging = false
+        end
+    end)
+    table.insert(self.Connections, connBarEnd)
 
     -- Container Tombol Aksi
     local btnContainer = Instance.new("Frame")
