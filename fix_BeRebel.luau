@@ -207,20 +207,30 @@ local ClickEngine = {
 
 -- Eksekusi 1 Ketukan (Tap / Mouse Click) pada Koordinat (X, Y)
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
-    local holdSec = math.max(0.005, holdDurationMs / 1000)
+    -- 🛡️ Anti BAC-10229: Human touch duration (45ms - 85ms) menyerupai sentuhan jari nyata
+    local holdSec = math.clamp(holdDurationMs / 1000, 0.045, 0.085)
     local success = false
     local intX = math.floor(x)
     local intY = math.floor(y)
 
-    -- METODE 1: VirtualInputManager (Resmi Roblox Engine, Sinkronisasi MouseMove untuk Anti BAC-92210)
+    -- METODE 1: VirtualInputManager (Multi-Tier Native C++ Dispatcher, Zero Synthetic MouseMove)
     if VirtualInputManager then
+        -- Tier 1: Standar C++ Engine DataModel Bridge (game, clickCount=0)
         local ok = pcall(function()
-            -- 🛡️ Anti BAC-92210: Sinkronisasi posisi pointer kursor sebelum menekan tombol (koordinat integer)
-            VirtualInputManager:SendMouseMoveEvent(intX, intY, game)
             VirtualInputManager:SendMouseButtonEvent(intX, intY, 0, true, game, 0)
             task.wait(holdSec)
             VirtualInputManager:SendMouseButtonEvent(intX, intY, 0, false, game, 0)
         end)
+
+        -- Tier 2: Workspace Fallback (Anti Target Signature Mismatch)
+        if not ok then
+            ok = pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(intX, intY, 0, true, workspace, 0)
+                task.wait(holdSec)
+                VirtualInputManager:SendMouseButtonEvent(intX, intY, 0, false, workspace, 0)
+            end)
+        end
+
         if ok then success = true end
     end
 
@@ -257,6 +267,13 @@ end
 -- Mulai Loop Auto Clicker dengan BAC-8223 Stealth Protection
 function ClickEngine:Start()
     if State.IsRunning then return end
+
+    -- 🛡️ ATURAN ANTI BAC-10221 / BAC-7221: Jika menu pengaturan sedang terbuka, tutup otomatis sebelum mulai klik
+    if BeRebelGui and BeRebelGui.SettingsModal and BeRebelGui.SettingsModal.Visible then
+        BeRebelGui.SettingsModal.Visible = false
+        State.IsSettingsOpen = false
+    end
+
     State:Set("IsRunning", true)
     State:Set("LastStatus", "Aktif (Running)")
 
@@ -368,6 +385,7 @@ end
 local BeRebelGui = {
     ScreenGui = nil :: ScreenGui?,
     TargetPin = nil :: Frame?,
+    SettingsModal = nil :: Frame?,
     StatusThread = nil :: thread?,
     Connections = {} :: { any },
 }
@@ -760,6 +778,7 @@ function BeRebelGui:Create()
     setModal.Active = true
     setModal.ZIndex = 100
     setModal.Parent = screenGui
+    self.SettingsModal = setModal
 
     local function updateModalBounds()
         local currentVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
@@ -847,6 +866,9 @@ function BeRebelGui:Create()
     end)
 
     setBtn.MouseButton1Click:Connect(function()
+        if State.IsRunning then
+            ClickEngine:Stop() -- 🛡️ Auto-Pause: Buka menu -> Auto Clicker Pause (Anti BAC-10221 / BAC-7221)
+        end
         State.IsSettingsOpen = not State.IsSettingsOpen
         updateModalBounds()
         setModal.Visible = State.IsSettingsOpen
