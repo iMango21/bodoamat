@@ -195,16 +195,17 @@ local ClickEngine = {
 function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number): boolean
     local holdSec = math.max(0.005, holdDurationMs / 1000)
     local success = false
+    local intX = math.floor(x)
+    local intY = math.floor(y)
 
     -- METODE 1: VirtualInputManager (Resmi Roblox Engine, Sinkronisasi MouseMove untuk Anti BAC-92210)
     if VirtualInputManager then
         local ok = pcall(function()
-            -- 🛡️ Anti BAC-92210: Sinkronisasi posisi pointer kursor sebelum menekan tombol
-            VirtualInputManager:SendMouseMoveEvent(x, y, game)
-            task.wait(0.002)
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            -- 🛡️ Anti BAC-92210: Sinkronisasi posisi pointer kursor sebelum menekan tombol (koordinat integer)
+            VirtualInputManager:SendMouseMoveEvent(intX, intY, game)
+            VirtualInputManager:SendMouseButtonEvent(intX, intY, 0, true, game, 0)
             task.wait(holdSec)
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(intX, intY, 0, false, game, 0)
         end)
         if ok then success = true end
     end
@@ -218,7 +219,7 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
 
         if mouse1press and mouse1release then
             pcall(function()
-                if mousemoveabs then mousemoveabs(x, y) end
+                if mousemoveabs then mousemoveabs(intX, intY) end
                 mouse1press()
                 task.wait(holdSec)
                 mouse1release()
@@ -226,7 +227,7 @@ function ClickEngine:ExecuteClick(x: number, y: number, holdDurationMs: number):
             success = true
         elseif mouse1click then
             pcall(function()
-                if mousemoveabs then mousemoveabs(x, y) end
+                if mousemoveabs then mousemoveabs(intX, intY) end
                 mouse1click()
             end)
             success = true
@@ -349,29 +350,42 @@ end
 -- ====================================================================
 local BeRebelGui = {
     ScreenGui = nil :: ScreenGui?,
+    TargetPin = nil :: Frame?,
+    StatusThread = nil :: thread?,
     Connections = {} :: { any },
 }
 
 function BeRebelGui:Create()
-    -- 1. Bersihkan sisa GUI lama dari container jika ada
+    -- 1. Bersihkan sisa GUI lama dari container jika ada (Anti Memory Leak & Anti Signature)
     pcall(function()
+        if genv.__RB_ACTIVE_GUI and typeof(genv.__RB_ACTIVE_GUI) == "Instance" then
+            genv.__RB_ACTIVE_GUI:Destroy()
+            genv.__RB_ACTIVE_GUI = nil
+        end
         local container = getSafeGuiContainer()
         if container then
-            local oldHud = container:FindFirstChild("FishItHUD")
-            if oldHud then oldHud:Destroy() end
+            for _, child in ipairs(container:GetChildren()) do
+                if child:IsA("ScreenGui") and (child.Name == "FishItHUD" or child.Name:sub(1, 4) == "HUD_") then
+                    child:Destroy()
+                end
+            end
         end
         local pg = LocalPlayer:FindFirstChild("PlayerGui")
         if pg then
-            local oldHud = pg:FindFirstChild("FishItHUD")
-            if oldHud then oldHud:Destroy() end
+            for _, child in ipairs(pg:GetChildren()) do
+                if child:IsA("ScreenGui") and (child.Name == "FishItHUD" or child.Name:sub(1, 4) == "HUD_") then
+                    child:Destroy()
+                end
+            end
         end
     end)
 
-    -- 2. Buat ScreenGui Utama dengan Stealth Container
+    -- 2. Buat ScreenGui Utama dengan Stealth Container & Sanitized Dynamic Name (Anti BAC-7226 / Error 267)
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "FishItHUD"
+    screenGui.Name = "HUD_" .. HttpService:GenerateGUID(false):gsub("-", ""):sub(1, 8)
     screenGui.ResetOnSpawn = false
-    screenGui.DisplayOrder = 100000
+    screenGui.IgnoreGuiInset = true -- 🎯 Presisi 1:1 antara koordinat UI dan VirtualInputManager
+    screenGui.DisplayOrder = 100 -- Normalisasi DisplayOrder standar yang aman
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
     -- Proteksi syn.protect_gui jika didukung executor
@@ -382,6 +396,7 @@ function BeRebelGui:Create()
 
     screenGui.Parent = getSafeGuiContainer()
     self.ScreenGui = screenGui
+    genv.__RB_ACTIVE_GUI = screenGui
 
     local theme = Config.UI.Theme
     local vp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
@@ -509,6 +524,7 @@ function BeRebelGui:Create()
     end
 
     State:OnChange("IsRunning", function(running)
+        targetPin.Active = not running -- 🛡️ Zero-Interference: Nonaktifkan blocking saat running agar klik tembus langsung ke elemen game!
         if running then
             pinStroke.Color = theme.AccentGlow
             pinLabel.TextColor3 = theme.Success
@@ -1063,8 +1079,8 @@ function BeRebelGui:Create()
     statText.Parent = statBox
 
     -- Live Status Updater Loop
-    task.spawn(function()
-        while screenGui.Parent do
+    self.StatusThread = task.spawn(function()
+        while self.ScreenGui and self.ScreenGui.Parent do
             local elapsed = State:GetElapsedTime()
             local statusColor = State.IsRunning and "#2ecc71" or "#f1c40f"
             local pos = State.TargetPosition
@@ -1098,6 +1114,11 @@ end
 function BeRebelGui:Destroy()
     ClickEngine:Stop()
 
+    if self.StatusThread then
+        task.cancel(self.StatusThread)
+        self.StatusThread = nil
+    end
+
     for _, conn in ipairs(self.Connections) do
         pcall(function() conn:Disconnect() end)
     end
@@ -1108,6 +1129,7 @@ function BeRebelGui:Destroy()
         self.ScreenGui = nil
     end
 
+    genv.__RB_ACTIVE_GUI = nil
     genv.__RB_SESSION_ACTIVE = nil
     genv.__RB_SESSION_CLEANUP = nil
 end
