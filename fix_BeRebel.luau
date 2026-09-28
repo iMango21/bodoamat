@@ -49,6 +49,7 @@ genv.__RB_SESSION_ACTIVE = true
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 
@@ -57,6 +58,20 @@ local VirtualInputManager = pcall(function() return game:GetService("VirtualInpu
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local CurrentCamera = Workspace.CurrentCamera or Workspace:WaitForChild("Camera")
+
+-- 🛡️ Anti BAC-6225: Resolver Batas Layar Aman di Bawah Topbar Roblox
+local function getSafeScreenBounds(): (number, number, number, number)
+    local vp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
+    local topInset = Vector2.zero
+    pcall(function()
+        topInset = GuiService:GetGuiInset()
+    end)
+    local minY = math.max(70, topInset.Y + 25) -- Lindungi area Topbar & Status Bar (Y < 65px)
+    local minX = 25
+    local maxX = math.max(minX + 50, vp.X - 25)
+    local maxY = math.max(minY + 50, vp.Y - 25)
+    return minX, maxX, minY, maxY
+end
 
 -- ====================================================================
 -- KONFIGURASI DEFAULT & TEMA (LUA REBEL DARK-GLASSMORPHISM)
@@ -257,18 +272,21 @@ function ClickEngine:Start()
             local currentInterval = State.IntervalMs
             local currentHold = State.HoldDurationMs
 
-            -- 🛡️ 1. BAC-8223 GAUSSIAN HUMAN JITTER (Zero-Pattern Protection)
+            -- 🛡️ 1. BAC-8223 GAUSSIAN HUMAN JITTER (Zero-Pattern Protection) & BAC-6225 Safe Bounds
+            local minBoundX, maxBoundX, minBoundY, maxBoundY = getSafeScreenBounds()
             if State.IsHumanize then
                 local offsetX = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetY = math.random(-Config.Clicker.JitterPx, Config.Clicker.JitterPx)
                 local offsetMs = math.random(-Config.Clicker.JitterMs, Config.Clicker.JitterMs)
                 local holdOffsetMs = math.random(-6, 8)
                 
-                local camSize = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-                targetX = math.clamp(targetX + offsetX, 10, camSize.X - 10)
-                targetY = math.clamp(targetY + offsetY, 10, camSize.Y - 10)
+                targetX = math.clamp(targetX + offsetX, minBoundX, maxBoundX)
+                targetY = math.clamp(targetY + offsetY, minBoundY, maxBoundY)
                 currentInterval = math.max(65, currentInterval + offsetMs)
                 currentHold = math.clamp(currentHold + holdOffsetMs, 8, 38)
+            else
+                targetX = math.clamp(targetX, minBoundX, maxBoundX)
+                targetY = math.clamp(targetY, minBoundY, maxBoundY)
             end
 
             -- Visual Pulse Feedback pada Target Pin
@@ -380,20 +398,17 @@ function BeRebelGui:Create()
         end
     end)
 
-    -- 2. Buat ScreenGui Utama dengan Stealth Container & Sanitized Dynamic Name (Anti BAC-7226 / Error 267)
+    -- 2. Buat ScreenGui Utama dengan Stealth Container (Zero CoreGui Touch & Anti BAC-6228)
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "HUD_" .. HttpService:GenerateGUID(false):gsub("-", ""):sub(1, 8)
+    screenGui.Name = "RobloxGuiAppLayer"
     screenGui.ResetOnSpawn = false
     screenGui.IgnoreGuiInset = true -- 🎯 Presisi 1:1 antara koordinat UI dan VirtualInputManager
-    screenGui.DisplayOrder = 100 -- Normalisasi DisplayOrder standar yang aman
+    screenGui.DisplayOrder = 10 -- Nilai standar wajar (Anti BAC-5228 Extreme DisplayOrder Overlay Flag)
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    -- Proteksi syn.protect_gui jika didukung executor
-    local synProtect = (syn and syn.protect_gui) or (genv and genv.syn and genv.syn.protect_gui) or protectgui
-    if synProtect then
-        pcall(synProtect, screenGui)
-    end
-
+    -- 🛡️ Anti BAC-6228: JANGAN PERNAH panggil syn.protect_gui atau protectgui!
+    -- protectgui memindahkan/memetakan ScreenGui ke CoreGui, yang langsung memicu tripwire scanner BAC-6228.
+    -- Container getSafeGuiContainer() menggunakan gethui() yang sudah 100% terisolasi tanpa menyentuh CoreGui.
     screenGui.Parent = getSafeGuiContainer()
     self.ScreenGui = screenGui
     genv.__RB_ACTIVE_GUI = screenGui
@@ -497,12 +512,9 @@ function BeRebelGui:Create()
     local connDragPin = UserInputService.InputChanged:Connect(function(input)
         if pinDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - pinDragStart
-            local newX = pinStartPos.X.Offset + delta.X
-            local newY = pinStartPos.Y.Offset + delta.Y
-            
-            local camVp = (CurrentCamera and CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
-            newX = math.clamp(newX, pinSize / 2, camVp.X - (pinSize / 2))
-            newY = math.clamp(newY, pinSize / 2, camVp.Y - (pinSize / 2))
+            local minBoundX, maxBoundX, minBoundY, maxBoundY = getSafeScreenBounds()
+            newX = math.clamp(newX, minBoundX, maxBoundX)
+            newY = math.clamp(newY, minBoundY, maxBoundY)
 
             targetPin.Position = UDim2.new(0, newX, 0, newY)
             State.TargetPosition = Vector2.new(newX, newY)
