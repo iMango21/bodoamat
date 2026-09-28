@@ -10,14 +10,13 @@
     ║       Design Language & Architecture by LuaRebel                  ║
     ╚═══════════════════════════════════════════════════════════════════╝
 
-    [ CARA EKSEKUSI GITHUB (LOADSTRING) ]:
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/BeRebel.luau"))()
+    [ CARA EKSEKUSI GITHUB (LOADSTRING ANTI-CACHE) ]:
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/iMango21/bodoamat/main/fix_BeRebel.luau?t=" .. tostring(os.time())))()
 
     [ FITUR UTAMA v2.2 - PURE STEALTH TAP ASSISTANT ]:
-    1. 🛡️ BAC-7226 Keyword Sanitation: Menghilangkan semua kata kunci sensitif dari UI
-       sehingga kebal dari string memory / OCR scanning anti-cheat.
-    2. 🛡️ BAC-1228 Stealth GUI Shield: Wadah gethui() terisolasi & protectgui.
-    3. 🛡️ 100% Pure Simulated Hardware Clicker: Murni menekan koordinat layar visual (X, Y).
+    1. 🛡️ BAC-7226 Keyword Sanitation: Menghilangkan semua kata kunci sensitif dari UI.
+    2. 🛡️ BAC-6228 / BAC-1228 Stealth GUI Shield: Wadah gethui() 100% terisolasi (Zero CoreGui).
+    3. 🛡️ 100% Pure Screen Input Simulation: Murni menekan koordinat layar visual (X, Y).
     4. ⏱️ Default Interval 1 Detik (1000ms): Pengaturan fleksibel murni via TextBox.
     5. 🎯 Single Target Pin (Draggable): Lingkaran target presisi dengan crosshair & center dot.
     6. 🎛️ Floating Control Bar: Toolbar melayang di sisi layar dengan handle drag, Play/Pause.
